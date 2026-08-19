@@ -12,11 +12,13 @@ def show():
         st.warning("Elenco não carregado.")
         return
 
-    jogador = st.selectbox("Jogador", df['nome_completo'].tolist())
-    tipo = st.selectbox("Tipo", ["Mapa de Calor", "Finalizações", "Passes"])
+    jogador = st.selectbox("Jogador", df['nome_completo'].tolist(), key="sb_jogador_vis")
+    tipo = st.selectbox("Tipo", ["Mapa de Calor", "Finalizações", "Passes"], key="sb_tipo_vis")
 
-    # key adicionada para resolver o erro StreamlitDuplicateElementId
-    if st.button("Gerar", use_container_width=True, key="btn_gerar_visualizacao"):
+    # Gera uma key única dinâmica combinando as seleções atuais
+    chave_botao = f"btn_gerar_{jogador}_{tipo}".lower().replace(" ", "_")
+
+    if st.button("Gerar", use_container_width=True, key=chave_botao):
         np.random.seed(42)
         x = np.random.uniform(0, 120, 30)
         y = np.random.uniform(0, 80, 30)

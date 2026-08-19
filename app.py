@@ -663,7 +663,7 @@ with tabs[7]:
         import pages.relatorios as relatorios
         relatorios.show()
     except ImportError as e:
-        st.error(f"Erro ao carregar página de relatórios: {e}")
+        st.error(f"Erro ao carregar página de relatorios: {e}")
 
 # ----------------------------------------------------------------------
 # ABA 9: EXPORTAR
