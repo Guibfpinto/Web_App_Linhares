@@ -1717,3 +1717,50 @@ def obter_historico_clubes(jogador_row):
     if pd.isna(historico) or not historico:
         return "Nenhum histórico de clubes registrado."
     return str(historico).strip()
+
+# =============================================
+# FORMATAÇÃO DE CARTÕES (NOVA FUNÇÃO)
+# =============================================
+def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
+    """
+    Retorna uma string formatada com os cartões de um jogador ou de todos.
+    Parâmetros:
+        cartoes: dicionário retornado por carregar_cartoes_json()[0]
+        nome_jogador: nome canônico do jogador. Se None, retorna resumo geral.
+    """
+    if not cartoes:
+        return "Nenhum dado de cartões disponível."
+
+    if nome_jogador:
+        dados = cartoes.get(nome_jogador)
+        if not dados:
+            return f"Jogador '{nome_jogador}' não encontrado."
+
+        amarelos = dados.get('amarelos', 0)
+        vermelho = "Sim" if dados.get('vermelho', False) else "Não"
+        suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
+        historico = dados.get('historico', [])
+
+        linhas = [f"📋 **Cartões de {nome_jogador}**"]
+        linhas.append(f"  🟨 Amarelos acumulados: {amarelos}")
+        linhas.append(f"  🟥 Vermelho direto: {vermelho}")
+        linhas.append(f"  ⚠️ Suspenso para o próximo jogo: {suspenso}")
+
+        if historico:
+            linhas.append("\n  **Histórico (últimos eventos):**")
+            for ev in historico[-5:]:  # últimos 5
+                data = ev.get('data', 'data desconhecida')
+                adv = ev.get('adversario', 'adversário')
+                cor = ev.get('cor', '')
+                emoji = "🟨" if cor == "amarelo" else "🟥"
+                linhas.append(f"    {emoji} {data} vs {adv} - {cor}")
+        return "\n".join(linhas)
+
+    else:
+        linhas = ["📊 **RESUMO DE CARTÕES DE TODOS OS JOGADORES**", ""]
+        for jog, dados in sorted(cartoes.items()):
+            amarelos = dados.get('amarelos', 0)
+            vermelho = "🔴" if dados.get('vermelho', False) else ""
+            suspenso = "⚠️" if dados.get('suspenso_proxima', False) else ""
+            linhas.append(f"  {jog}: {amarelos} 🟨 {vermelho} {suspenso}".strip())
+        return "\n".join(linhas)
