@@ -12,7 +12,7 @@ from mplsoccer import Pitch, VerticalPitch
 import sqlite3
 
 # ======================================================================
-# IMPORTAÇÕES DO UTILS (para Análise e Comissão)
+# IMPORTAÇÕES DO UTILS
 # ======================================================================
 from utils import (
     carregar_elenco_profissional,
@@ -67,14 +67,29 @@ from utils import (
 )
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL
+# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
+# CSS para mudar a cor do texto de mensagens para preto
+st.markdown("""
+<style>
+    /* Deixa o texto das mensagens (error, warning, success, info) em preto */
+    div[data-testid="stAlert"] {
+        color: black !important;
+    }
+    /* Para garantir que o texto dentro da caixa também fique preto */
+    div[data-testid="stAlert"] .stAlert {
+        color: black !important;
+    }
+    /* Ajuste opcional para o texto de outros elementos */
+    .stAlert {
+        color: black !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def set_background(image_path):
-    """
-    Aplica uma imagem de fundo (se existir) ou um gradiente suave como fallback.
-    """
     if os.path.exists(image_path):
         with open(image_path, "rb") as f:
             img_base64 = base64.b64encode(f.read()).decode()

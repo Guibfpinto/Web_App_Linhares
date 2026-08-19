@@ -1719,14 +1719,11 @@ def obter_historico_clubes(jogador_row):
     return str(historico).strip()
 
 # =============================================
-# FORMATAÇÃO DE CARTÕES (NOVA FUNÇÃO)
+# FORMATAÇÃO DE CARTÕES
 # =============================================
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
     """
     Retorna uma string formatada com os cartões de um jogador ou de todos.
-    Parâmetros:
-        cartoes: dicionário retornado por carregar_cartoes_json()[0]
-        nome_jogador: nome canônico do jogador. Se None, retorna resumo geral.
     """
     if not cartoes:
         return "Nenhum dado de cartões disponível."
@@ -1748,7 +1745,7 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
 
         if historico:
             linhas.append("\n  **Histórico (últimos eventos):**")
-            for ev in historico[-5:]:  # últimos 5
+            for ev in historico[-5:]:
                 data = ev.get('data', 'data desconhecida')
                 adv = ev.get('adversario', 'adversário')
                 cor = ev.get('cor', '')
@@ -1764,3 +1761,40 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             suspenso = "⚠️" if dados.get('suspenso_proxima', False) else ""
             linhas.append(f"  {jog}: {amarelos} 🟨 {vermelho} {suspenso}".strip())
         return "\n".join(linhas)
+
+# =============================================
+# STUBS PARA FUNÇÕES USADAS EM PÁGINAS
+# =============================================
+
+def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
+    """
+    Exporta a escalação para um arquivo Excel.
+    (Implementação mínima para evitar erro de importação.)
+    """
+    try:
+        df.to_excel(nome_arquivo, index=False, engine='openpyxl')
+        return True
+    except Exception as e:
+        print(f"Erro ao exportar escalação: {e}")
+        return False
+
+def inicializar_cartoes_comissao(categoria, df_comissao):
+    """
+    Inicializa o sistema de cartões para a comissão técnica.
+    (Stub – substitua pela lógica real se necessário.)
+    """
+    # Retorna um dicionário vazio para simular cartões
+    return {}, []
+
+def gerar_relatorio_diretoria(df, categoria):
+    """
+    Gera um relatório para a diretoria.
+    (Stub – substitua pela lógica real se necessário.)
+    """
+    if df is None or df.empty:
+        return f"Sem dados para gerar relatório da diretoria – {categoria}"
+    texto = f"RELATÓRIO PARA DIRETORIA – {categoria}\n"
+    texto += f"Total de membros: {len(df)}\n"
+    if 'nome' in df.columns:
+        texto += f"Principais: {', '.join(df['nome'].head(5).tolist())}\n"
+    return texto
