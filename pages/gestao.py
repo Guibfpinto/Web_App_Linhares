@@ -2,7 +2,11 @@
 import os
 import pandas as pd
 import streamlit as st
+import sqlite3
 from utils import carregar_elenco_profissional
+
+# Conexão com o banco de dados SQLite
+conn = sqlite3.connect('dados/database.db')
 
 # Arquivos CSV salvos na pasta dados/
 ARQUIVO_TREINOS = 'dados/treinos.csv'
@@ -139,9 +143,49 @@ def show():
     # 5. JOGOS
     with tabs[4]:
         st.subheader("Jogos")
-        cols_j = ['data', 'adversario', 'mando', 'placar', 'competicao']
-        df_j = carregar_dados_csv(ARQUIVO_JOGOS, cols_j)
-        st.dataframe(df_j, use_container_width=True)
+        
+        query_jogos = """
+        SELECT 
+            j.id AS Jogo_ID,
+            datetime(j.data_hora, '-3 hours') AS Data_Hora,
+            tc.nome AS Mandante,
+            tc.logo_url AS Escudo_Mandante,
+            j.gols_casa AS Gols_Casa,
+            j.gols_fora AS Gols_Fora,
+            tf.nome AS Visitante,
+            tf.logo_url AS Escudo_Visitante,
+            v.nome AS Estadio,
+            v.cidade AS Cidade,
+            v.endereco AS Endereco,
+            v.imagem AS Foto_Estadio
+        FROM jogos j
+        JOIN times tc ON j.time_casa_id = tc.id
+        JOIN times tf ON j.time_fora_id = tf.id
+        LEFT JOIN venues v ON tc.venue_id = v.id
+        """
+        
+        df_jogos = pd.read_sql_query(query_jogos, conn)
+
+        # Renderização visual dos jogos
+        for idx, row in df_jogos.iterrows():
+            with st.container():
+                col1, col2, col3 = st.columns([1, 3, 2])
+                
+                with col1:
+                    st.caption(f"📅 {row['Data_Hora']}")
+                    st.markdown(f"**{row['Mandante']}** {row['Gols_Casa']} x {row['Gols_Fora']} **{row['Visitante']}**")
+                
+                with col2:
+                    st.write(f"🏟️ **{row['Estadio']}** ({row['Cidade']})")
+                    st.caption(f"📍 {row['Endereco']}")
+                
+                with col3:
+                    if row['Foto_Estadio']:
+                        try:
+                            st.image(row['Foto_Estadio'], width=150)
+                        except:
+                            st.write("Sem foto do estádio")
+            st.divider()
 
     # 6. GPS
     with tabs[5]:
