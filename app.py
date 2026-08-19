@@ -72,6 +72,9 @@ from utils import (
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
 def set_background(image_path):
+    """
+    Aplica uma imagem de fundo (se existir) ou um gradiente suave como fallback.
+    """
     if os.path.exists(image_path):
         with open(image_path, "rb") as f:
             img_base64 = base64.b64encode(f.read()).decode()
@@ -92,7 +95,19 @@ def set_background(image_path):
         """
         st.markdown(bg_css, unsafe_allow_html=True)
     else:
-        st.warning("Imagem de fundo não encontrada.")
+        # Fallback: gradiente suave (sem aviso)
+        bg_css = """
+        <style>
+        [data-testid="stAppViewContainer"] {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
+            background-attachment: fixed;
+        }
+        [data-testid="stHeader"] { background: rgba(0,0,0,0); }
+        .stApp { background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }
+        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.8); }
+        </style>
+        """
+        st.markdown(bg_css, unsafe_allow_html=True)
 
 bg_image = os.path.join(DATA_DIR, "background.png")
 set_background(bg_image)
