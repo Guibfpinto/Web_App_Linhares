@@ -8,10 +8,17 @@ import unicodedata
 import json
 import sqlite3
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 import openpyxl
-from openpyxl.styles import Font
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 from io import BytesIO
+import reportlab
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
@@ -45,7 +52,7 @@ CAMINHO_CARTOES_COMISSAO_SUB20 = "cartoes_acumulados_comissao_sub20.json"
 CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
 
 # =============================================
-# MAPEAMENTO DE NOMES (copie o seu)
+# MAPEAMENTO DE NOMES (JOGADORES E COMISSÃO)
 # =============================================
 MAPEAMENTO_NOMES_PROFISSIONAL = {
     'Wenderson Silva Neves': 'Wendy',
@@ -110,7 +117,7 @@ MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL = {}
 MAPEAMENTO_NOMES_COMISSAO_SUB20 = {}
 
 # =============================================
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES BÁSICAS
 # =============================================
 def calcular_idade(data_nasc_str, data_referencia=None):
     if pd.isna(data_nasc_str) or not data_nasc_str:
@@ -192,7 +199,6 @@ def extrair_id_jogo(caminho_arquivo):
     return None
 
 def extrair_data_jogo(caminho_arquivo):
-    """Extrai data do nome do arquivo ou retorna None."""
     match = re.search(r'(\d{4}-\d{2}-\d{2})', caminho_arquivo)
     if match:
         try:
@@ -202,7 +208,7 @@ def extrair_data_jogo(caminho_arquivo):
     return None
 
 # =============================================
-# CLASSIFICAÇÕES
+# CLASSIFICAÇÕES (IMC, GORDURA, ESTADO FÍSICO)
 # =============================================
 def classif_imc(imc):
     if pd.isna(imc): return "Indefinido"
@@ -234,7 +240,7 @@ def estado_fisico(imc_class, gor_class):
     return "Regular"
 
 # =============================================
-# INICIALIZAÇÃO DO BANCO DE DADOS (SQLite)
+# INICIALIZAÇÃO DO BANCO SQLITE
 # =============================================
 def inicializar_banco():
     """Cria todas as tabelas necessárias se não existirem."""
@@ -473,13 +479,6 @@ def carregar_comissao() -> pd.DataFrame:
         else:
             df['idade'] = np.nan
         df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
-        # Adiciona colunas de staff se existirem no CSV
-        staff_cols = [col for col in df.columns if col.startswith('staff_')]
-        if not staff_cols:
-            # Cria colunas vazias para evitar erros
-            for col in ['staff_lideranca', 'staff_motivacao', 'staff_tatica']:
-                if col not in df.columns:
-                    df[col] = np.nan
         return df
     except Exception as e:
         st.error(f"Erro ao carregar comissão: {e}")
@@ -517,11 +516,6 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
 # EXIBIR FOTO
 # =============================================
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
-    """
-    Exibe a foto do jogador/membro.
-    Busca na pasta correta usando apelido ou nome.
-    """
-    # 1) Tenta usar a coluna 'foto' se existir
     foto = pessoa_row.get('foto')
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
@@ -534,8 +528,6 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
         elif os.path.exists(caminho):
             st.image(caminho, width=width)
             return
-
-    # 2) Busca na pasta correta usando apelido ou nome
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
         nome_clean = normalizar_texto(nome).replace(' ', '_')
@@ -556,12 +548,10 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
                 if os.path.exists(caminho):
                     st.image(caminho, width=width)
                     return
-
-    # 3) Fallback: ícone
     st.write("📷")
 
 # =============================================
-# FUNÇÕES PARA ESTATÍSTICAS DE PARTIDAS (CSVs)
+# ESTATÍSTICAS DE PARTIDAS (MINUTAGEM)
 # =============================================
 def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
     pasta = {
@@ -636,7 +626,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
 # FUNÇÕES DE CARTÕES (JSON)
 # =============================================
 def carregar_cartoes_json(categoria):
-    """Retorna (cartoes_dict, datas_globais) do arquivo JSON."""
     caminho = {
         'profissional': CAMINHO_CARTOES_PROFISSIONAL,
         'sub20': CAMINHO_CARTOES_SUB20,
@@ -676,7 +665,6 @@ def jogador_suspenso(nome, cartoes):
     return cartoes[nome].get('suspenso_proxima', False)
 
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
-    """Recalcula cartões a partir dos CSVs de estatísticas (igual ao PyQt)."""
     st.info(f"🔄 Reinicializando cartões para {categoria}...")
     if categoria == 'profissional':
         pasta = PASTA_ESTATISTICAS_PROFISSIONAL
@@ -687,16 +675,13 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     else:
         st.error("Categoria inválida para jogadores.")
         return {}, []
-
     if not os.path.exists(pasta):
         st.warning(f"Pasta {pasta} não encontrada.")
         return {}, []
-
     lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas encontrado.")
         return {}, []
-
     arquivos_com_data = []
     for arq in lista_arquivos:
         data_jogo = extrair_data_jogo(arq)
@@ -708,40 +693,33 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         arquivos_com_data.append((data_jogo, arq))
     arquivos_com_data.sort(key=lambda x: x[0])
     datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
-
     cartoes = {}
     competicao_anterior = None
     ids_processados = set()
     reset_ids = []
     reset_apos_ids = []
-
     for data_jogo, arq in arquivos_com_data:
         jogo_id = extrair_id_jogo(arq)
         if jogo_id is not None and jogo_id in ids_processados:
             continue
         if jogo_id is not None:
             ids_processados.add(jogo_id)
-
         try:
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-
             competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
             adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
-
             if competicao_anterior is not None and competicao_atual != competicao_anterior:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
             competicao_anterior = competicao_atual
-
             if jogo_id in reset_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
-
             relacionados_ogol_ids = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -750,7 +728,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 canonico = mapear_nome_para_canonico(nome)
                 if canonico and canonico in canonico_para_ogol_id:
                     relacionados_ogol_ids.add(canonico_para_ogol_id[canonico])
-
             for nome, dados in list(cartoes.items()):
                 if dados.get('suspenso_proxima', False):
                     ogol_id = dados.get('ogol_id')
@@ -765,7 +742,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
                             ev['suspenso_cumprida'] = True
                             break
-
             suspensos_neste_jogo = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -814,7 +790,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'suspenso_causada': True,
                         'suspenso_cumprida': False
                     })
-
             if jogo_id in reset_apos_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
@@ -823,16 +798,13 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 for nome in suspensos_neste_jogo:
                     if nome in cartoes:
                         cartoes[nome]['suspenso_proxima'] = True
-
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
-
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões reinicializados para {categoria}.")
     return cartoes, datas_globais
 
 def inicializar_cartoes_comissao(categoria):
-    """Recalcula cartões da comissão a partir dos CSVs."""
     st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
     if categoria == 'comissao_profissional':
         pasta = PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL
@@ -846,16 +818,13 @@ def inicializar_cartoes_comissao(categoria):
     else:
         st.error("Categoria inválida para comissão.")
         return {}, []
-
     if not os.path.exists(pasta):
         st.warning(f"Pasta {pasta} não encontrada.")
         return {}, []
-
     lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas da comissão encontrado.")
         return {}, []
-
     arquivos_com_data = []
     for arq in lista_arquivos:
         data_jogo = extrair_data_jogo(arq)
@@ -867,40 +836,33 @@ def inicializar_cartoes_comissao(categoria):
         arquivos_com_data.append((data_jogo, arq))
     arquivos_com_data.sort(key=lambda x: x[0])
     datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
-
     cartoes = {}
     ids_processados = set()
     competicao_anterior = None
     reset_ids = []
     reset_apos_ids = []
-
     for data_jogo, arq in arquivos_com_data:
         jogo_id = extrair_id_jogo(arq)
         if jogo_id is not None and jogo_id in ids_processados:
             continue
         if jogo_id is not None:
             ids_processados.add(jogo_id)
-
         try:
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-
             competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
             adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
-
             if competicao_anterior is not None and competicao_atual != competicao_anterior:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
             competicao_anterior = competicao_atual
-
             if jogo_id in reset_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
-
             relacionados_nomes = set()
             for _, row in df.iterrows():
                 nome = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
@@ -908,7 +870,6 @@ def inicializar_cartoes_comissao(categoria):
                     canonico = mapear_nome_para_canonico(nome)
                     if canonico:
                         relacionados_nomes.add(canonico)
-
             for nome, dados in list(cartoes.items()):
                 if dados.get('suspenso_proxima', False):
                     if nome not in relacionados_nomes:
@@ -919,7 +880,6 @@ def inicializar_cartoes_comissao(categoria):
                             if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
                                 ev['suspenso_cumprida'] = True
                                 break
-
             suspensos_neste_jogo = set()
             for _, row in df.iterrows():
                 nome_raw = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
@@ -967,7 +927,6 @@ def inicializar_cartoes_comissao(categoria):
                         'suspenso_causada': True,
                         'suspenso_cumprida': False
                     })
-
             if jogo_id in reset_apos_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
@@ -976,16 +935,14 @@ def inicializar_cartoes_comissao(categoria):
                 for nome in suspensos_neste_jogo:
                     if nome in cartoes:
                         cartoes[nome]['suspenso_proxima'] = True
-
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
-
     salvar_cartoes_json(cartoes, categoria_save, datas_globais)
     st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
     return cartoes, datas_globais
 
 # =============================================
-# DEMAIS FUNÇÕES (interpretar_formacao, etc.)
+# DEMAIS FUNÇÕES (INTERPRETAR FORMAÇÃO, ETC.)
 # =============================================
 def interpretar_formacao(formacao_str):
     partes = formacao_str.split('-')
@@ -1083,8 +1040,23 @@ def formatar_cartoes(dados_cartao):
     return " ".join(partes)
 
 # =============================================
-# RELATÓRIOS (Excel)
+# RELATÓRIOS (EXCEL E PDF)
 # =============================================
+def formatar_planilha(ws, titulo):
+    ws.title = titulo
+    for col in ws.columns:
+        max_length = 0
+        for cell in col:
+            try:
+                if cell.value and len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        if col:
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = adjusted_width
+
 def gerar_relatorio_diretoria(df_jogadores, df_comissao, output: BytesIO):
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1134,3 +1106,169 @@ def gerar_relatorio_comissao(membro_row, output: BytesIO):
         if pd.isna(valor) or valor == '': valor = 'N/I'
         ws[f'A{row}'] = label; ws[f'B{row}'] = valor; row += 1
     wb.save(output); output.seek(0)
+
+def exportar_escalacao_excel(titulares, reservas, instrucoes, formacao, estilo, output: BytesIO):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Escalação"
+    ws['A1'] = f"ESCALAÇÃO - {formacao} | ESTILO: {estilo}"
+    ws['A1'].font = Font(size=14, bold=True)
+    ws.merge_cells('A1:E1')
+    row = 3
+    ws[f'A{row}'] = "TITULARES"
+    ws[f'A{row}'].font = Font(bold=True)
+    row += 1
+    ws[f'A{row}'] = "Posição"
+    ws[f'B{row}'] = "Jogador"
+    ws[f'C{row}'] = "Apelido"
+    ws[f'D{row}'] = "ID"
+    ws[f'E{row}'] = "Rating"
+    for col in 'ABCDE':
+        ws[col+str(row)].font = Font(bold=True)
+    row += 1
+    for j in titulares:
+        ws[f'A{row}'] = j.get('posicao_exibida', '')
+        ws[f'B{row}'] = j.get('nome', '')
+        ws[f'C{row}'] = j.get('apelido', '')
+        ws[f'D{row}'] = j.get('row', {}).get('ogol_id', '')
+        ws[f'E{row}'] = j.get('row', {}).get('Rating_Geral_FM26', '')
+        row += 1
+    row += 2
+    ws[f'A{row}'] = "RESERVAS"
+    ws[f'A{row}'].font = Font(bold=True)
+    row += 1
+    ws[f'A{row}'] = "Posição"
+    ws[f'B{row}'] = "Jogador"
+    ws[f'C{row}'] = "Apelido"
+    ws[f'D{row}'] = "Rating"
+    for col in 'ABCD':
+        ws[col+str(row)].font = Font(bold=True)
+    row += 1
+    for j in reservas:
+        ws[f'A{row}'] = j.get('posicao_principal', '')
+        ws[f'B{row}'] = j.get('nome', '')
+        ws[f'C{row}'] = j.get('apelido', '')
+        ws[f'D{row}'] = j.get('row', {}).get('Rating_Geral_FM26', '')
+        row += 1
+    if instrucoes:
+        ws2 = wb.create_sheet("Instruções")
+        ws2['A1'] = "INSTRUÇÕES INDIVIDUAIS"
+        ws2['A1'].font = Font(size=14, bold=True)
+        ws2.merge_cells('A1:C1')
+        row = 3
+        for nome, inst in instrucoes.items():
+            ws2[f'A{row}'] = nome
+            ws2[f'B{row}'] = "Com bola: " + ", ".join(inst.get('com_bola', []))
+            ws2[f'C{row}'] = "Sem bola: " + ", ".join(inst.get('sem_bola', []))
+            row += 2
+    wb.save(output); output.seek(0)
+
+def exportar_escalacao_pdf(titulares, reservas, instrucoes, formacao, estilo, output: BytesIO):
+    try:
+        pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+        font_name = 'Arial'
+    except:
+        font_name = 'Helvetica'
+    c = canvas.Canvas(output, pagesize=A4)
+    width, height = A4
+    c.setFont(font_name, 16)
+    c.drawString(30, height - 30, f"ESCALAÇÃO - {formacao} | ESTILO: {estilo}")
+    c.setFont(font_name, 12)
+    y = height - 60
+    c.setFont(font_name, 14)
+    c.drawString(30, y, "TITULARES")
+    y -= 20
+    c.setFont(font_name, 10)
+    for j in titulares:
+        if y < 50:
+            c.showPage()
+            y = height - 30
+            c.setFont(font_name, 10)
+        c.drawString(30, y, f"{j.get('posicao_exibida', '')}: {j.get('nome', '')} ({j.get('apelido', '')})")
+        y -= 16
+    y -= 20
+    c.setFont(font_name, 14)
+    c.drawString(30, y, "RESERVAS")
+    y -= 20
+    c.setFont(font_name, 10)
+    for j in reservas:
+        if y < 50:
+            c.showPage()
+            y = height - 30
+            c.setFont(font_name, 10)
+        c.drawString(30, y, f"{j.get('posicao_principal', '')}: {j.get('nome', '')} ({j.get('apelido', '')})")
+        y -= 16
+    if instrucoes:
+        c.showPage()
+        c.setFont(font_name, 14)
+        c.drawString(30, height - 30, "INSTRUÇÕES INDIVIDUAIS")
+        y = height - 60
+        c.setFont(font_name, 10)
+        for nome, inst in instrucoes.items():
+            if y < 50:
+                c.showPage()
+                y = height - 30
+                c.setFont(font_name, 10)
+            c.setFont(font_name, 11)
+            c.drawString(30, y, f"{nome}:")
+            y -= 16
+            c.setFont(font_name, 9)
+            c.drawString(40, y, f"Com bola: {', '.join(inst.get('com_bola', []))}")
+            y -= 14
+            c.drawString(40, y, f"Sem bola: {', '.join(inst.get('sem_bola', []))}")
+            y -= 16
+    c.save()
+    output.seek(0)
+
+def salvar_escalacao_json(titulares, reservas, formacao, estilo, caminho):
+    dados = {
+        'formacao': formacao,
+        'estilo': estilo,
+        'titulares': [],
+        'reservas': []
+    }
+    for j in titulares:
+        dados['titulares'].append({
+            'nome': j.get('nome'),
+            'apelido': j.get('apelido'),
+            'posicao_exibida': j.get('posicao_exibida'),
+            'ogol_id': j.get('row', {}).get('ogol_id', '')
+        })
+    for j in reservas:
+        dados['reservas'].append({
+            'nome': j.get('nome'),
+            'apelido': j.get('apelido'),
+            'posicao_principal': j.get('posicao_principal'),
+            'ogol_id': j.get('row', {}).get('ogol_id', '')
+        })
+    with open(caminho, 'w', encoding='utf-8') as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+
+def carregar_escalacao_json(df, caminho):
+    with open(caminho, 'r', encoding='utf-8') as f:
+        dados = json.load(f)
+    formacao = dados.get('formacao', '4-4-2')
+    estilo = dados.get('estilo', 'Posse de Bola')
+    titulares = []
+    for item in dados.get('titulares', []):
+        row = df[df['ogol_id'] == item.get('ogol_id')]
+        if not row.empty:
+            row = row.iloc[0]
+            titulares.append({
+                'nome': row['nome_completo'],
+                'apelido': row['apelido'],
+                'posicao_exibida': item.get('posicao_exibida'),
+                'row': row
+            })
+    reservas = []
+    for item in dados.get('reservas', []):
+        row = df[df['ogol_id'] == item.get('ogol_id')]
+        if not row.empty:
+            row = row.iloc[0]
+            reservas.append({
+                'nome': row['nome_completo'],
+                'apelido': row['apelido'],
+                'posicao_principal': item.get('posicao_principal'),
+                'row': row
+            })
+    return formacao, estilo, titulares, reservas
