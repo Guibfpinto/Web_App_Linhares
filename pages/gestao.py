@@ -140,52 +140,50 @@ def show():
 
         st.dataframe(df_les, use_container_width=True)
 
-    # 5. JOGOS
     with tabs[4]:
         st.subheader("Jogos")
         
+        # SQL limpo e compatível com qualquer versão do SQLite/Pandas
         query_jogos = """
         SELECT 
             j.id AS Jogo_ID,
-            datetime(j.data_hora, '-3 hours') AS Data_Hora,
+            j.data_hora,
+            j.gols_casa,
+            j.gols_fora,
             tc.nome AS Mandante,
             tc.logo_url AS Escudo_Mandante,
-            j.gols_casa AS Gols_Casa,
-            j.gols_fora AS Gols_Fora,
             tf.nome AS Visitante,
             tf.logo_url AS Escudo_Visitante,
             v.nome AS Estadio,
-            v.cidade AS Cidade,
-            v.endereco AS Endereco,
+            v.endereco AS Endereco_Estadio,
             v.imagem AS Foto_Estadio
         FROM jogos j
-        JOIN times tc ON j.time_casa_id = tc.id
-        JOIN times tf ON j.time_fora_id = tf.id
-        LEFT JOIN venues v ON tc.venue_id = v.id
+        INNER JOIN times tc ON j.time_casa_id = tc.id
+        INNER JOIN times tf ON j.time_fora_id = tf.id
+        LEFT JOIN venues v ON tc.venue_id = v.id;
         """
         
-        df_jogos = pd.read_sql_query(query_jogos, conn)
+        try:
+            df_jogos = pd.read_sql_query(query_jogos, conn)
+            
+            # Ajuste do Fuso Horário (-3 horas) via Pandas
+            df_jogos['data_hora'] = pd.to_datetime(df_jogos['data_hora']) - pd.Timedelta(hours=3)
+            df_jogos['Data_Hora'] = df_jogos['data_hora'].dt.strftime('%d/%m/%Y %H:%M')
+            
+            # Formatação do Placar via Pandas
+            df_jogos['Placar'] = df_jogos['gols_casa'].astype(str) + " x " + df_jogos['gols_fora'].astype(str)
+            
+            # Seleção e reordenação final das colunas
+            df_exibicao = df_jogos[[
+                'Jogo_ID', 'Data_Hora', 'Mandante', 'Escudo_Mandante', 
+                'Placar', 'Visitante', 'Escudo_Visitante', 
+                'Estadio', 'Endereco_Estadio', 'Foto_Estadio'
+            ]]
+            
+            st.dataframe(df_exibicao, use_container_width=True)
 
-        # Renderização visual dos jogos
-        for idx, row in df_jogos.iterrows():
-            with st.container():
-                col1, col2, col3 = st.columns([1, 3, 2])
-                
-                with col1:
-                    st.caption(f"📅 {row['Data_Hora']}")
-                    st.markdown(f"**{row['Mandante']}** {row['Gols_Casa']} x {row['Gols_Fora']} **{row['Visitante']}**")
-                
-                with col2:
-                    st.write(f"🏟️ **{row['Estadio']}** ({row['Cidade']})")
-                    st.caption(f"📍 {row['Endereco']}")
-                
-                with col3:
-                    if row['Foto_Estadio']:
-                        try:
-                            st.image(row['Foto_Estadio'], width=150)
-                        except:
-                            st.write("Sem foto do estádio")
-            st.divider()
+        except Exception as e:
+            st.error(f"Erro ao carregar dados de jogos: {e}")
 
     # 6. GPS
     with tabs[5]:
