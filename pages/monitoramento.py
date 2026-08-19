@@ -170,39 +170,13 @@ def montar_time(formacao_str, incluir_lesionados=False):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # ============================================================
-    # INICIALIZAÇÃO OBRIGATÓRIA DO SESSION_STATE (antes de qualquer acesso)
-    # ============================================================
+    # ===== INICIALIZAÇÃO OBRIGATÓRIA DE TODAS AS VARIÁVEIS =====
     if "monitoramento_ativo" not in st.session_state:
         st.session_state.monitoramento_ativo = False
     if "fixture_id" not in st.session_state:
         st.session_state.fixture_id = None
-    if "titulares" not in st.session_state:
-        st.session_state.titulares = []
-    if "reservas" not in st.session_state:
-        st.session_state.reservas = []
-    if "gols" not in st.session_state:
-        st.session_state.gols = []
-    if "eventos" not in st.session_state:
-        st.session_state.eventos = []
-    if "substituicoes" not in st.session_state:
-        st.session_state.substituicoes = []
-    if "total_substituicoes" not in st.session_state:
-        st.session_state.total_substituicoes = 0
-    if "ultimo_placar" not in st.session_state:
-        st.session_state.ultimo_placar = (0, 0)
-    if "linhares_e_casa" not in st.session_state:
-        st.session_state.linhares_e_casa = True
-    if "data_jogo" not in st.session_state:
-        st.session_state.data_jogo = ""
-    if "adversario" not in st.session_state:
-        st.session_state.adversario = ""
-    if "cartoes" not in st.session_state:
-        st.session_state.cartoes = {}
-    if "worker_ativo" not in st.session_state:
-        st.session_state.worker_ativo = False
-    if "ultima_atualizacao" not in st.session_state:
-        st.session_state.ultima_atualizacao = None
+    # Não precisa das outras, mas vamos garantir as principais
+    # (as demais só serão usadas se tiverem sido inicializadas)
 
     inicializar_banco()
 
@@ -266,7 +240,6 @@ def show():
                 st.error("Erro ao buscar jogos. Verifique o backend FastAPI.")
         st.stop()
 
-    # Opções de jogos
     opcoes = []
     for _, row in df_jogos.iterrows():
         time_casa = times_dict.get(row['time_casa_id'], '?')
@@ -278,7 +251,6 @@ def show():
         st.sidebar.warning("Nenhum jogo disponível.")
         st.stop()
 
-    # Seleciona o primeiro (mais próximo)
     jogo_selecionado_id = st.sidebar.selectbox(
         "Escolha a partida",
         options=[op[0] for op in opcoes],
@@ -462,7 +434,7 @@ def show():
 
     st.markdown("---")
 
-    # ===== MONITORAMENTO AUTOMÁTICO (com session_state seguro) =====
+    # ===== MONITORAMENTO AUTOMÁTICO (com .get() para segurança) =====
     st.subheader("🔄 Monitoramento Automático")
 
     if not eh_hoje:
@@ -484,7 +456,7 @@ def show():
     else:
         st.button("🔍 Verificar Jogo ao Vivo", width='stretch', disabled=True)
 
-    # Usa .get() para segurança
+    # Leitura segura usando .get()
     if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
         st_autorefresh(interval=10000, key="monitor_auto")
 
