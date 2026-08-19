@@ -8,12 +8,22 @@ def show():
     inicializar_banco()
     st.title("👤 Detalhes do Jogador")
 
-    # Obtém o ID do jogador vindo da página anterior (analise.py)
-    jogador_id = st.session_state.get("jogador_id")
+    # Tenta obter o ID via query params (mais robusto)
+    params = st.query_params
+    jogador_id = params.get("id", None)
+    if jogador_id is not None:
+        try:
+            jogador_id = int(jogador_id)
+        except:
+            jogador_id = None
+
+    # Fallback para session_state
+    if jogador_id is None:
+        jogador_id = st.session_state.get("jogador_id")
 
     if jogador_id is None:
-        st.warning("Nenhum jogador selecionado. Volte e clique em 'Ver detalhes'.")
-        if st.button("← Voltar para análise", width='stretch'):
+        st.warning("Nenhum jogador selecionado.")
+        if st.button("← Voltar para análise"):
             st.switch_page("pages/analise.py")
         return
 
@@ -23,12 +33,11 @@ def show():
         st.error("Dados do elenco não carregados. Verifique o CSV.")
         return
 
-    # Busca o jogador pelo ID (assumindo que a coluna 'id' existe)
-    # Se não existir, tenta usar o índice
+    # Busca o jogador
     if 'id' in df.columns:
         jogador = df[df['id'] == jogador_id]
     else:
-        # Fallback: usa o índice (se o ID for o índice)
+        # Fallback: usa o índice
         try:
             jogador = df.iloc[int(jogador_id)]
             jogador = pd.DataFrame([jogador])
@@ -37,7 +46,7 @@ def show():
 
     if jogador.empty:
         st.error(f"Jogador com ID {jogador_id} não encontrado.")
-        if st.button("← Voltar para análise", width='stretch'):
+        if st.button("← Voltar para análise"):
             st.switch_page("pages/analise.py")
         return
 
@@ -82,7 +91,6 @@ def show():
         'resistencia', 'forca_fisica', 'reflexos', 'jogo_aereo_goleiro',
         'defesas_goleiro', 'cabecada', 'marcacao', 'antecipacao', 'posicionamento'
     ]
-    # Filtra apenas os atributos que existem no DataFrame
     attrs_existentes = [a for a in atributos_fm26 if a in row.index and pd.notna(row.get(a))]
     if attrs_existentes:
         st.subheader("🎮 Atributos FM26")
@@ -94,12 +102,11 @@ def show():
         st.subheader("📜 Histórico de Clubes")
         st.write(row['historico'])
 
-    # ===== CARTÕES (buscar do SQLite) =====
+    # ===== CARTÕES =====
     st.subheader("🟨 Cartões e Suspensões")
     try:
         conn = sqlite3.connect('meu_futebol.db', timeout=10)
         cursor = conn.cursor()
-        # Busca o ID do jogador na tabela elenco (se existir)
         cursor.execute("SELECT id FROM elenco WHERE nome = ? OR apelido = ?", (nome, apelido))
         elenco_id = cursor.fetchone()
         if elenco_id:
@@ -151,5 +158,5 @@ def show():
         st.info(f"Erro ao buscar lesões: {e}")
 
     # ===== BOTÃO VOLTAR =====
-    if st.button("← Voltar para análise", width='stretch'):
+    if st.button("← Voltar para análise"):
         st.switch_page("pages/analise.py")

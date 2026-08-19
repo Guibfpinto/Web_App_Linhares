@@ -7,23 +7,31 @@ def show():
     inicializar_banco()
     st.title("👤 Detalhes do Membro da Comissão")
 
-    # Obtém o índice do membro vindo da página anterior (comissao.py)
-    idx = st.session_state.get("membro_comissao_idx")
+    # Tenta obter o índice via query params
+    params = st.query_params
+    idx = params.get("idx", None)
+    if idx is not None:
+        try:
+            idx = int(idx)
+        except:
+            idx = None
+
+    # Fallback para session_state
+    if idx is None:
+        idx = st.session_state.get("membro_comissao_idx")
     nome_membro = st.session_state.get("membro_comissao_nome", "desconhecido")
 
     if idx is None:
-        st.warning("Nenhum membro selecionado. Volte e clique em 'Ver detalhes'.")
-        if st.button("← Voltar para lista", width='stretch'):
+        st.warning("Nenhum membro selecionado.")
+        if st.button("← Voltar para lista"):
             st.switch_page("pages/comissao.py")
         return
 
-    # Carrega o DataFrame da comissão
     df = carregar_comissao()
     if df.empty:
         st.error("Dados da comissão não carregados. Verifique o CSV.")
         return
 
-    # Tenta acessar pelo índice
     try:
         if idx < len(df):
             membro = df.iloc[idx]
@@ -74,13 +82,12 @@ def show():
                 nome_attr = attr.replace('staff_', '').replace('_', ' ').title()
                 st.write(f"- **{nome_attr}:** {val}")
 
-    # ===== CARTÕES (buscar do SQLite) =====
+    # ===== CARTÕES =====
     st.subheader("🟨 Cartões e Suspensões")
     try:
         import sqlite3
         conn = sqlite3.connect('meu_futebol.db', timeout=10)
         cursor = conn.cursor()
-        # Busca o ID do membro na tabela tecnicos (se existir)
         cursor.execute("SELECT id FROM tecnicos WHERE nome = ?", (nome,))
         tec_id = cursor.fetchone()
         if tec_id:
@@ -111,5 +118,5 @@ def show():
         st.info(f"Erro ao buscar cartões: {e}")
 
     # ===== BOTÃO VOLTAR =====
-    if st.button("← Voltar para lista", width='stretch'):
+    if st.button("← Voltar para lista"):
         st.switch_page("pages/comissao.py")

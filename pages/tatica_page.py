@@ -5,9 +5,9 @@ from io import BytesIO
 from utils import (
     carregar_elenco_profissional,
     interpretar_formacao,
+    formatar_planilha,
     exportar_escalacao_excel,
     exportar_escalacao_pdf,
-    formatar_planilha
 )
 from tatica import (
     ROLES_FM26_PT,

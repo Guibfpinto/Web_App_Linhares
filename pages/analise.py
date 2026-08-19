@@ -78,8 +78,12 @@ def show():
             if 'minutos_totais' in row:
                 info += f" | ⏱️ {row['minutos_totais']} min"
             st.write(info)
+            # Botão para ver detalhes (usa switch_page)
             if st.button("Ver detalhes", key=f"detalhes_{idx}"):
-                st.session_state.jogador_id = row.get('id', idx)
+                # Armazena o ID do jogador no session_state (usa ID se existir, senão o índice)
+                jogador_id = row.get('id', idx)
+                st.session_state.jogador_id = jogador_id
+                # Navega para a página de detalhes
                 st.switch_page("pages/detalhes_jogador.py")
         st.divider()
 
@@ -172,7 +176,6 @@ def show():
                 st.write("**Top 15 jogadores por minutos totais:**")
                 df_total = df_heatmap[['total']].sort_values('total', ascending=False).head(15)
                 fig2, ax2 = plt.subplots(figsize=(10, 6))
-                # CORREÇÃO: usar hue em vez de palette sem hue
                 sns.barplot(data=df_total.reset_index(), x='total', y='index',
                             hue='index', palette='viridis', legend=False, ax=ax2)
                 ax2.set_title('Top 15 Jogadores por Minutos Totais')
