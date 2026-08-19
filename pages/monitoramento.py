@@ -138,6 +138,7 @@ def show():
                    status, data_hora, formacao_casa, formacao_fora 
             FROM jogos 
             WHERE time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID}
+                AND data_hora >= date('now')
             ORDER BY data_hora ASC
         """, conn)
     except Exception as e:
