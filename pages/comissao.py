@@ -7,7 +7,6 @@ def show():
     inicializar_banco()
     st.title("👔 Comissão Técnica")
 
-    # Carrega diretamente do CSV
     df = carregar_comissao()
 
     if df.empty:
@@ -15,7 +14,6 @@ def show():
         st.info("Certifique-se de que o arquivo 'perfil_completo_comissao_2026.csv' está na pasta do projeto.")
         return
 
-    # Filtro por cargo
     if 'cargo' in df.columns:
         cargos = ['Todos'] + sorted(df['cargo'].dropna().unique().tolist())
         filtro = st.selectbox("Filtrar por cargo", cargos)
@@ -24,7 +22,6 @@ def show():
 
     st.subheader(f"{len(df)} membros encontrados")
 
-    # Exibe lista em cards com botão "Ver detalhes"
     for idx, row in df.iterrows():
         col1, col2 = st.columns([1, 4])
         with col1:
@@ -35,11 +32,8 @@ def show():
             idade = row.get('idade', 'N/I')
             st.write(f"**{nome}**")
             st.write(f"Cargo: {cargo} | Idade: {idade if pd.notna(idade) else 'N/I'} anos")
-            # Botão para ver detalhes
             if st.button("Ver detalhes", key=f"btn_{idx}"):
-                # Armazena o índice do membro no session_state
                 st.session_state.membro_comissao_idx = idx
                 st.session_state.membro_comissao_nome = nome
-                # Navega para a página de detalhes da comissão
                 st.switch_page("pages/detalhes_comissao.py")
         st.divider()
