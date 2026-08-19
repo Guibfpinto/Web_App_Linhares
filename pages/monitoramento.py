@@ -138,7 +138,7 @@ def show():
                    status, data_hora, formacao_casa, formacao_fora 
             FROM jogos 
             WHERE time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID}
-            ORDER BY data_hora DESC
+            ORDER BY data_hora ASC
         """, conn)
     except Exception as e:
         st.error(f"Erro ao carregar jogos: {e}")
