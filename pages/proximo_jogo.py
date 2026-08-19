@@ -8,6 +8,7 @@ from utils import carregar_cronograma, obter_proximo_jogo, inicializar_banco
 TEAM_ID = 12928
 
 def show():
+    # Inicializa banco (cria tabelas se necessário)
     inicializar_banco()
 
     st.title("📅 Próximo Jogo")
@@ -33,28 +34,29 @@ def show():
                 conn = sqlite3.connect('meu_futebol.db', timeout=10)
                 hoje = datetime.now().strftime("%Y-%m-%d")
                 query = f"""
-                    SELECT * FROM jogos 
-                    WHERE (time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID})
-                      AND data_hora >= '{hoje}'
-                    ORDER BY data_hora 
+                    SELECT j.id, j.data_hora, j.status, 
+                           t1.nome AS time_casa, t2.nome AS time_fora,
+                           j.time_casa_id, j.time_fora_id
+                    FROM jogos j
+                    LEFT JOIN times t1 ON j.time_casa_id = t1.id
+                    LEFT JOIN times t2 ON j.time_fora_id = t2.id
+                    WHERE (j.time_casa_id = {TEAM_ID} OR j.time_fora_id = {TEAM_ID})
+                      AND j.data_hora >= '{hoje}'
+                    ORDER BY j.data_hora 
                     LIMIT 1
                 """
                 df = pd.read_sql_query(query, conn)
                 conn.close()
                 if not df.empty:
                     row = df.iloc[0]
-                    # Busca o nome do adversário
                     if row['time_casa_id'] == TEAM_ID:
-                        adversario_id = row['time_fora_id']
+                        adversario = row['time_fora']
                         local = "Casa"
                     else:
-                        adversario_id = row['time_casa_id']
+                        adversario = row['time_casa']
                         local = "Fora"
-                    conn2 = sqlite3.connect('meu_futebol.db')
-                    adv_nome = pd.read_sql_query(f"SELECT nome FROM times WHERE id = {adversario_id}", conn2).iloc[0]['nome']
-                    conn2.close()
                     st.success("Jogo encontrado no banco de dados!")
-                    st.write(f"**Adversário:** {adv_nome}")
+                    st.write(f"**Adversário:** {adversario}")
                     st.write(f"**Data:** {row['data_hora']}")
                     st.write(f"**Local:** {local}")
                     st.write(f"**Status:** {row['status']}")
