@@ -365,18 +365,37 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
                 with cols_attr[i % 3]:
                     st.write(f"**{label}:** {val_str}")
 
-        # 4. Cartões
+        # 4. Histórico de Cartões
         st.subheader("🟨 Histórico de Cartões")
         with st.container(border=True):
-            if nome_canonico in cartoes:
-                historico = cartoes[nome_canonico].get('historico', [])
-                if historico:
-                    df_hist = pd.DataFrame(historico)
-                    st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
-                else:
-                    st.info("Nenhum cartão registrado.")
+            # Resumo da Temporada (puxado do CSV da comissão)
+            ca_totais = row.get('cartoes_amarelos_totais', 0)
+            cv_totais = row.get('cartoes_vermelhos_totais', 0)
+            jogos_temp = row.get('jogos_temporada', 0)
+            
+            col_c1, col_c2, col_c3 = st.columns(3)
+            col_c1.metric("Jogos na Temp.", int(jogos_temp) if pd.notna(jogos_temp) else 0)
+            col_c2.metric("Cartões Amarelos", int(ca_totais) if pd.notna(ca_totais) else 0)
+            col_c3.metric("Cartões Vermelhos", int(cv_totais) if pd.notna(cv_totais) else 0)
+
+            st.divider()
+
+            # Busca histórico detalhado no dicionário de cartões
+            nome_canonico = str(row.get('nome_canonico', '')).strip().lower()
+            nome_apelido = str(row.get('apelido', '')).strip().lower()
+            
+            # Tenta encontrar no dicionário usando variações de nome
+            historico = []
+            for chave, dados in cartoes.items():
+                if chave.lower() in [nome_canonico, nome_apelido]:
+                    historico = dados.get('historico', [])
+                    break
+
+            if historico:
+                df_hist = pd.DataFrame(historico)
+                st.dataframe(df_hist[['data', 'adversario', 'cor', 'terceiro_amarelo', 'suspenso_causada', 'suspenso_cumprida']], width='stretch')
             else:
-                st.info("Nenhum cartão registrado.")
+                st.info("Nenhum registro de cartão detalhado em súmulas nesta temporada.")
 
 # ======================================================================
 # AUTENTICAÇÃO
