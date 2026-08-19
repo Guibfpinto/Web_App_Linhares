@@ -56,13 +56,12 @@ st.markdown(
 )
 
 # ============================================================
-# FUNÇÕES DE AUTENTICAÇÃO LOCAL (igual ao PyQt)
+# FUNÇÕES DE AUTENTICAÇÃO LOCAL
 # ============================================================
 ARQUIVO_USUARIOS = "usuarios.json"
 
 def carregar_usuarios():
     if not os.path.exists(ARQUIVO_USUARIOS):
-        # Cria usuário padrão
         senha_admin = "@W.d06302005"
         hash_admin = bcrypt.hashpw(senha_admin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         usuarios = {"Guibfpinto": hash_admin}
@@ -118,6 +117,8 @@ menu = st.sidebar.radio(
     ["📊 Monitoramento ao Vivo",
      "📅 Próximo Jogo",
      "📋 Análise de Elenco",
+     "👔 Comissão Técnica",    # NOVO
+     "🟨 Cartões",             # NOVO
      "📄 Relatórios",
      "📐 Escalação Tática",
      "⚙️ Gestão Esportiva",
@@ -141,6 +142,12 @@ elif menu == "📅 Próximo Jogo":
 elif menu == "📋 Análise de Elenco":
     import pages.analise as analise
     analise.show()
+elif menu == "👔 Comissão Técnica":
+    import pages.comissao as comissao
+    comissao.show()
+elif menu == "🟨 Cartões":
+    import pages.cartoes as cartoes
+    cartoes.show()
 elif menu == "📄 Relatórios":
     import pages.relatorios as relatorios
     relatorios.show()

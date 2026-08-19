@@ -6,6 +6,7 @@ import os
 import re
 import unicodedata
 import sqlite3
+import json
 from datetime import datetime
 from typing import Dict, Optional, List
 import openpyxl
@@ -22,7 +23,26 @@ ARQUIVO_CSV_COMISSAO_PROF = "perfil_completo_comissao_2026.csv"
 ARQUIVO_CSV_COMISSAO_SUB20 = "perfil_completo_comissao_Sub20_2026.csv"
 ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
 ARQUIVO_CRONO_SUB20 = "cronograma_sub20_2026.csv"
+
+# =============================================
+# PASTAS DE ESTATÍSTICAS PARA CARTÕES
+# =============================================
 PASTA_ESTATISTICAS_PROFISSIONAL = "data/estatisticas_jogadores/"
+PASTA_ESTATISTICAS_SUB20 = "data/estatisticas_sub20/"
+PASTA_ESTATISTICAS_SUB17 = "data/estatisticas_sub17/"
+PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = "data/estatisticas_comissao_tecnica_profissional/"
+PASTA_ESTATISTICAS_COMISSAO_SUB20 = "data/estatisticas_comissao_tecnica_sub20/"
+PASTA_ESTATISTICAS_COMISSAO_SUB17 = "data/estatisticas_comissao_tecnica_sub17/"
+
+# =============================================
+# ARQUIVOS DE CARTÕES (JSON)
+# =============================================
+CAMINHO_CARTOES_PROFISSIONAL = "cartoes_acumulados_profissional.json"
+CAMINHO_CARTOES_SUB20 = "cartoes_acumulados_sub20.json"
+CAMINHO_CARTOES_SUB17 = "cartoes_acumulados_sub17.json"
+CAMINHO_CARTOES_COMISSAO_PROFISSIONAL = "cartoes_acumulados_comissao_profissional.json"
+CAMINHO_CARTOES_COMISSAO_SUB20 = "cartoes_acumulados_comissao_sub20.json"
+CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
 
 # =============================================
 # MAPEAMENTO DE NOMES (copie o seu)
@@ -32,7 +52,57 @@ MAPEAMENTO_NOMES_PROFISSIONAL = {
     'Wendy': 'Wendy',
     'Marcus Paulo Sousa Oliveira': 'Marcus Paulo',
     'Marcus Paulo': 'Marcus Paulo',
-    # ... coloque todo o seu mapeamento aqui
+    'Francisco Wesley da Silva Sousa': 'Wesley',
+    'Wesley': 'Wesley',
+    'Francisco de Assis Rapozo Neto': 'Francisco Neto',
+    'Francisco Neto': 'Francisco Neto',
+    'Stuart Asafe Ferreira Alves': 'Stuart',
+    'Stuart': 'Stuart',
+    'Yuri Ribeiro Giovanelli': 'Yuri Ribeiro',
+    'Yuri Ribeiro': 'Yuri Ribeiro',
+    'João Pedro Firmino Oliveira': 'João Firmino',
+    'João Firmino': 'João Firmino',
+    'Joao Firmino': 'João Firmino',
+    'Lucas Titol Lopes': 'Lucas Titol',
+    'Lucas Titol': 'Lucas Titol',
+    'Rayner Silva Gomes': 'Rayner',
+    'Rayner': 'Rayner',
+    'Kayque Santos da Cunha': 'Kayque Santos',
+    'Kayque Santos': 'Kayque Santos',
+    'Cayque': 'Kayque Santos',
+    'Ruan Amaral Rios': 'Ruan Rios',
+    'Ruan Rios': 'Ruan Rios',
+    'Genilson dos Santos Júnior': 'Júnior Espeto',
+    'Júnior Espeto': 'Junior Espeto',
+    'Clavis Severo Leão': 'Clavis Neto',
+    'Clavis Neto': 'Clavis Neto',
+    'Jeferson David Palacios Cantillo': 'Jeferson Palacios',
+    'Jeferson Palacios': 'Jeferson Palacios',
+    'J. D. Palacios Cantillo': 'Jeferson Palacios',
+    'Gabriel Amorim de Aguiar': 'Gabriel Amorim',
+    'Gabriel Amorim': 'Gabriel Amorim',
+    'Virgílio Santos Borges': 'Borjão',
+    'Borjão': 'Borjão',
+    'Borjao': 'Borjão',
+    'Matheus Toribes Ferreira Souza': 'Matheus Toribes',
+    'Matheus Toribes': 'Matheus Toribes',
+    'João Marcos Santos Ferraz Luz': 'João Marcos',
+    'João Marcos': 'João Marcos',
+    'Davi Fornaciari Lima': 'Davi Fornaciari',
+    'Davi Fornaciari': 'Davi Fornaciari',
+    'Karlos Henrique dos Reis Calavort': 'Kaká',
+    'Kaká': 'Kaká',
+    'Kaka': 'Kaká',
+    'Daniel Olmo Morais Gonçalves': 'Daniel Olmo',
+    'Daniel Olmo': 'Daniel Olmo',
+    'Arthur Luiz Darros': 'Arthur Darros',
+    'Arthur Darros': 'Arthur Darros',
+    'Júlio César Fontana Leite': 'Julio César',
+    'Julio César': 'Julio César',
+    'Matheus Sarmento Mesquita': 'Matheus Sarmento',
+    'Matheus Sarmento': 'Matheus Nossa',
+    'Gabriel de Jesus Rodrigues': 'Gabriel Jesus',
+    'Gabriel Jesus': 'Gabriel Jesus',
 }
 MAPEAMENTO_NOMES_SUB20 = {}
 MAPEAMENTO_NOMES_SUB17 = {}
@@ -121,6 +191,22 @@ def extrair_id_jogo(caminho_arquivo):
         return int(match.group(1))
     return None
 
+def extrair_data_jogo(caminho_arquivo):
+    """Extrai a data do jogo do nome do arquivo ou do conteúdo."""
+    nome = os.path.basename(caminho_arquivo)
+    # Tenta extrair do nome
+    match = re.search(r'(\d{4}-\d{2}-\d{2})', nome)
+    if match:
+        try:
+            return datetime.strptime(match.group(1), "%Y-%m-%d")
+        except:
+            pass
+    # Fallback: data de modificação
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(caminho_arquivo))
+    except:
+        return None
+
 # =============================================
 # CLASSIFICAÇÕES
 # =============================================
@@ -161,7 +247,6 @@ def inicializar_banco():
     conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
 
-    # Tabela: treinos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,8 +256,6 @@ def inicializar_banco():
             duracao_min INTEGER
         )
     ''')
-
-    # Tabela: wellbeing
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS wellbeing (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,8 +267,6 @@ def inicializar_banco():
             disposicao INTEGER
         )
     ''')
-
-    # Tabela: lesoes
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS lesoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,8 +277,6 @@ def inicializar_banco():
             ativo INTEGER DEFAULT 1
         )
     ''')
-
-    # Tabela: jogos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS jogos (
             id INTEGER PRIMARY KEY,
@@ -213,8 +292,6 @@ def inicializar_banco():
             formacao_fora TEXT
         )
     ''')
-
-    # Tabela: gps
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS gps (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,8 +302,6 @@ def inicializar_banco():
             sprints INTEGER
         )
     ''')
-
-    # Tabela: times
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS times (
             id INTEGER PRIMARY KEY,
@@ -236,8 +311,6 @@ def inicializar_banco():
             fundado INTEGER
         )
     ''')
-
-    # Tabela: elenco
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS elenco (
             id INTEGER PRIMARY KEY,
@@ -250,8 +323,6 @@ def inicializar_banco():
             time_id INTEGER
         )
     ''')
-
-    # Tabela: eventos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS eventos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,6 +331,18 @@ def inicializar_banco():
             tipo TEXT,
             jogador_id INTEGER,
             detalhes TEXT,
+            time_id INTEGER
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tecnicos (
+            id INTEGER PRIMARY KEY,
+            nome TEXT,
+            cargo TEXT,
+            idade INTEGER,
+            data_nascimento TEXT,
+            historico_profissional TEXT,
+            historico_jogador TEXT,
             time_id INTEGER
         )
     ''')
@@ -434,14 +517,9 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     return df_futuros.iloc[0].to_dict()
 
 # =============================================
-# EXIBIR FOTO (CORRIGIDO)
+# EXIBIR FOTO
 # =============================================
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
-    """
-    Exibe a foto do jogador/membro.
-    Busca na pasta correta usando apelido ou nome.
-    """
-    # 1) Tenta usar a coluna 'foto' se existir
     foto = pessoa_row.get('foto')
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
@@ -454,13 +532,9 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
         elif os.path.exists(caminho):
             st.image(caminho, width=width)
             return
-
-    # 2) Busca na pasta correta usando apelido ou nome
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
-        # Remove acentos e espaços para formar nome do arquivo
         nome_clean = normalizar_texto(nome).replace(' ', '_')
-        # Pastas possíveis
         pastas = [
             "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
             "fotos_sistema_Analise_Elenco/Jogadores/Sub20",
@@ -470,25 +544,25 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
         ]
         for ext in ['.png', '.jpg', '.jpeg']:
             for pasta in pastas:
-                # tenta com nome original
                 caminho = os.path.join(pasta, f"{nome}{ext}")
                 if os.path.exists(caminho):
                     st.image(caminho, width=width)
                     return
-                # tenta com nome limpo
                 caminho = os.path.join(pasta, f"{nome_clean}{ext}")
                 if os.path.exists(caminho):
                     st.image(caminho, width=width)
                     return
-
-    # 3) Fallback: ícone
     st.write("📷")
 
 # =============================================
 # FUNÇÕES PARA ESTATÍSTICAS DE PARTIDAS (CSVs)
 # =============================================
 def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
-    pasta = PASTA_ESTATISTICAS_PROFISSIONAL if categoria == "Profissional" else ""
+    pasta = {
+        'Profissional': PASTA_ESTATISTICAS_PROFISSIONAL,
+        'Sub-20': PASTA_ESTATISTICAS_SUB20,
+        'Sub-17': PASTA_ESTATISTICAS_SUB17
+    }.get(categoria, '')
     if not os.path.exists(pasta):
         return []
     return [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
@@ -496,42 +570,40 @@ def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
 def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
     arquivos = listar_arquivos_estatisticas(categoria)
     if not arquivos:
-        st.warning("Nenhum CSV de estatísticas encontrado na pasta 'data/estatisticas_jogadores/'.")
         return pd.DataFrame()
-
     stats = {}
     colunas_minutos_possiveis = ['minutos', 'minutos_jogados', 'minutos_totais', 'minuto', 'tempo_jogado', 'min']
     coluna_minutos_encontrada = None
-    total_linhas = 0
 
     for arq in arquivos:
         try:
-            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
+            df = None
+            for sep in [';', ',']:
+                try:
+                    df_temp = pd.read_csv(arq, sep=sep, encoding='utf-8-sig', on_bad_lines='skip')
+                    if len(df_temp.columns) > 1:
+                        df = df_temp
+                        break
+                except:
+                    continue
+            if df is None:
+                continue
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-            total_linhas += len(df)
-
-            # 1) Encontra a coluna de minutos
             col_min = None
             for col in colunas_minutos_possiveis:
                 if col in df.columns:
                     col_min = col
                     break
             if col_min is None:
-                # Tenta qualquer coluna que contenha 'minuto'
                 for col in df.columns:
                     if 'minuto' in col:
                         col_min = col
                         break
                 if col_min is None:
-                    st.warning(f"⚠️ Nenhuma coluna de minutos encontrada em {os.path.basename(arq)}. Colunas: {list(df.columns)}")
                     continue
-
             if coluna_minutos_encontrada is None:
                 coluna_minutos_encontrada = col_min
-
-            df[col_min] = pd.to_numeric(df[col_min], errors='coerce').fillna(0)
-
-            # 2) Processa jogadores
+            df[col_min] = df[col_min].astype(str).str.replace(',', '.').astype(float, errors='coerce').fillna(0)
             for _, row in df.iterrows():
                 jogador = row.get('jogador', '')
                 if pd.isna(jogador) or jogador == '':
@@ -544,9 +616,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                     stats[canonico]['minutos_totais'] += int(minutos)
                     if int(minutos) >= 90:
                         stats[canonico]['jogos_90min'] += 1
-                # else: se não mapear, podemos ignorar ou avisar (opcional)
-
-            # 3) Titulares (linhas 2 a 12)
             if len(df) > 12:
                 titulares_df = df.iloc[1:12]
             else:
@@ -560,17 +629,9 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                     if canonico not in stats:
                         stats[canonico] = {'starts': 0, 'jogos_90min': 0, 'minutos_totais': 0}
                     stats[canonico]['starts'] += 1
-
         except Exception as e:
             st.warning(f"Erro ao ler {arq}: {e}")
 
-    # Se nenhum arquivo teve coluna de minutos, exibe aviso
-    if coluna_minutos_encontrada is None:
-        st.error("❌ Nenhuma coluna de minutos foi encontrada em nenhum CSV. Verifique o formato dos arquivos.")
-    else:
-        st.info(f"✅ Coluna de minutos identificada: '{coluna_minutos_encontrada}' em {len(arquivos)} arquivos, {total_linhas} linhas processadas.")
-
-    # Converte para DataFrame
     df_stats = pd.DataFrame.from_dict(stats, orient='index').reset_index()
     df_stats = df_stats.rename(columns={'index': 'jogador_canonico'})
     for col in ['starts', 'jogos_90min', 'minutos_totais']:
@@ -578,8 +639,351 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
             df_stats[col] = df_stats[col].fillna(0).astype(int)
         else:
             df_stats[col] = 0
-
     return df_stats
+
+# =============================================
+# FUNÇÕES DE CARTÕES (JSON e inicialização por CSVs)
+# =============================================
+def carregar_cartoes_json(categoria):
+    """Retorna (cartoes_dict, datas_globais) do arquivo JSON."""
+    caminho = {
+        'profissional': CAMINHO_CARTOES_PROFISSIONAL,
+        'sub20': CAMINHO_CARTOES_SUB20,
+        'sub17': CAMINHO_CARTOES_SUB17,
+        'comissao_profissional': CAMINHO_CARTOES_COMISSAO_PROFISSIONAL,
+        'comissao_sub20': CAMINHO_CARTOES_COMISSAO_SUB20,
+        'comissao_sub17': CAMINHO_CARTOES_COMISSAO_SUB17,
+    }.get(categoria)
+    if not caminho or not os.path.exists(caminho):
+        return {}, []
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('cartoes', {}), data.get('datas_globais', [])
+    except:
+        return {}, []
+
+def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
+    caminho = {
+        'profissional': CAMINHO_CARTOES_PROFISSIONAL,
+        'sub20': CAMINHO_CARTOES_SUB20,
+        'sub17': CAMINHO_CARTOES_SUB17,
+        'comissao_profissional': CAMINHO_CARTOES_COMISSAO_PROFISSIONAL,
+        'comissao_sub20': CAMINHO_CARTOES_COMISSAO_SUB20,
+        'comissao_sub17': CAMINHO_CARTOES_COMISSAO_SUB17,
+    }.get(categoria)
+    if not caminho:
+        return
+    if datas_globais is None:
+        _, datas_globais = carregar_cartoes_json(categoria)
+    with open(caminho, 'w', encoding='utf-8') as f:
+        json.dump({'cartoes': cartoes, 'datas_globais': datas_globais}, f, ensure_ascii=False, indent=2)
+
+def jogador_suspenso(nome, cartoes):
+    if nome not in cartoes:
+        return False
+    return cartoes[nome].get('suspenso_proxima', False)
+
+def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
+    st.info(f"🔄 Reinicializando cartões para {categoria}...")
+    if categoria == 'profissional':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_PROFISSIONAL, f) for f in os.listdir(PASTA_ESTATISTICAS_PROFISSIONAL) if f.endswith('.csv')]
+        reset_ids = []
+        reset_apos_ids = []
+    elif categoria == 'sub20':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_SUB20, f) for f in os.listdir(PASTA_ESTATISTICAS_SUB20) if f.endswith('.csv')]
+        reset_ids = []
+        reset_apos_ids = []
+    elif categoria == 'sub17':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_SUB17, f) for f in os.listdir(PASTA_ESTATISTICAS_SUB17) if f.endswith('.csv')]
+        reset_ids = []
+        reset_apos_ids = []
+    else:
+        st.error("Categoria inválida para jogadores.")
+        return {}, []
+
+    if not lista_arquivos:
+        st.warning("Nenhum CSV de estatísticas encontrado.")
+        return {}, []
+
+    arquivos_com_data = []
+    for arq in lista_arquivos:
+        data_jogo = extrair_data_jogo(arq)
+        if not data_jogo:
+            try:
+                data_jogo = datetime.fromtimestamp(os.path.getmtime(arq))
+            except:
+                continue
+        arquivos_com_data.append((data_jogo, arq))
+    arquivos_com_data.sort(key=lambda x: x[0])
+    datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
+
+    cartoes = {}
+    competicao_anterior = None
+    ids_processados = set()
+
+    for data_jogo, arq in arquivos_com_data:
+        jogo_id = extrair_id_jogo(arq)
+        if jogo_id is not None and jogo_id in ids_processados:
+            continue
+        if jogo_id is not None:
+            ids_processados.add(jogo_id)
+
+        try:
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
+            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+
+            competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
+            adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
+
+            if competicao_anterior is not None and competicao_atual != competicao_anterior:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+            competicao_anterior = competicao_atual
+
+            if jogo_id in reset_ids:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+
+            relacionados_ogol_ids = set()
+            for _, row in df.iterrows():
+                nome = row.get('jogador')
+                if pd.isna(nome):
+                    continue
+                canonico = mapear_nome_para_canonico(nome)
+                if canonico and canonico in canonico_para_ogol_id:
+                    relacionados_ogol_ids.add(canonico_para_ogol_id[canonico])
+
+            for nome, dados in list(cartoes.items()):
+                if dados.get('suspenso_proxima', False):
+                    ogol_id = dados.get('ogol_id')
+                    if ogol_id and ogol_id in relacionados_ogol_ids:
+                        continue
+                    if nome in [mapear_nome_para_canonico(row.get('jogador')) for _, row in df.iterrows() if pd.notna(row.get('jogador'))]:
+                        continue
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+                    for ev in reversed(dados.get('historico', [])):
+                        if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
+                            ev['suspenso_cumprida'] = True
+                            break
+
+            suspensos_neste_jogo = set()
+            for _, row in df.iterrows():
+                nome = row.get('jogador')
+                if pd.isna(nome):
+                    continue
+                canonico = mapear_nome_para_canonico(nome)
+                if not canonico:
+                    continue
+                amarelos = int(row.get('cartoes_amarelos', 0))
+                vermelhos = int(row.get('cartoes_vermelhos', 0))
+                if amarelos == 0 and vermelhos == 0:
+                    continue
+                if canonico not in cartoes:
+                    cartoes[canonico] = {
+                        'amarelos': 0,
+                        'vermelho': False,
+                        'suspenso_proxima': False,
+                        'historico': [],
+                        'ogol_id': canonico_para_ogol_id.get(canonico)
+                    }
+                for _ in range(amarelos):
+                    cartoes[canonico]['amarelos'] += 1
+                    terceiro = cartoes[canonico]['amarelos'] >= 3
+                    if terceiro:
+                        cartoes[canonico]['suspenso_proxima'] = True
+                        suspensos_neste_jogo.add(canonico)
+                    cartoes[canonico]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'cor': 'amarelo',
+                        'terceiro_amarelo': terceiro,
+                        'suspenso_causada': terceiro,
+                        'suspenso_cumprida': False
+                    })
+                for _ in range(vermelhos):
+                    cartoes[canonico]['vermelho'] = True
+                    cartoes[canonico]['suspenso_proxima'] = True
+                    suspensos_neste_jogo.add(canonico)
+                    cartoes[canonico]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'cor': 'vermelho',
+                        'terceiro_amarelo': False,
+                        'suspenso_causada': True,
+                        'suspenso_cumprida': False
+                    })
+
+            if jogo_id in reset_apos_ids:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+                for nome in suspensos_neste_jogo:
+                    if nome in cartoes:
+                        cartoes[nome]['suspenso_proxima'] = True
+
+        except Exception as e:
+            st.warning(f"Erro ao processar {arq}: {e}")
+
+    salvar_cartoes_json(cartoes, categoria, datas_globais)
+    st.success(f"✅ Cartões reinicializados para {categoria}.")
+    return cartoes, datas_globais
+
+def inicializar_cartoes_comissao(categoria):
+    st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
+    if categoria == 'comissao_profissional':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL) if f.endswith('.csv')]
+        categoria_save = 'comissao_profissional'
+    elif categoria == 'comissao_sub20':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_SUB20, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_SUB20) if f.endswith('.csv')]
+        categoria_save = 'comissao_sub20'
+    elif categoria == 'comissao_sub17':
+        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_SUB17, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_SUB17) if f.endswith('.csv')]
+        categoria_save = 'comissao_sub17'
+    else:
+        st.error("Categoria inválida para comissão.")
+        return {}, []
+
+    if not lista_arquivos:
+        st.warning("Nenhum CSV de estatísticas da comissão encontrado.")
+        return {}, []
+
+    arquivos_com_data = []
+    for arq in lista_arquivos:
+        data_jogo = extrair_data_jogo(arq)
+        if not data_jogo:
+            try:
+                data_jogo = datetime.fromtimestamp(os.path.getmtime(arq))
+            except:
+                continue
+        arquivos_com_data.append((data_jogo, arq))
+    arquivos_com_data.sort(key=lambda x: x[0])
+    datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
+
+    cartoes = {}
+    ids_processados = set()
+    competicao_anterior = None
+    reset_ids = []
+    reset_apos_ids = []
+
+    for data_jogo, arq in arquivos_com_data:
+        jogo_id = extrair_id_jogo(arq)
+        if jogo_id is not None and jogo_id in ids_processados:
+            continue
+        if jogo_id is not None:
+            ids_processados.add(jogo_id)
+
+        try:
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
+            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+
+            competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
+            adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
+
+            if competicao_anterior is not None and competicao_atual != competicao_anterior:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+            competicao_anterior = competicao_atual
+
+            if jogo_id in reset_ids:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+
+            relacionados_nomes = set()
+            for _, row in df.iterrows():
+                nome = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
+                if pd.notna(nome) and str(nome).strip():
+                    canonico = mapear_nome_para_canonico(nome)
+                    if canonico:
+                        relacionados_nomes.add(canonico)
+
+            for nome, dados in list(cartoes.items()):
+                if dados.get('suspenso_proxima', False):
+                    if nome not in relacionados_nomes:
+                        dados['amarelos'] = 0
+                        dados['vermelho'] = False
+                        dados['suspenso_proxima'] = False
+                        for ev in reversed(dados.get('historico', [])):
+                            if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
+                                ev['suspenso_cumprida'] = True
+                                break
+
+            suspensos_neste_jogo = set()
+            for _, row in df.iterrows():
+                nome_raw = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
+                if pd.isna(nome_raw):
+                    continue
+                nome = mapear_nome_para_canonico(nome_raw)
+                if not nome:
+                    continue
+                amarelos = int(row.get('cartoes_amarelos', 0))
+                vermelhos = int(row.get('cartoes_vermelhos', 0))
+                if amarelos == 0 and vermelhos == 0:
+                    continue
+                if nome not in cartoes:
+                    cartoes[nome] = {
+                        'amarelos': 0,
+                        'vermelho': False,
+                        'suspenso_proxima': False,
+                        'historico': []
+                    }
+                for _ in range(amarelos):
+                    cartoes[nome]['amarelos'] += 1
+                    terceiro = cartoes[nome]['amarelos'] >= 3
+                    if terceiro:
+                        cartoes[nome]['suspenso_proxima'] = True
+                        suspensos_neste_jogo.add(nome)
+                    cartoes[nome]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'cor': 'amarelo',
+                        'terceiro_amarelo': terceiro,
+                        'suspenso_causada': terceiro,
+                        'suspenso_cumprida': False
+                    })
+                for _ in range(vermelhos):
+                    cartoes[nome]['vermelho'] = True
+                    cartoes[nome]['suspenso_proxima'] = True
+                    suspensos_neste_jogo.add(nome)
+                    cartoes[nome]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'cor': 'vermelho',
+                        'terceiro_amarelo': False,
+                        'suspenso_causada': True,
+                        'suspenso_cumprida': False
+                    })
+
+            if jogo_id in reset_apos_ids:
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+                for nome in suspensos_neste_jogo:
+                    if nome in cartoes:
+                        cartoes[nome]['suspenso_proxima'] = True
+
+        except Exception as e:
+            st.warning(f"Erro ao processar {arq}: {e}")
+
+    salvar_cartoes_json(cartoes, categoria_save, datas_globais)
+    st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
+    return cartoes, datas_globais
 
 # =============================================
 # DEMAIS FUNÇÕES (interpretar_formacao, etc.)

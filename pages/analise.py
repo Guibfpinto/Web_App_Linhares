@@ -13,7 +13,6 @@ from utils import (
 )
 
 def show():
-    # Inicializa o banco (cria tabelas se não existirem)
     inicializar_banco()
 
     st.title("📋 Análise de Elenco")
@@ -77,6 +76,10 @@ def show():
                 if 'minutos_totais' in row:
                     info += f" | ⏱️ {row['minutos_totais']} min"
                 st.write(info)
+                # Botão para ver detalhes
+                if st.button(f"Ver detalhes", key=f"detalhes_{row.get('id', idx)}"):
+                    st.session_state.jogador_id = row.get('id', idx)
+                    st.switch_page("pages/detalhes_jogador.py")
             st.divider()
     else:
         st.dataframe(df_filtrado, use_container_width=True)
