@@ -15,17 +15,25 @@ def show():
     jogador = st.selectbox("Jogador", df['nome_completo'].tolist())
     tipo = st.selectbox("Tipo", ["Mapa de Calor", "Finalizações", "Passes"])
 
-    if st.button("Gerar", use_container_width=True):
+    # key adicionada para resolver o erro StreamlitDuplicateElementId
+    if st.button("Gerar", use_container_width=True, key="btn_gerar_visualizacao"):
         np.random.seed(42)
         x = np.random.uniform(0, 120, 30)
         y = np.random.uniform(0, 80, 30)
 
-        fig, ax = plt.subplots(figsize=(10,7))
-        pitch = Pitch(pitch_type='statsbomb', line_zorder=2, pitch_color='#22312b', line_color='#efefef')
+        fig, ax = plt.subplots(figsize=(10, 7))
+        pitch = Pitch(
+            pitch_type='statsbomb', 
+            line_zorder=2, 
+            pitch_color='#22312b', 
+            line_color='#efefef'
+        )
         pitch.draw(ax=ax)
+        
         if tipo == "Mapa de Calor":
-            pitch.heatmap(pitch.bin_statistic(x, y, bins=(50,50)), ax=ax, cmap='Reds')
+            pitch.heatmap(pitch.bin_statistic(x, y, bins=(50, 50)), ax=ax, cmap='Reds')
         else:
             color = 'blue' if tipo == "Passes" else 'red'
             pitch.scatter(x, y, ax=ax, c=color, s=50, alpha=0.7)
+            
         st.pyplot(fig)
