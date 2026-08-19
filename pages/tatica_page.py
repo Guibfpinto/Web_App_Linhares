@@ -1,47 +1,194 @@
 # pages/tatica_page.py
 import streamlit as st
 from utils import carregar_elenco_profissional, interpretar_formacao
-from tatica import ROLES_FM26_PT, selecionar_time_por_funcoes, gerar_instrucoes_por_role
+from tatica import (
+    ROLES_FM26_PT,
+    TRADUCAO_ROLES_PT,
+    selecionar_time_por_funcoes,
+    gerar_instrucoes_por_role,
+    role_to_pos,
+    CATEGORIA_ROLE,
+    POSICAO_ESPERADA_PARA_GRUPO,
+    GRUPO_POSICAO_JOGADOR
+)
 
+# ============================================================
+# FUNÇÕES AUXILIARES
+# ============================================================
+def _filtrar_roles_por_fase(fase='in'):
+    """Retorna roles da fase especificada ('in' ou 'out')."""
+    return [role for role in ROLES_FM26_PT if CATEGORIA_ROLE.get(role, 'in') == fase]
+
+def _filtrar_roles_por_posicao(roles, posicao_esperada):
+    """Filtra roles que são compatíveis com a posição esperada."""
+    if not posicao_esperada:
+        return roles
+    grupo_esperado = POSICAO_ESPERADA_PARA_GRUPO.get(posicao_esperada, '')
+    if not grupo_esperado:
+        return roles
+    return [role for role in roles if POSICAO_ESPERADA_PARA_GRUPO.get(role_to_pos.get(role, ''), '') == grupo_esperado]
+
+# ============================================================
+# PÁGINA PRINCIPAL
+# ============================================================
 def show():
-    st.title("📐 Escalação Tática")
+    st.title("📐 Análise Tática - 4 Formações")
+
+    # Carrega elenco
     df = carregar_elenco_profissional()
     if df.empty:
-        st.warning("Elenco não carregado.")
+        st.warning("Dados do elenco não carregados. Verifique o CSV.")
         return
 
-    formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2")
-    col_form, col_btn = st.columns([3, 1])
-    with col_form:
-        formacao = st.text_input("Formação", value="4-4-2")
-    with col_btn:
-        if st.button("Gerar Posições", use_container_width=True):
-            defensores, meio, atac, posicoes = interpretar_formacao(formacao)
-            if not posicoes:
-                st.error("Formação inválida.")
+    # ===== CRIA AS 4 ABAS =====
+    tabs = st.tabs(["⚽ Inicial", "🔄 Construção de Jogada", "⚡ Ofensivo (com bola)", "🛡️ Defensivo (sem bola)"])
+
+    # Mapeamento de fases: 'in' para as três primeiras, 'out' para defensiva
+    fases = {
+        "⚽ Inicial": "in",
+        "🔄 Construção de Jogada": "in",
+        "⚡ Ofensivo (com bola)": "in",
+        "🛡️ Defensivo (sem bola)": "out"
+    }
+
+    # Mapeamento para armazenar o estado de cada aba
+    if "escalacoes_geradas" not in st.session_state:
+        st.session_state.escalacoes_geradas = {}
+
+    for tab, fase in zip(tabs, fases.values()):
+        with tab:
+            st.subheader(f"Formação – {fase.capitalize()}")
+            chave = f"tab_{fase}"
+
+            # ===== INPUT DA FORMAÇÃO =====
+            col_form, col_btn = st.columns([3, 1])
+            with col_form:
+                formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2", key=f"form_{chave}")
+            with col_btn:
+                if st.button("Gerar Posições", key=f"btn_pos_{chave}", width='stretch'):
+                    defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
+                    if posicoes:
+                        st.session_state[f"posicoes_{chave}"] = posicoes
+                        st.session_state[f"formacao_{chave}"] = formacao
+                        st.rerun()
+                    else:
+                        st.error("Formação inválida. Use ex: 4-4-2")
+
+            # ===== EXIBE POSIÇÕES E ROLES =====
+            posicoes = st.session_state.get(f"posicoes_{chave}")
+            if posicoes:
+                roles_disponiveis = _filtrar_roles_por_fase(fase)
+                st.write("**Defina a função (role) para cada posição:**")
+                roles_selecionadas = []
+                cols = st.columns(2)  # duas colunas para economizar espaço
+                for i, (pos_exibida, pos_tipo) in enumerate(posicoes):
+                    # Filtra roles por posição esperada (compatibilidade)
+                    pos_esperada = None
+                    if pos_tipo == 'Goleiro':
+                        pos_esperada = 'Goleiro'
+                    elif pos_tipo in ['Defensor', 'Lateral']:
+                        pos_esperada = 'Defensor'
+                    elif pos_tipo in ['Meio-Campo', 'Volante', 'Meia-Atacante']:
+                        pos_esperada = 'Meio-Campista'
+                    elif pos_tipo == 'Atacante':
+                        pos_esperada = 'Atacante'
+                    roles_filtradas = _filtrar_roles_por_posicao(roles_disponiveis, pos_esperada)
+                    if not roles_filtradas:
+                        roles_filtradas = roles_disponiveis  # fallback
+
+                    # Tradução para exibição
+                    display_roles = [TRADUCAO_ROLES_PT.get(r, r) for r in roles_filtradas]
+                    # Mapeia display -> chave original
+                    display_to_key = {TRADUCAO_ROLES_PT.get(r, r): r for r in roles_filtradas}
+
+                    # Seleciona a role padrão (baseada na posição)
+                    default_key = None
+                    if pos_tipo == 'Goleiro':
+                        default_key = 'Goleiro' if fase == 'in' else 'Line-Holding Keeper'
+                    elif pos_tipo == 'Defensor':
+                        default_key = 'Zagueiro Central' if fase == 'in' else 'Covering Centre-Back'
+                    elif pos_tipo == 'Meio-Campo':
+                        default_key = 'Meia Central' if fase == 'in' else 'Pressing Central Midfielder'
+                    elif pos_tipo == 'Atacante':
+                        default_key = 'Centroavante' if fase == 'in' else 'Central Outlet Centre Forward'
+                    else:
+                        default_key = roles_filtradas[0] if roles_filtradas else None
+                    default_display = TRADUCAO_ROLES_PT.get(default_key, default_key) if default_key else None
+                    default_index = display_roles.index(default_display) if default_display in display_roles else 0
+
+                    with cols[i % 2]:
+                        role_display = st.selectbox(
+                            f"{pos_exibida}",
+                            options=display_roles,
+                            index=default_index,
+                            key=f"role_{chave}_{i}"
+                        )
+                        # Recupera a chave original
+                        role_key = display_to_key.get(role_display, role_display)
+                        roles_selecionadas.append(role_key)
+
+                # ===== BOTÃO ESCALAR =====
+                if st.button("⚽ Escalar Time", key=f"btn_escalar_{chave}", width='stretch'):
+                    if len(roles_selecionadas) != len(posicoes):
+                        st.error("Selecione uma função para cada posição.")
+                    else:
+                        # Chama a seleção de time
+                        titulares, reservas = selecionar_time_por_funcoes(
+                            df,
+                            roles_selecionadas,
+                            excluir_lesionados=True,
+                            cartoes=None,  # sem cartões por enquanto
+                            usar_rating_fallback=False,
+                            priorizar_posicao=True,
+                            priorizar_minutagem=True
+                        )
+                        # Armazena para exibição
+                        st.session_state.escalacoes_geradas[chave] = {
+                            'titulares': titulares,
+                            'reservas': reservas,
+                            'formacao': formacao,
+                            'roles': roles_selecionadas,
+                            'posicoes': posicoes
+                        }
+                        st.rerun()
+
+                # ===== EXIBE ESCALAÇÃO GERADA =====
+                escalacao = st.session_state.escalacoes_geradas.get(chave)
+                if escalacao:
+                    st.subheader("⚽ Time Titular")
+                    for i, jog in enumerate(escalacao['titulares'], 1):
+                        nome = jog.get('nome', 'N/D')
+                        apelido = jog.get('apelido', '')
+                        role = jog.get('role', '')
+                        score = jog.get('score', 0)
+                        st.write(f"{i}. {nome} ({apelido}) - {role} (Score: {score:.1f})")
+
+                    st.subheader("🟢 Reservas")
+                    for i, jog in enumerate(escalacao['reservas'], 1):
+                        nome = jog.get('nome', 'N/D')
+                        apelido = jog.get('apelido', '')
+                        st.write(f"{i}. {nome} ({apelido})")
+
+                    # Instruções individuais (apenas para titulares)
+                    st.subheader("📝 Instruções Individuais")
+                    for jog in escalacao['titulares']:
+                        row = jog.get('row')
+                        role = jog.get('role')
+                        if row is not None and role:
+                            inst = gerar_instrucoes_por_role(row, role)
+                            st.write(f"**{jog.get('nome', '')}** ({role})")
+                            st.write(f"- Com bola: {', '.join(inst.get('com_bola', []))}")
+                            st.write(f"- Sem bola: {', '.join(inst.get('sem_bola', []))}")
+                            st.write("---")
+
             else:
-                st.session_state.posicoes = posicoes
+                st.info("Clique em 'Gerar Posições' para definir a formação.")
 
-    if "posicoes" in st.session_state:
-        posicoes = st.session_state.posicoes
-        roles = []
-        for i, (pos_exibida, pos_tipo) in enumerate(posicoes):
-            role_list = list(ROLES_FM26_PT.keys())
-            default = "Meia Central" if "Meio" in pos_tipo else "Centroavante"
-            role = st.selectbox(f"{pos_exibida}", role_list, index=role_list.index(default) if default in role_list else 0, key=f"role_{i}")
-            roles.append(role)
+        # ===== RODAPÉ DA ABA =====
+        st.caption("As roles defensivas (Out of Possession) só aparecem na aba Defensiva.")
 
-        if st.button("Gerar Escalação", use_container_width=True):
-            titulares, reservas = selecionar_time_por_funcoes(df, roles, excluir_lesionados=True)
-            st.subheader("⚽ Titulares")
-            for i, jog in enumerate(titulares, 1):
-                st.write(f"{i}. {jog['nome']} ({jog['apelido']}) - {jog['role']} (Score: {jog['score']:.1f})")
-            st.subheader("🟢 Reservas")
-            for i, jog in enumerate(reservas, 1):
-                st.write(f"{i}. {jog['nome']} ({jog['apelido']})")
-            st.subheader("📝 Instruções")
-            for jog in titulares:
-                inst = gerar_instrucoes_por_role(jog['row'], jog['role'])
-                st.write(f"**{jog['nome']}**")
-                st.write(f"- Com bola: {', '.join(inst['com_bola'])}")
-                st.write(f"- Sem bola: {', '.join(inst['sem_bola'])}")
+# ============================================================
+# EXECUÇÃO LOCAL (opcional)
+# ============================================================
+if __name__ == "__main__":
+    show()
