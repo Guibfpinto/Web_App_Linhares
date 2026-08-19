@@ -4,15 +4,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import time
-import json
 import base64
 import os
 import random
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch, VerticalPitch
+import sqlite3
 
 # ======================================================================
-# IMPORTAÇÕES DO UTILS (SUBSTITUI O funcoes_originais)
+# IMPORTAÇÕES DO UTILS (para Análise e Comissão)
 # ======================================================================
 from utils import (
     carregar_elenco_profissional,
@@ -61,6 +61,9 @@ from utils import (
     ARQUIVO_CSV_COMISSAO_PROFISSIONAL,
     ARQUIVO_CSV_COMISSAO_SUB20,
     obter_proximo_jogo,
+    exibir_foto,
+    formatar_cartoes,
+    inicializar_banco,
 )
 
 # ======================================================================
@@ -123,12 +126,17 @@ if "fixture_id" not in st.session_state:
     st.session_state.fixture_id = None
 if "monitorando" not in st.session_state:
     st.session_state.monitorando = False
+if "time_base" not in st.session_state:
+    st.session_state.time_base = None
+if "escalacoes_geradas" not in st.session_state:
+    st.session_state.escalacoes_geradas = {}
+if "instrucoes_coletivas" not in st.session_state:
+    st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÕES DE DETALHES (JOGADOR E COMISSÃO) – VERSÃO CORRIGIDA
+# FUNÇÕES DE DETALHES (JOGADOR E COMISSÃO)
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
-    """Exibe todos os detalhes de um jogador em um expander."""
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
@@ -223,7 +231,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             st.info("Nenhum cartão registrado.")
 
 def exibir_detalhes_comissao(row, categoria, cartoes):
-    """Exibe todos os detalhes de um membro da comissão em um expander."""
     with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
         col1, col2 = st.columns([1,2])
         with col1:
@@ -337,32 +344,34 @@ def carregar_dfs():
     }
     try:
         df_prof = carregar_elenco_profissional()
-        df_sub20 = carregar_elenco_sub20() if 'carregar_elenco_sub20' in globals() else pd.DataFrame()
-        df_sub17 = carregar_elenco_sub17() if 'carregar_elenco_sub17' in globals() else pd.DataFrame()
+        df_sub20 = carregar_elenco_sub20()
+        df_sub17 = carregar_elenco_sub17()
 
         if df_prof is not None and not df_prof.empty:
             df_prof = adicionar_coluna_lesionado(df_prof, 'profissional')
-            df_prof = aplicar_dados_bioimpedancia(df_prof, carregar_dados_bioimpedancia('profissional'))
+            bio_prof = carregar_dados_bioimpedancia('profissional')
+            df_prof = aplicar_dados_bioimpedancia(df_prof, bio_prof)
         if df_sub20 is not None and not df_sub20.empty:
             df_sub20 = adicionar_coluna_lesionado(df_sub20, 'sub20')
-            df_sub20 = aplicar_dados_bioimpedancia(df_sub20, carregar_dados_bioimpedancia('sub20'))
+            bio_sub20 = carregar_dados_bioimpedancia('sub20')
+            df_sub20 = aplicar_dados_bioimpedancia(df_sub20, bio_sub20)
         if df_sub17 is not None and not df_sub17.empty:
             df_sub17 = adicionar_coluna_lesionado(df_sub17, 'sub17')
-            df_sub17 = aplicar_dados_bioimpedancia(df_sub17, carregar_dados_bioimpedancia('sub17'))
+            bio_sub17 = carregar_dados_bioimpedancia('sub17')
+            df_sub17 = aplicar_dados_bioimpedancia(df_sub17, bio_sub17)
 
         resultado["Profissional"] = df_prof
         resultado["Sub-20"] = df_sub20
         resultado["Sub-17"] = df_sub17
 
         resultado["Comissão Profissional"] = carregar_comissao()
-        resultado["Comissão Sub-20"] = carregar_comissao_sub20() if 'carregar_comissao_sub20' in globals() else pd.DataFrame()
+        resultado["Comissão Sub-20"] = carregar_comissao_sub20()
         resultado["Comissão Sub-17"] = pd.DataFrame()
 
         df_stats = carregar_estatisticas_partidas()
         if not df_stats.empty and df_prof is not None:
             resultado["Profissional"] = precomputar_scores_posicionais(df_prof, df_stats)
 
-        # Cartões
         for cat, key in [
             ('profissional', 'cartoes_prof'),
             ('sub20', 'cartoes_sub20'),
@@ -394,20 +403,23 @@ def get_df_cartoes(categoria):
 # ======================================================================
 # ABAS PRINCIPAIS
 # ======================================================================
-tab_analise, tab_partida, tab_comissao, tab_cartoes, tab_proximo, tab_exportar, tab_viz = st.tabs([
-    "📊 Análise de Elenco",
-    "⚽ Partida",
-    "👥 Comissão Técnica",
-    "🟨 Cartões e Suspensões",
-    "📅 Próximo Jogo",
-    "📤 Exportar Dados",
-    "🎥 Visualização Tática"
+tabs = st.tabs([
+    "📊 Análise de Elenco",    # direto no app.py
+    "👥 Comissão Técnica",      # direto no app.py
+    "⚽ Monitoramento ao Vivo", # pages.monitoramento.show()
+    "🟨 Cartões",               # pages.cartoes.show()
+    "📅 Próximo Jogo",          # pages.proximo_jogo.show()
+    "📐 Escalação Tática",      # pages.tatica_page.show()
+    "⚙️ Gestão",                # pages.gestao.show()
+    "📄 Relatórios",            # pages.relatorios.show()
+    "📤 Exportar",              # pages.exportar.show()
+    "🎥 Visualização Tática"    # pages.visualizacao.show()
 ])
 
 # ----------------------------------------------------------------------
-# ABA ANÁLISE
+# ABA 1: ANÁLISE DE ELENCO (DIRETO)
 # ----------------------------------------------------------------------
-with tab_analise:
+with tabs[0]:
     st.header("Análise de Jogadores")
     cat_analise = st.selectbox("Categoria", ["Profissional", "Sub-20", "Sub-17"])
     df_analise, cartoes_analise = get_df_cartoes(cat_analise)
@@ -528,205 +540,9 @@ with tab_analise:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ----------------------------------------------------------------------
-# ABA PARTIDA
+# ABA 2: COMISSÃO TÉCNICA (DIRETO)
 # ----------------------------------------------------------------------
-with tab_partida:
-    st.header("Montagem do Time e Acompanhamento")
-    with st.form("info_partida"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            data_partida = st.date_input("Data do jogo", value=datetime.now())
-            adversario = st.text_input("Adversário")
-        with col2:
-            formacao = st.text_input("Formação (ex: 4-4-2)", "4-4-2")
-            local = st.selectbox("Local", ["Casa", "Fora"])
-        with col3:
-            incluir_lesionados = st.checkbox("Incluir lesionados no banco?")
-        montar = st.form_submit_button("Iniciar Montagem")
-
-    if montar:
-        defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
-        if not posicoes:
-            st.error("Formação inválida")
-        else:
-            df_prof, cartoes_prof = get_df_cartoes("Profissional")
-            if df_prof is None or df_prof.empty:
-                st.error("Dados do profissional não carregados")
-            else:
-                st.subheader("Escolha os titulares")
-                titulares_temp = []
-                usados = []
-                for pos_exibida, pos_tipo in posicoes:
-                    candidatos = obter_jogadores_para_posicao(df_prof, pos_tipo, usados, cartoes_prof, incluir_lesionados)
-                    if candidatos.empty:
-                        st.warning(f"Nenhum jogador para {pos_exibida}")
-                        continue
-                    opcoes = [f"{row['nome_completo']} ({row['apelido']})" for _, row in candidatos.iterrows()]
-                    sel = st.selectbox(pos_exibida, opcoes, key=f"tit_{pos_exibida}")
-                    if sel:
-                        nome = sel.split(" (")[0]
-                        row = candidatos[candidatos['nome_completo'] == nome].iloc[0]
-                        titulares_temp.append({'posicao_exibida': pos_exibida, 'nome': row['nome_completo'], 'apelido': row['apelido'], 'row': row, 'ogol_id': row.get('ogol_id')})
-                        usados.append(nome)
-                st.session_state.titulares = titulares_temp
-                st.subheader("Selecione os reservas")
-                disponiveis = df_prof[~df_prof['nome_completo'].isin(usados)]
-                if not incluir_lesionados and 'lesionado' in disponiveis.columns:
-                    disponiveis = disponiveis[~disponiveis['lesionado']]
-                reservas_nomes = st.multiselect("Jogadores disponíveis", disponiveis['nome_completo'].tolist())
-                st.session_state.reservas = [{'nome': nome, 'apelido': disponiveis[disponiveis['nome_completo']==nome].iloc[0]['apelido'], 'ogol_id': disponiveis[disponiveis['nome_completo']==nome].iloc[0].get('ogol_id'), 'row': disponiveis[disponiveis['nome_completo']==nome].iloc[0]} for nome in reservas_nomes]
-                st.session_state.data_jogo = data_partida.strftime("%d/%m/%Y")
-                st.session_state.adversario = adversario
-                st.session_state.vila_e_casa = (local == "Casa")
-                st.success("Time escalado!")
-                with st.expander("Resumo"):
-                    st.write("Titulares:", [j['nome'] for j in st.session_state.titulares])
-                    st.write("Reservas:", [j['nome'] for j in st.session_state.reservas])
-
-    if st.session_state.titulares:
-        st.divider()
-        st.subheader("Ações da Partida")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("🔄 Substituição"):
-                if not st.session_state.reservas:
-                    st.warning("Sem reservas")
-                else:
-                    with st.form("subst"):
-                        sai = st.selectbox("Quem sai", [j['nome'] for j in st.session_state.titulares])
-                        entra = st.selectbox("Quem entra", [j['nome'] for j in st.session_state.reservas])
-                        minuto = st.number_input("Minuto", 0, 120, 45)
-                        if st.form_submit_button("Comparar e Confirmar"):
-                            sai_obj = next(j for j in st.session_state.titulares if j['nome'] == sai)
-                            entra_obj = next(j for j in st.session_state.reservas if j['nome'] == entra)
-                            posicao = sai_obj['row'].get('Posicao_Principal', 'Indefinido')
-                            atributos = obter_atributos_chave(posicao)
-                            melhorias = []
-                            pioras = []
-                            for attr in atributos:
-                                val_sai = sai_obj['row'].get(attr, np.nan)
-                                val_entra = entra_obj['row'].get(attr, np.nan)
-                                if pd.notna(val_sai) and pd.notna(val_entra):
-                                    diff = val_entra - val_sai
-                                    if diff > 0:
-                                        melhorias.append(f"{attr} (+{diff:.1f})")
-                                    elif diff < 0:
-                                        pioras.append(f"{attr} ({diff:.1f})")
-                            st.write(f"**Posição:** {posicao}")
-                            st.write(f"**Rating:** {sai_obj['row'].get('Rating_Geral_FM26',0):.1f} → {entra_obj['row'].get('Rating_Geral_FM26',0):.1f}")
-                            if melhorias:
-                                st.success("Melhorias: " + ", ".join(melhorias[:3]))
-                            if pioras:
-                                st.warning("Pioras: " + ", ".join(pioras[:3]))
-                            if not melhorias and not pioras:
-                                st.info("Perfil semelhante")
-                            confirmar = st.checkbox("Confirmar substituição mesmo assim?")
-                            if confirmar:
-                                st.session_state.titulares.remove(sai_obj)
-                                st.session_state.titulares.append(entra_obj)
-                                st.session_state.reservas.remove(entra_obj)
-                                st.session_state.reservas.append(sai_obj)
-                                st.session_state.substituicoes.append({"minuto": minuto, "sai": sai, "entra": entra})
-                                st.session_state.total_substituicoes += 1
-                                st.success(f"Substituição realizada: {sai} ↔️ {entra} ({minuto}')")
-                                st.rerun()
-        with col2:
-            if st.button("🟨 Registrar Cartão"):
-                with st.form("cartao"):
-                    todos = st.session_state.titulares + st.session_state.reservas
-                    jogador = st.selectbox("Jogador", [j['nome'] for j in todos])
-                    tipo = st.selectbox("Tipo", ["Amarelo", "Vermelho"])
-                    minuto = st.number_input("Minuto", 0, 120, 45)
-                    if st.form_submit_button("Registrar"):
-                        jog_obj = next(j for j in todos if j['nome'] == jogador)
-                        canonico = mapear_nome_para_canonico(jogador)
-                        cartoes_prof, _ = get_df_cartoes("Profissional")
-                        if canonico not in cartoes_prof:
-                            cartoes_prof[canonico] = {'amarelos':0, 'vermelho':False, 'suspenso_proxima':False, 'historico':[]}
-                        if tipo == "Amarelo":
-                            cartoes_prof[canonico]['amarelos'] += 1
-                            terceiro = cartoes_prof[canonico]['amarelos'] >= 3
-                            if terceiro:
-                                cartoes_prof[canonico]['suspenso_proxima'] = True
-                            cor = 'amarelo'
-                        else:
-                            cartoes_prof[canonico]['vermelho'] = True
-                            cartoes_prof[canonico]['suspenso_proxima'] = True
-                            terceiro = False
-                            cor = 'vermelho'
-                        cartoes_prof[canonico]['historico'].append({'data': st.session_state.data_jogo, 'adversario': st.session_state.adversario, 'cor': cor, 'terceiro_amarelo': terceiro, 'suspenso_causada': (cor == 'vermelho' or terceiro), 'suspenso_cumprida': False})
-                        salvar_cartoes_json(cartoes_prof, 'profissional')
-                        if tipo == "Vermelho" or terceiro:
-                            if jog_obj in st.session_state.titulares:
-                                st.session_state.titulares.remove(jog_obj)
-                                st.warning(f"{jogador} expulso")
-                        st.success(f"Cartão {tipo} registrado")
-                        st.rerun()
-        with col3:
-            if st.button("⚽ Registrar Gol"):
-                with st.form("gol"):
-                    todos = st.session_state.titulares + st.session_state.reservas
-                    jogador = st.selectbox("Jogador", [j['nome'] for j in todos])
-                    time_gol = st.radio("Time", ["Linhares FC", "Adversário"])
-                    minuto = st.number_input("Minuto", 0, 120, 45)
-                    if st.form_submit_button("Registrar"):
-                        st.session_state.gols.append({'minuto': minuto, 'jogador': jogador, 'time': time_gol})
-                        st.success(f"Gol registrado: {jogador} ({time_gol})")
-                        st.rerun()
-        with col4:
-            if st.button("📡 Monitorar Jogo Ao Vivo"):
-                fixture = verificar_jogo_ao_vivo()
-                if not fixture:
-                    st.error("Nenhum jogo ao vivo")
-                else:
-                    st.session_state.fixture_id = fixture
-                    st.session_state.monitorando = True
-                    st.info(f"Monitorando partida {fixture}")
-
-        if st.session_state.monitorando and st.session_state.fixture_id:
-            placeholder = st.empty()
-            if st.button("Parar monitoramento"):
-                st.session_state.monitorando = False
-                st.rerun()
-            with st.spinner("Aguardando atualizações..."):
-                for _ in range(20):
-                    if not st.session_state.monitorando: break
-                    detalhes = obter_detalhes_jogo(st.session_state.fixture_id)
-                    if detalhes:
-                        status = detalhes['fixture']['status']['short']
-                        if status in ['FT','AET','PEN','CANC','ABD']:
-                            placeholder.info("Partida encerrada. Gerando relatório...")
-                            gerar_relatorio_excel(st.session_state.fixture_id)
-                            st.session_state.monitorando = False
-                            st.success("Relatório gerado!")
-                            break
-                        else:
-                            gols_casa = detalhes['goals']['home']
-                            gols_fora = detalhes['goals']['away']
-                            minuto = detalhes['fixture']['status'].get('elapsed', 0)
-                            placeholder.info(f"⏱️ {minuto}'  Placar: {gols_casa} x {gols_fora}")
-                    time.sleep(30)
-            st.rerun()
-
-        if st.session_state.substituicoes:
-            st.write("**Substituições:**", st.session_state.substituicoes)
-        if st.session_state.gols:
-            st.write("**Gols:**", st.session_state.gols)
-        st.divider()
-        st.subheader("Escalação Atual")
-        colA, colB = st.columns(2)
-        with colA:
-            st.markdown("🏠 Time da Casa" if st.session_state.vila_e_casa else "✈️ Visitante")
-            for j in st.session_state.titulares:
-                st.write(f"• {j['nome']} ({j['apelido']})")
-        with colB:
-            st.markdown("✈️ Visitante" if st.session_state.vila_e_casa else "🏠 Casa")
-            st.write("(adversário)")
-
-# ----------------------------------------------------------------------
-# ABA COMISSÃO TÉCNICA
-# ----------------------------------------------------------------------
-with tab_comissao:
+with tabs[1]:
     st.header("Comissão Técnica")
     cat_com = st.selectbox("Categoria", ["Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"])
     df_com, cartoes_com = get_df_cartoes(cat_com)
@@ -763,124 +579,70 @@ with tab_comissao:
         st.info("Nenhum dado de comissão disponível.")
 
 # ----------------------------------------------------------------------
-# ABA CARTÕES
+# ABA 3: MONITORAMENTO AO VIVO
 # ----------------------------------------------------------------------
-with tab_cartoes:
-    st.header("Controle de Cartões e Suspensões")
-    cat_cartao = st.selectbox("Categoria", ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20"])
-    df_cart, cartoes_cart = get_df_cartoes(cat_cartao)
-    if cartoes_cart:
-        # Extrair competições
-        todas_competicoes = set()
-        for dados_cartao in cartoes_cart.values():
-            for ev in dados_cartao.get('historico', []):
-                comp = ev.get('competicao', 'Desconhecida')
-                if comp:
-                    todas_competicoes.add(comp)
-        lista_comp = sorted(list(todas_competicoes))
-        comp_filtro = st.selectbox("Filtrar por competição", ["Todas"] + lista_comp, key="filtro_comp_cartoes")
-        def filtrar_cartoes(cartoes_orig, competencia):
-            if competencia == "Todas":
-                return cartoes_orig
-            novos = {}
-            for nome, dados_cartao in cartoes_orig.items():
-                hist_filt = []
-                amarelos = 0
-                vermelho = False
-                suspenso = False
-                for ev in dados_cartao.get('historico', []):
-                    if ev.get('competicao') == competencia:
-                        hist_filt.append(ev)
-                        if ev['cor'] == 'amarelo':
-                            amarelos += 1
-                            if amarelos >= 3:
-                                suspenso = True
-                        else:
-                            vermelho = True
-                            suspenso = True
-                if hist_filt:
-                    novos[nome] = {'amarelos': amarelos, 'vermelho': vermelho, 'suspenso_proxima': suspenso, 'historico': hist_filt}
-            return novos
-        cartoes_filt = filtrar_cartoes(cartoes_cart, comp_filtro)
-        if cartoes_filt:
-            df_resumo = pd.DataFrame([{"Nome": n, "Amarelos": d.get('amarelos',0), "Vermelho": "Sim" if d.get('vermelho') else "Não", "Suspenso": "Sim" if d.get('suspenso_proxima') else "Não"} for n,d in cartoes_filt.items()])
-            st.dataframe(df_resumo, width='stretch')
-            membro_hist = st.selectbox("Selecione um membro", list(cartoes_filt.keys()))
-            if membro_hist:
-                hist = cartoes_filt[membro_hist].get('historico', [])
-                if hist:
-                    df_hist = pd.DataFrame(hist)
-                    cols_hist = ['data','adversario','competicao','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']
-                    cols_ex = [c for c in cols_hist if c in df_hist.columns]
-                    st.dataframe(df_hist[cols_ex], width='stretch')
-                else:
-                    st.info("Nenhum cartão no histórico filtrado.")
-        else:
-            st.info(f"Nenhum cartão corresponde ao filtro '{comp_filtro}'. Tente 'Todas'.")
-    else:
-        st.info("Nenhum cartão registrado ainda. Use a aba 'Partida' para registrar ou clique em 'Reinicializar cartões' se tiver CSVs.")
-    if st.button("🔄 Reinicializar cartões a partir dos CSVs"):
-        st.warning("Isso irá recriar o histórico baseado nos CSVs. Apagará registros manuais.")
-        if st.button("Confirmar reinicialização"):
-            df_prof, _ = get_df_cartoes("Profissional")
-            if df_prof is not None:
-                canonico_para_ogol = {}
-                for _, row in df_prof.iterrows():
-                    canonico = row.get('apelido')
-                    ogol = row.get('ogol_id')
-                    if canonico and pd.notna(ogol):
-                        canonico_para_ogol[canonico] = int(ogol)
-                novos_cartoes, _ = inicializar_cartoes_por_csvs('profissional', canonico_para_ogol)
-                st.success(f"Reinicializado! {len(novos_cartoes)} jogadores com cartões.")
-                st.rerun()
-            else:
-                st.error("Dados do profissional não carregados.")
-
-# ----------------------------------------------------------------------
-# ABA PRÓXIMO JOGO
-# ----------------------------------------------------------------------
-with tab_proximo:
-    st.header("📅 Próximo Jogo da Temporada")
+with tabs[2]:
     try:
-        if obter_proximo_jogo:
-            prox = obter_proximo_jogo()
-            if prox:
-                local_icon = "🏠" if prox['local_jogo'] == '(C)' else "✈️"
-                local_texto = "Casa" if prox['local_jogo'] == '(C)' else "Fora"
-                box_html = f"""
-                <div style="
-                    background-color: rgba(30, 136, 229, 0.35);
-                    border-left: 8px solid #1E88E5;
-                    border-radius: 16px;
-                    padding: 20px;
-                    margin: 15px 0;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                    backdrop-filter: blur(4px);
-                ">
-                    <h3 style="color: #1E88E5; margin-top: 0;">⚽ {prox['adversario']}</h3>
-                    <p><strong>🏆 Competição:</strong> {prox.get('competicao', 'N/I')}</p>
-                    <p><strong>📅 Data:</strong> {prox['data_jogo']}</p>
-                    <p><strong>{local_icon} Local:</strong> {local_texto}</p>
-                    <p><strong>🆔 ID:</strong> {prox['id_jogo']}</p>
-                    <p><strong>🔗 Link:</strong> <a href="{prox.get('url_completa', '#')}" target="_blank" style="color: #1E88E5;">{prox.get('url_completa', 'N/A')}</a></p>
-                    <p><strong>⏳ Status:</strong> {prox['status']}</p>
-                </div>
-                """
-                st.markdown(box_html, unsafe_allow_html=True)
-                if prox['status'] == 'NÃO INICIADO':
-                    st.info("⏰ Partida ainda não começou.")
-            else:
-                st.info("Nenhum jogo futuro encontrado.")
-        else:
-            st.warning("Módulo de cronograma não disponível.")
-    except Exception as e:
-        st.warning(f"Erro: {e}")
+        import pages.monitoramento as monitoramento
+        monitoramento.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de monitoramento: {e}")
 
 # ----------------------------------------------------------------------
-# ABA EXPORTAR
+# ABA 4: CARTÕES
 # ----------------------------------------------------------------------
-with tab_exportar:
-    st.header("Exportação de Dados")
+with tabs[3]:
+    try:
+        import pages.cartoes as cartoes
+        cartoes.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de cartões: {e}")
+
+# ----------------------------------------------------------------------
+# ABA 5: PRÓXIMO JOGO
+# ----------------------------------------------------------------------
+with tabs[4]:
+    try:
+        import pages.proximo_jogo as proximo_jogo
+        proximo_jogo.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de próximo jogo: {e}")
+
+# ----------------------------------------------------------------------
+# ABA 6: ESCALAÇÃO TÁTICA
+# ----------------------------------------------------------------------
+with tabs[5]:
+    try:
+        import pages.tatica_page as tatica_page
+        tatica_page.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de tática: {e}")
+
+# ----------------------------------------------------------------------
+# ABA 7: GESTÃO
+# ----------------------------------------------------------------------
+with tabs[6]:
+    try:
+        import pages.gestao as gestao
+        gestao.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de gestão: {e}")
+
+# ----------------------------------------------------------------------
+# ABA 8: RELATÓRIOS
+# ----------------------------------------------------------------------
+with tabs[7]:
+    try:
+        import pages.relatorios as relatorios
+        relatorios.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de relatórios: {e}")
+
+# ----------------------------------------------------------------------
+# ABA 9: EXPORTAR
+# ----------------------------------------------------------------------
+with tabs[8]:
+    st.header("📤 Exportar Dados")
     cat_export = st.selectbox("Categoria", ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"])
     df_export, _ = get_df_cartoes(cat_export)
     if df_export is not None and not df_export.empty:
@@ -904,34 +666,11 @@ with tab_exportar:
         st.warning("Nenhum dado disponível")
 
 # ----------------------------------------------------------------------
-# ABA VISUALIZAÇÃO TÁTICA
+# ABA 10: VISUALIZAÇÃO TÁTICA
 # ----------------------------------------------------------------------
-with tab_viz:
-    st.header("Visualização Tática")
-    df_viz, _ = get_df_cartoes("Profissional")
-    if df_viz is not None and not df_viz.empty:
-        jogador_viz = st.selectbox("Jogador", df_viz['nome_completo'].tolist(), key="viz_jogador")
-        tipo_viz = st.selectbox("Tipo", ["Mapa de Calor", "Finalizações", "Passes"])
-        if st.button("Gerar"):
-            # Simulação de dados – substitua por coordenadas reais lidas de CSVs
-            random.seed(42)
-            x_coords = [random.uniform(0, 120) for _ in range(50)]
-            y_coords = [random.uniform(0, 80) for _ in range(50)]
-
-            fig, ax = plt.subplots(figsize=(10, 7))
-            pitch = Pitch(pitch_type='statsbomb', line_zorder=2, pitch_color='#22312b', line_color='#efefef')
-            pitch.draw(ax=ax)
-
-            if tipo_viz == "Mapa de Calor":
-                bin_stat = VerticalPitch(pitch_type='statsbomb').bin_statistic(x_coords, y_coords, statistic='count', bins=(50, 50))
-                pitch.heatmap(bin_stat, ax=ax, cmap='Reds', edgecolors='#f9f9f9')
-            elif tipo_viz == "Finalizações":
-                pitch.scatter(x_coords, y_coords, ax=ax, c='red', label='Finalizações', alpha=0.7, s=50)
-                ax.legend()
-            else:  # Passes
-                pitch.scatter(x_coords, y_coords, ax=ax, c='green', label='Passes', alpha=0.7, s=50)
-                ax.legend()
-
-            st.pyplot(fig)
-    else:
-        st.warning("Carregue os dados do profissional primeiro.")
+with tabs[9]:
+    try:
+        import pages.visualizacao as visualizacao
+        visualizacao.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de visualização: {e}")
