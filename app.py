@@ -10,6 +10,7 @@ import random
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch, VerticalPitch
 import sqlite3
+import json
 
 # ======================================================================
 # IMPORTAÇÕES DO UTILS
@@ -65,6 +66,35 @@ from utils import (
     formatar_cartoes,
     inicializar_banco,
 )
+
+# Definição da função para exibir o próximo jogo
+def renderizar_aba_proximo_jogo():
+    st.subheader("📅 Próximo Jogo")
+    caminho_json = 'dados/jogos.json'
+    
+    if os.path.exists(caminho_json):
+        with open(caminho_json, 'r', encoding='utf-8') as f:
+            dados = json.load(f)
+            
+        lista_jogos = dados.get('jogos', [])
+        proximo_jogo = next((j for j in lista_jogos if j.get('status') == 'AGENDADO'), None)
+        
+        if proximo_jogo:
+            with st.container(border=True):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write(f"**Confronto:** {proximo_jogo.get('time_casa')} x {proximo_jogo.get('time_fora')}")
+                    st.write(f"**Competição:** {proximo_jogo.get('competicao', 'Capixabão Série B')}")
+                    st.write(f"**Data e Horário:** {proximo_jogo.get('data_jogo')} às {proximo_jogo.get('horario', '15:00')}")
+
+                with col2:
+                    st.write(f"**📍 Estádio:** {proximo_jogo.get('estadio')}")
+                    st.write(f"**🗺️ Endereço:** {proximo_jogo.get('endereco')} ({proximo_jogo.get('cidade')})")
+        else:
+            st.info("Nenhum jogo agendado no momento.")
+    else:
+        st.warning("Arquivo 'dados/jogos.json' não foi encontrado.")
 
 # ======================================================================
 # CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
