@@ -71,7 +71,7 @@ from utils import (
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para mudar a cor do texto de mensagens para preto e formatar caixas de texto
+# CSS para mudar a cor do texto de mensagens para preto e aplicar fundo preto com borda nas boxes
 st.markdown("""
 <style>
     div[data-testid="stAlert"] {
@@ -83,12 +83,12 @@ st.markdown("""
     .stAlert {
         color: black !important;
     }
-    .string-box {
-        border: 1px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0px;
-        background-color: rgba(255, 255, 255, 0.05);
+    /* Estilização para as caixas do st.container(border=True) */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: rgba(0, 0, 0, 0.85) !important;
+        border: 1px solid #444444 !important;
+        border-radius: 8px !important;
+        padding: 15px !important;
     }
 </style>
 """, unsafe_allow_html=True)
