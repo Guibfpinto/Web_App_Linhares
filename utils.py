@@ -503,25 +503,54 @@ def carregar_comissao() -> pd.DataFrame:
     if not os.path.exists(ARQUIVO_CSV_COMISSAO_PROFISSIONAL):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='utf-8-sig')
+        # Tenta ler em utf-8-sig/utf-8 e latin1 como fallback
+        try:
+            df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='utf-8-sig')
+        except UnicodeDecodeError:
+            df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='latin1')
+
+        # Padroniza nomes das colunas
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-        if 'apelido' in df.columns:
-            df['nome'] = df['apelido'].fillna('')
+
+        # 1. Definir o nome de exibição principal (Apelido ou Nome Completo)
+        if 'apelido' in df.columns and 'nome_completo' in df.columns:
+            df['nome'] = df['apelido'].fillna(df['nome_completo']).replace('', np.nan).fillna(df['nome_completo'])
+        elif 'apelido' in df.columns:
+            df['nome'] = df['apelido'].fillna('Sem Nome')
         elif 'nome_completo' in df.columns:
-            df['nome'] = df['nome_completo'].fillna('')
+            df['nome'] = df['nome_completo'].fillna('Sem Nome')
+        else:
+            df['nome'] = 'Membro'
+
+        # 2. Mapeamento do nome canônico para fotos/cartões
+        if 'apelido_norm' in df.columns:
+            df['nome_canonico'] = df['apelido_norm'].fillna(df['nome'].str.lower().str.strip())
+        else:
+            df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+
+        # 3. Cargo e Idade
         if 'cargo' not in df.columns:
-            df['cargo'] = 'Técnico'
+            df['cargo'] = 'Comissão Técnica'
+
         if 'data_nascimento' in df.columns:
-            df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
+            df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(str(x)) if pd.notna(x) else np.nan)
         else:
             df['idade'] = np.nan
+
+        # 4. Cidade e Estado
         if 'cidade_nascimento' in df.columns:
-            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df.get('uf_nascimento', '').fillna('')
-            df['cidade_uf'] = df['cidade_uf'].str.rstrip(', ')
+            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ' / ' + df.get('uf_nascimento', '').fillna('')
+            df['cidade_uf'] = df['cidade_uf'].str.strip(' /')
+            df['cidade_uf'] = df['cidade_uf'].replace('', 'N/I')
         else:
             df['cidade_uf'] = 'N/I'
-        df['pais'] = df.get('pais_nascimento', 'N/I')
-        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+
+        df['pais'] = df.get('pais_nascimento', 'Brasil').fillna('Brasil')
+
+        # 5. Mapeamento dos Históricos do CSV
+        df['historico_profissional'] = df.get('historico_comissao', '').fillna('')
+        df['historico_jogador'] = df.get('historico_jogador', '').fillna('')
+
         return df
     except Exception as e:
         st.error(f"Erro ao carregar comissão: {e}")
