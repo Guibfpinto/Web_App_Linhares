@@ -41,7 +41,8 @@ def show():
         return
 
     # ===== CRIA AS 4 ABAS =====
-    tabs = st.tabs(["⚽ Inicial", "🔄 Construção de Jogada", "⚡ Ofensivo (com bola)", "🛡️ Defensivo (sem bola)"])
+    nomes_abas = ["⚽ Inicial", "🔄 Construção de Jogada", "⚡ Ofensivo (com bola)", "🛡️ Defensivo (sem bola)"]
+    tabs = st.tabs(nomes_abas)
 
     # Mapeamento de fases: 'in' para as três primeiras, 'out' para defensiva
     fases = {
@@ -55,27 +56,33 @@ def show():
     if "escalacoes_geradas" not in st.session_state:
         st.session_state.escalacoes_geradas = {}
 
-    for tab, fase in zip(tabs, fases.values()):
+    for idx, (tab, nome_aba) in enumerate(zip(tabs, nomes_abas)):
+        fase = fases[nome_aba]
         with tab:
-            st.subheader(f"Formação – {fase.capitalize()}")
-            chave = f"tab_{fase}"
+            st.subheader(f"Formação – {nome_aba}")
+            chave_prefix = f"tab_{idx}_{fase}"  # usa índice para evitar duplicação
 
             # ===== INPUT DA FORMAÇÃO =====
             col_form, col_btn = st.columns([3, 1])
             with col_form:
-                formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2", key=f"form_{chave}")
+                # key com prefixo único
+                formacao = st.text_input(
+                    "Formação (ex: 4-4-2)",
+                    value="4-4-2",
+                    key=f"form_{chave_prefix}"
+                )
             with col_btn:
-                if st.button("Gerar Posições", key=f"btn_pos_{chave}", width='stretch'):
+                if st.button("Gerar Posições", key=f"btn_pos_{chave_prefix}", width='stretch'):
                     defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
                     if posicoes:
-                        st.session_state[f"posicoes_{chave}"] = posicoes
-                        st.session_state[f"formacao_{chave}"] = formacao
+                        st.session_state[f"posicoes_{chave_prefix}"] = posicoes
+                        st.session_state[f"formacao_{chave_prefix}"] = formacao
                         st.rerun()
                     else:
                         st.error("Formação inválida. Use ex: 4-4-2")
 
             # ===== EXIBE POSIÇÕES E ROLES =====
-            posicoes = st.session_state.get(f"posicoes_{chave}")
+            posicoes = st.session_state.get(f"posicoes_{chave_prefix}")
             if posicoes:
                 roles_disponiveis = _filtrar_roles_por_fase(fase)
                 st.write("**Defina a função (role) para cada posição:**")
@@ -117,18 +124,19 @@ def show():
                     default_index = display_roles.index(default_display) if default_display in display_roles else 0
 
                     with cols[i % 2]:
+                        # key com prefixo + índice da posição
                         role_display = st.selectbox(
                             f"{pos_exibida}",
                             options=display_roles,
                             index=default_index,
-                            key=f"role_{chave}_{i}"
+                            key=f"role_{chave_prefix}_{i}"
                         )
                         # Recupera a chave original
                         role_key = display_to_key.get(role_display, role_display)
                         roles_selecionadas.append(role_key)
 
                 # ===== BOTÃO ESCALAR =====
-                if st.button("⚽ Escalar Time", key=f"btn_escalar_{chave}", width='stretch'):
+                if st.button("⚽ Escalar Time", key=f"btn_escalar_{chave_prefix}", width='stretch'):
                     if len(roles_selecionadas) != len(posicoes):
                         st.error("Selecione uma função para cada posição.")
                     else:
@@ -143,7 +151,7 @@ def show():
                             priorizar_minutagem=True
                         )
                         # Armazena para exibição
-                        st.session_state.escalacoes_geradas[chave] = {
+                        st.session_state.escalacoes_geradas[chave_prefix] = {
                             'titulares': titulares,
                             'reservas': reservas,
                             'formacao': formacao,
@@ -153,7 +161,7 @@ def show():
                         st.rerun()
 
                 # ===== EXIBE ESCALAÇÃO GERADA =====
-                escalacao = st.session_state.escalacoes_geradas.get(chave)
+                escalacao = st.session_state.escalacoes_geradas.get(chave_prefix)
                 if escalacao:
                     st.subheader("⚽ Time Titular")
                     for i, jog in enumerate(escalacao['titulares'], 1):
