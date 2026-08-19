@@ -368,34 +368,63 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         # 4. Histórico de Cartões
         st.subheader("🟨 Histórico de Cartões")
         with st.container(border=True):
-            # Resumo da Temporada (puxado do CSV da comissão)
-            ca_totais = row.get('cartoes_amarelos_totais', 0)
-            cv_totais = row.get('cartoes_vermelhos_totais', 0)
-            jogos_temp = row.get('jogos_temporada', 0)
-            
-            col_c1, col_c2, col_c3 = st.columns(3)
-            col_c1.metric("Jogos na Temp.", int(jogos_temp) if pd.notna(jogos_temp) else 0)
-            col_c2.metric("Cartões Amarelos", int(ca_totais) if pd.notna(ca_totais) else 0)
-            col_c3.metric("Cartões Vermelhos", int(cv_totais) if pd.notna(cv_totais) else 0)
+            # Garante leitura tanto se passar o JSON completo ou apenas a chave 'cartoes'
+            dict_cartoes = cartoes.get('cartoes', cartoes) if isinstance(cartoes, dict) else {}
 
-            st.divider()
+            # Lista possíveis nomes do membro para busca no JSON
+            nomes_para_busca = [
+                str(row.get('apelido', '')).strip(),
+                str(row.get('nome', '')).strip(),
+                str(row.get('nome_completo', '')).strip(),
+                str(row.get('nome_canonico', '')).strip()
+            ]
 
-            # Busca histórico detalhado no dicionário de cartões
-            nome_canonico = str(row.get('nome_canonico', '')).strip().lower()
-            nome_apelido = str(row.get('apelido', '')).strip().lower()
-            
-            # Tenta encontrar no dicionário usando variações de nome
-            historico = []
-            for chave, dados in cartoes.items():
-                if chave.lower() in [nome_canonico, nome_apelido]:
-                    historico = dados.get('historico', [])
+            # Busca insensível a maiúsculas/minúsculas
+            dados_membro = None
+            for nome in nomes_para_busca:
+                if not nome:
+                    continue
+                for chave_json, valor_json in dict_cartoes.items():
+                    if chave_json.lower() == nome.lower():
+                        dados_membro = valor_json
+                        break
+                if dados_membro:
                     break
 
-            if historico:
-                df_hist = pd.DataFrame(historico)
-                st.dataframe(df_hist[['data', 'adversario', 'cor', 'terceiro_amarelo', 'suspenso_causada', 'suspenso_cumprida']], width='stretch')
+            if dados_membro:
+                # Métricas do JSON
+                amarelos = dados_membro.get('amarelos', 0)
+                vermelho = dados_membro.get('vermelho', False)
+                suspenso_prox = dados_membro.get('suspenso_proxima', False)
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Amarelos Acumulados", amarelos)
+                c2.metric("Cartão Vermelho", "Sim" if vermelho else "Não")
+                c3.metric("Suspenso Próx. Jogo", "Sim" if suspenso_prox else "Não")
+
+                st.divider()
+
+                # Tabela de Histórico
+                historico = dados_membro.get('historico', [])
+                if historico:
+                    df_hist = pd.DataFrame(historico)
+                    
+                    # Formatação das colunas para exibição na tela
+                    colunas_renomear = {
+                        'data': 'Data',
+                        'adversario': 'Adversário',
+                        'cor': 'Cartão',
+                        'terceiro_amarelo': '3º Amarelo',
+                        'suspenso_causada': 'Gera Suspensão',
+                        'suspenso_cumprida': 'Cumprida'
+                    }
+                    df_hist = df_hist.rename(columns=colunas_renomear)
+                    
+                    st.dataframe(df_hist, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nenhum cartão registrado no histórico deste membro.")
             else:
-                st.info("Nenhum registro de cartão detalhado em súmulas nesta temporada.")
+                st.info("Nenhum registro de cartão encontrado no JSON para este membro.")
 
 # ======================================================================
 # AUTENTICAÇÃO
