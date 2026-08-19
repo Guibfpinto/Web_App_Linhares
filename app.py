@@ -74,15 +74,12 @@ st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORAD
 # CSS para mudar a cor do texto de mensagens para preto
 st.markdown("""
 <style>
-    /* Deixa o texto das mensagens (error, warning, success, info) em preto */
     div[data-testid="stAlert"] {
         color: black !important;
     }
-    /* Para garantir que o texto dentro da caixa também fique preto */
     div[data-testid="stAlert"] .stAlert {
         color: black !important;
     }
-    /* Ajuste opcional para o texto de outros elementos */
     .stAlert {
         color: black !important;
     }
@@ -110,7 +107,6 @@ def set_background(image_path):
         """
         st.markdown(bg_css, unsafe_allow_html=True)
     else:
-        # Fallback: gradiente suave (sem aviso)
         bg_css = """
         <style>
         [data-testid="stAppViewContainer"] {
@@ -434,20 +430,20 @@ def get_df_cartoes(categoria):
 # ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
-    "📊 Análise de Elenco",    # direto no app.py
-    "👥 Comissão Técnica",      # direto no app.py
-    "⚽ Monitoramento ao Vivo", # pages.monitoramento.show()
-    "🟨 Cartões",               # pages.cartoes.show()
-    "📅 Próximo Jogo",          # pages.proximo_jogo.show()
-    "📐 Escalação Tática",      # pages.tatica_page.show()
-    "⚙️ Gestão",                # pages.gestao.show()
-    "📄 Relatórios",            # pages.relatorios.show()
-    "📤 Exportar",              # pages.exportar.show()
-    "🎥 Visualização Tática"    # pages.visualizacao.show()
+    "📊 Análise de Elenco",
+    "👥 Comissão Técnica",
+    "⚽ Monitoramento ao Vivo",
+    "🟨 Cartões",
+    "📅 Próximo Jogo",
+    "📐 Escalação Tática",
+    "⚙️ Gestão",
+    "📄 Relatórios",
+    "📤 Exportar",
+    "🎥 Visualização Tática"
 ])
 
 # ----------------------------------------------------------------------
-# ABA 1: ANÁLISE DE ELENCO (DIRETO)
+# ABA 1: ANÁLISE DE ELENCO
 # ----------------------------------------------------------------------
 with tabs[0]:
     st.header("Análise de Jogadores")
@@ -570,7 +566,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ----------------------------------------------------------------------
-# ABA 2: COMISSÃO TÉCNICA (DIRETO)
+# ABA 2: COMISSÃO TÉCNICA
 # ----------------------------------------------------------------------
 with tabs[1]:
     st.header("Comissão Técnica")
@@ -673,7 +669,11 @@ with tabs[7]:
 # ----------------------------------------------------------------------
 with tabs[8]:
     st.header("📤 Exportar Dados")
-    cat_export = st.selectbox("Categoria", ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"])
+    cat_export = st.selectbox(
+        "Categoria",
+        ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"],
+        key="export_categoria"   # <-- CHAVE ÚNICA para evitar ID duplicado
+    )
     df_export, _ = get_df_cartoes(cat_export)
     if df_export is not None and not df_export.empty:
         if st.button("📥 Exportar para Excel"):

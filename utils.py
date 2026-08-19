@@ -998,7 +998,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas encontrado.")
         return {}, []
-    # Implementação completa (copiada do PyQt)
     arquivos_com_data = []
     for arq in lista_arquivos:
         data_jogo = extrair_data_jogo(arq)
@@ -1722,27 +1721,20 @@ def obter_historico_clubes(jogador_row):
 # FORMATAÇÃO DE CARTÕES
 # =============================================
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
-    """
-    Retorna uma string formatada com os cartões de um jogador ou de todos.
-    """
     if not cartoes:
         return "Nenhum dado de cartões disponível."
-
     if nome_jogador:
         dados = cartoes.get(nome_jogador)
         if not dados:
             return f"Jogador '{nome_jogador}' não encontrado."
-
         amarelos = dados.get('amarelos', 0)
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
         historico = dados.get('historico', [])
-
         linhas = [f"📋 **Cartões de {nome_jogador}**"]
         linhas.append(f"  🟨 Amarelos acumulados: {amarelos}")
         linhas.append(f"  🟥 Vermelho direto: {vermelho}")
         linhas.append(f"  ⚠️ Suspenso para o próximo jogo: {suspenso}")
-
         if historico:
             linhas.append("\n  **Histórico (últimos eventos):**")
             for ev in historico[-5:]:
@@ -1752,7 +1744,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 emoji = "🟨" if cor == "amarelo" else "🟥"
                 linhas.append(f"    {emoji} {data} vs {adv} - {cor}")
         return "\n".join(linhas)
-
     else:
         linhas = ["📊 **RESUMO DE CARTÕES DE TODOS OS JOGADORES**", ""]
         for jog, dados in sorted(cartoes.items()):
@@ -1765,12 +1756,7 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
 # =============================================
 # STUBS PARA FUNÇÕES USADAS EM PÁGINAS
 # =============================================
-
 def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
-    """
-    Exporta a escalação para um arquivo Excel.
-    (Implementação mínima para evitar erro de importação.)
-    """
     try:
         df.to_excel(nome_arquivo, index=False, engine='openpyxl')
         return True
@@ -1779,22 +1765,32 @@ def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
         return False
 
 def inicializar_cartoes_comissao(categoria, df_comissao):
-    """
-    Inicializa o sistema de cartões para a comissão técnica.
-    (Stub – substitua pela lógica real se necessário.)
-    """
-    # Retorna um dicionário vazio para simular cartões
     return {}, []
 
 def gerar_relatorio_diretoria(df, categoria):
-    """
-    Gera um relatório para a diretoria.
-    (Stub – substitua pela lógica real se necessário.)
-    """
     if df is None or df.empty:
         return f"Sem dados para gerar relatório da diretoria – {categoria}"
     texto = f"RELATÓRIO PARA DIRETORIA – {categoria}\n"
     texto += f"Total de membros: {len(df)}\n"
     if 'nome' in df.columns:
         texto += f"Principais: {', '.join(df['nome'].head(5).tolist())}\n"
+    return texto
+
+# =============================================
+# RELATÓRIO INDIVIDUAL DE JOGADOR (STUB)
+# =============================================
+def gerar_relatorio_jogador(row, categoria):
+    """
+    Gera um relatório detalhado de um jogador.
+    (Stub – substitua pela lógica real se necessário.)
+    """
+    if row is None:
+        return "Jogador não encontrado."
+    nome = row.get('nome_completo', 'N/I')
+    apelido = row.get('apelido', 'N/I')
+    posicao = row.get('Posicao_Principal', 'N/I')
+    idade = row.get('Idade', 'N/I')
+    rating = row.get('Rating_Geral_FM26', 'N/I')
+    texto = f"RELATÓRIO DO JOGADOR – {categoria}\n"
+    texto += f"Nome: {nome}\nApelido: {apelido}\nPosição: {posicao}\nIdade: {idade}\nRating FM26: {rating}\n"
     return texto
