@@ -71,24 +71,35 @@ from utils import (
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para mudar a cor do texto de mensagens para preto e aplicar fundo preto com borda nas boxes
+# CSS para aplicar fundo preto escuro em cards, containers e métricas
 st.markdown("""
 <style>
     div[data-testid="stAlert"] {
         color: black !important;
     }
-    div[data-testid="stAlert"] .stAlert {
-        color: black !important;
-    }
-    .stAlert {
-        color: black !important;
-    }
-    /* Estilização para as caixas do st.container(border=True) */
+    
+    /* Fundo preto para caixas com border=True */
     div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: rgba(0, 0, 0, 0.85) !important;
-        border: 1px solid #444444 !important;
+        background-color: #000000 !important;
+        border: 1px solid #333333 !important;
         border-radius: 8px !important;
         padding: 15px !important;
+    }
+
+    /* Fundo preto para blocos de métricas */
+    div[data-testid="stMetric"] {
+        background-color: #000000 !important;
+        border: 1px solid #333333 !important;
+        border-radius: 8px !important;
+        padding: 10px 15px !important;
+    }
+
+    /* Fundo escuro para a área central de conteúdo (para não misturar com o escudo) */
+    .block-container {
+        background-color: rgba(0, 0, 0, 0.85) !important;
+        border-radius: 12px;
+        padding: 25px !important;
+        margin-top: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
