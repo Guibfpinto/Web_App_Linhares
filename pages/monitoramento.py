@@ -170,7 +170,9 @@ def montar_time(formacao_str, incluir_lesionados=False):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # ===== INICIALIZAÇÃO OBRIGATÓRIA DO SESSION_STATE =====
+    # ============================================================
+    # INICIALIZAÇÃO OBRIGATÓRIA DO SESSION_STATE (antes de qualquer acesso)
+    # ============================================================
     if "monitoramento_ativo" not in st.session_state:
         st.session_state.monitoramento_ativo = False
     if "fixture_id" not in st.session_state:
@@ -211,7 +213,6 @@ def show():
     st.sidebar.header("Selecionar Partida")
     conn = sqlite3.connect('meu_futebol.db', timeout=10)
 
-    # Filtra jogos do Linhares a partir de hoje
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, 
@@ -461,7 +462,7 @@ def show():
 
     st.markdown("---")
 
-    # ===== MONITORAMENTO AUTOMÁTICO =====
+    # ===== MONITORAMENTO AUTOMÁTICO (com session_state seguro) =====
     st.subheader("🔄 Monitoramento Automático")
 
     if not eh_hoje:
@@ -483,7 +484,8 @@ def show():
     else:
         st.button("🔍 Verificar Jogo ao Vivo", width='stretch', disabled=True)
 
-    if st.session_state.monitoramento_ativo and st.session_state.fixture_id:
+    # Usa .get() para segurança
+    if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
         st_autorefresh(interval=10000, key="monitor_auto")
 
         fixture_id = st.session_state.fixture_id
