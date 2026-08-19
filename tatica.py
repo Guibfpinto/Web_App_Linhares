@@ -1,7 +1,7 @@
 # tatica.py
 import pandas as pd
 import numpy as np
-from utils import mapear_nome_para_canonico
+from utils import mapear_nome_para_canonico, jogador_suspenso
 
 # =============================================
 # CONSTANTES: ATRIBUTOS FM26
@@ -23,7 +23,7 @@ ATRIBUTOS_FM26 = [
 ]
 
 # =============================================
-# ROLES FM26 (copiado integralmente do PyQt)
+# ROLES FM26 (IN POSSESSION)
 # =============================================
 ROLES_FM26_PT = {
     'Goleiro': {
@@ -443,7 +443,7 @@ ROLES_OUT_POSSESSION = {
 }
 
 # =============================================
-# TRADUÇÕES E MAPEAMENTOS
+# JUNTA AS ROLES E DEFINE CATEGORIAS
 # =============================================
 ROLES_FM26_PT.update(ROLES_OUT_POSSESSION)
 
@@ -454,77 +454,9 @@ for role in ROLES_FM26_PT:
     else:
         CATEGORIA_ROLE[role] = 'in'
 
-TRADUCAO_ROLES_PT = {
-    'Goleiro': 'Goleiro',
-    'Goleiro de Bola': 'Goleiro com Bola',
-    'Goleiro Caxias': 'Goleiro Caxias',
-    'Line-Holding Keeper': 'Goleiro de Linha',
-    'Sweeper Keeper': 'Goleiro Líbero',
-    'Zagueiro Central': 'Zagueiro Central',
-    'Zagueiro de Bola': 'Zagueiro com Bola',
-    'Zagueiro Caxias': 'Zagueiro Caxias',
-    'Zagueiro Largo': 'Zagueiro Descaído',
-    'Zagueiro Avançado': 'Zagueiro Avançado',
-    'Zagueiro Sobreposição': 'Zagueiro de Dobra',
-    'Covering Centre-Back': 'Zagueiro de Cobertura',
-    'Stopping Centre-Back': 'Zagueiro de Contenção',
-    'Covering Wide Centre-Back': 'Zagueiro Descaído de Cobertura',
-    'Stopping Wide Centre-Back': 'Zagueiro Descaído de Contenção',
-    'Lateral': 'Lateral',
-    'Lateral Interno': 'Lateral Invertido',
-    'Ala': 'Ala',
-    'Ala Avançado': 'Ala Avançado',
-    'Ala Interno': 'Ala Invertido',
-    'Ala Armador': 'Ala Construtor',
-    'Holding Full-Back': 'Lateral de Cobertura',
-    'Pressing Full-Back': 'Lateral de Pressão',
-    'Holding Wing-Back': 'Ala de Cobertura',
-    'Pressing Wing-Back': 'Ala de Pressão',
-    'Volante': 'Volante',
-    'Meio-Volante': 'Meio-Volante',
-    'Armador Recuado': 'Armador Recuado',
-    'Dropping Defensive Midfielder': 'Volante Recuado',
-    'Pressing Defensive Midfielder': 'Volante de Pressão',
-    'Screening Defensive Midfielder': 'Volante de Cobertura',
-    'Wide Covering Defensive Midfielder': 'Volante Descaído de Cobertura',
-    'Meia Central': 'Meia Central',
-    'Meia Armador': 'Meia Armador',
-    'Meia Central Largo': 'Meia Central Descaído',
-    'Meia Largo': 'Meia de Ala',
-    'Meio-Campo Box-to-Box': 'Meia Box-to-Box',
-    'Meio-Campo Box-to-Box Armador': 'Meia Box-to-Box Armador',
-    'Pressing Central Midfielder': 'Meia Central de Pressão',
-    'Screening Central Midfielder': 'Meia Central de Cobertura',
-    'Wide Covering Central Midfielder': 'Meia Central Descaído de Cobertura',
-    'Tracking Wide Midfielder': 'Meia de Ala de Cobertura',
-    'Wide Outlet Wide Midfielder': 'Meia de Ala de Saída',
-    'Meia-Atacante': 'Meia-Atacante',
-    'Meia de Corredor': 'Meia de Corredor',
-    'Livre (Free Role)': 'Função Livre',
-    'Meia Armador Avançado': 'Meia Armador Avançado',
-    'Central Outlet Attacking Midfielder': 'Meia-Atacante de Saída',
-    'Splitting Outlet Attacking Midfielder': 'Meia-Atacante de Ruptura',
-    'Tracking Attacking Midfielder': 'Meia-Atacante de Marcação',
-    'Ponta': 'Ponta',
-    'Ponta Interior': 'Ponta Invertida',
-    'Ponta Armador': 'Ponta Construtor',
-    'Atacante Largo': 'Atacante Descaído',
-    'Ponta de Infiltração': 'Ponta de Infiltração',
-    'Inside Outlet Winger': 'Ponta de Saída Interior',
-    'Tracking Winger': 'Ponta de Marcação',
-    'Wide Outlet Winger': 'Ponta de Saída Larga',
-    'Centroavante': 'Centroavante',
-    'Atacante de Corredor': 'Atacante de Corredor',
-    'Atacante Recuado': 'Atacante Recuado',
-    'Falso 9': 'Falso 9',
-    'Caçador (Poacher)': 'Caçador (Poacher)',
-    'Centroavante Alvo': 'Centroavante Alvo',
-    'Segundo Atacante': 'Segundo Atacante',
-    'Central Outlet Centre Forward': 'Centroavante de Saída',
-    'Splitting Outlet Centre Forward': 'Centroavante de Ruptura',
-    'Tracking Centre Forward': 'Centroavante de Marcação',
-}
-
+# =============================================
+# MAPEAMENTO ROLE -> POSIÇÃO ESPERADA
+# =============================================
 role_to_pos = {
     'Goleiro': 'Goleiro',
     'Goleiro de Bola': 'Goleiro',
@@ -596,6 +528,83 @@ role_to_pos = {
     'Tracking Centre Forward': 'Atacante',
 }
 
+# =============================================
+# TRADUÇÃO PARA PT-BR
+# =============================================
+TRADUCAO_ROLES_PT = {
+    'Goleiro': 'Goleiro',
+    'Goleiro de Bola': 'Goleiro com Bola',
+    'Goleiro Caxias': 'Goleiro Caxias',
+    'Line-Holding Keeper': 'Goleiro de Linha',
+    'Sweeper Keeper': 'Goleiro Líbero',
+    'Zagueiro Central': 'Zagueiro Central',
+    'Zagueiro de Bola': 'Zagueiro com Bola',
+    'Zagueiro Caxias': 'Zagueiro Caxias',
+    'Zagueiro Largo': 'Zagueiro Descaído',
+    'Zagueiro Avançado': 'Zagueiro Avançado',
+    'Zagueiro Sobreposição': 'Zagueiro de Dobra',
+    'Covering Centre-Back': 'Zagueiro de Cobertura',
+    'Stopping Centre-Back': 'Zagueiro de Contenção',
+    'Covering Wide Centre-Back': 'Zagueiro Descaído de Cobertura',
+    'Stopping Wide Centre-Back': 'Zagueiro Descaído de Contenção',
+    'Lateral': 'Lateral',
+    'Lateral Interno': 'Lateral Invertido',
+    'Ala': 'Ala',
+    'Ala Avançado': 'Ala Avançado',
+    'Ala Interno': 'Ala Invertido',
+    'Ala Armador': 'Ala Construtor',
+    'Holding Full-Back': 'Lateral de Cobertura',
+    'Pressing Full-Back': 'Lateral de Pressão',
+    'Holding Wing-Back': 'Ala de Cobertura',
+    'Pressing Wing-Back': 'Ala de Pressão',
+    'Volante': 'Volante',
+    'Meio-Volante': 'Meio-Volante',
+    'Armador Recuado': 'Armador Recuado',
+    'Dropping Defensive Midfielder': 'Volante Recuado',
+    'Pressing Defensive Midfielder': 'Volante de Pressão',
+    'Screening Defensive Midfielder': 'Volante de Cobertura',
+    'Wide Covering Defensive Midfielder': 'Volante Descaído de Cobertura',
+    'Meia Central': 'Meia Central',
+    'Meia Armador': 'Meia Armador',
+    'Meia Central Largo': 'Meia Central Descaído',
+    'Meia Largo': 'Meia de Ala',
+    'Meio-Campo Box-to-Box': 'Meia Box-to-Box',
+    'Meio-Campo Box-to-Box Armador': 'Meia Box-to-Box Armador',
+    'Pressing Central Midfielder': 'Meia Central de Pressão',
+    'Screening Central Midfielder': 'Meia Central de Cobertura',
+    'Wide Covering Central Midfielder': 'Meia Central Descaído de Cobertura',
+    'Tracking Wide Midfielder': 'Meia de Ala de Cobertura',
+    'Wide Outlet Wide Midfielder': 'Meia de Ala de Saída',
+    'Meia-Atacante': 'Meia-Atacante',
+    'Meia de Corredor': 'Meia de Corredor',
+    'Livre (Free Role)': 'Função Livre',
+    'Meia Armador Avançado': 'Meia Armador Avançado',
+    'Central Outlet Attacking Midfielder': 'Meia-Atacante de Saída',
+    'Splitting Outlet Attacking Midfielder': 'Meia-Atacante de Ruptura',
+    'Tracking Attacking Midfielder': 'Meia-Atacante de Marcação',
+    'Ponta': 'Ponta',
+    'Ponta Interior': 'Ponta Invertida',
+    'Ponta Armador': 'Ponta Construtor',
+    'Atacante Largo': 'Atacante Descaído',
+    'Ponta de Infiltração': 'Ponta de Infiltração',
+    'Inside Outlet Winger': 'Ponta de Saída Interior',
+    'Tracking Winger': 'Ponta de Marcação',
+    'Wide Outlet Winger': 'Ponta de Saída Larga',
+    'Centroavante': 'Centroavante',
+    'Atacante de Corredor': 'Atacante de Corredor',
+    'Atacante Recuado': 'Atacante Recuado',
+    'Falso 9': 'Falso 9',
+    'Caçador (Poacher)': 'Caçador (Poacher)',
+    'Centroavante Alvo': 'Centroavante Alvo',
+    'Segundo Atacante': 'Segundo Atacante',
+    'Central Outlet Centre Forward': 'Centroavante de Saída',
+    'Splitting Outlet Centre Forward': 'Centroavante de Ruptura',
+    'Tracking Centre Forward': 'Centroavante de Marcação',
+}
+
+# =============================================
+# POSIÇÃO ESPERADA PARA GRUPOS GENÉRICOS
+# =============================================
 POSICAO_ESPERADA_PARA_GRUPO = {
     'Goleiro': 'Goleiro',
     'Zagueiro': 'Defensor',
@@ -625,7 +634,7 @@ GRUPO_POSICAO_JOGADOR = {
 }
 
 # =============================================
-# FUNÇÕES DE CÁLCULO
+# FUNÇÕES DE CÁLCULO E SELEÇÃO
 # =============================================
 def calcular_score_role(row, role_name):
     if role_name not in ROLES_FM26_PT:
@@ -654,7 +663,7 @@ def selecionar_time_por_funcoes(df, roles_list, excluir_lesionados=True, cartoes
     if df is None or df.empty:
         return [], []
     df_copy = df.copy()
-    if excluir_lesionados and 'lesionado' in df_copy.columns:
+    if excluir_lesionados:
         df_copy = df_copy[~df_copy['lesionado']]
     if cartoes:
         df_copy = df_copy[~df_copy['nome_completo'].apply(
@@ -697,7 +706,12 @@ def selecionar_time_por_funcoes(df, roles_list, excluir_lesionados=True, cartoes
             score_final = (score_atributos * 0.20) + (bonus_posicao_norm * 0.40) + (bonus_minutagem_norm * 0.40)
             scores.append((idx, score_final, row))
         scores.sort(key=lambda x: x[1], reverse=True)
-        posicoes.append({'role': role, 'candidates': scores, 'selected_idx': None, 'posicao_esperada': posicao_esperada})
+        posicoes.append({
+            'role': role,
+            'candidates': scores,
+            'selected_idx': None,
+            'posicao_esperada': posicao_esperada
+        })
 
     used_indices = set()
     titulares = []
@@ -728,7 +742,13 @@ def selecionar_time_por_funcoes(df, roles_list, excluir_lesionados=True, cartoes
         if selected:
             titulares.append(selected)
         else:
-            titulares.append({'nome': 'N/D', 'apelido': 'N/D', 'role': pos['role'], 'row': None, 'score': 0})
+            titulares.append({
+                'nome': 'N/D',
+                'apelido': 'N/D',
+                'role': pos['role'],
+                'row': None,
+                'score': 0
+            })
 
     reservas_df = df_copy[~df_copy.index.isin(used_indices)]
     reservas_df['rating'] = reservas_df.apply(lambda row: row.get('Rating_Geral_FM26', 0), axis=1)
