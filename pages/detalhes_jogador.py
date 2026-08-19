@@ -1,101 +1,93 @@
 # pages/detalhes_jogador.py
 import streamlit as st
 import pandas as pd
-from utils import (
-    carregar_elenco_profissional,
-    exibir_foto,
-    inicializar_banco,
-    mapear_nome_para_canonico,
-    carregar_cartoes_json
-)
+from utils import carregar_elenco_profissional, exibir_foto, inicializar_banco
 
 def show():
     inicializar_banco()
     st.title("👤 Detalhes do Jogador")
 
-    # Obtém o índice ou ID do jogador armazenado na sessão
-    jogador_idx = st.session_state.get("jogador_idx")
-    if jogador_idx is None:
+    jogador_id = st.session_state.get("jogador_id")
+    if jogador_id is None:
         st.warning("Nenhum jogador selecionado.")
-        if st.button("← Voltar para análise"):
+        if st.button("Voltar para análise"):
             st.switch_page("pages/analise.py")
         return
 
-    # Carrega o elenco
+    # Carrega o DataFrame completo
     df = carregar_elenco_profissional()
-    if df.empty or jogador_idx >= len(df):
+    if df.empty:
+        st.error("Dados do elenco não carregados.")
+        return
+
+    # Tenta encontrar o jogador pelo ID (se existir) ou pelo índice
+    # Verifica se 'id' é uma coluna no DataFrame
+    if 'id' in df.columns:
+        jogador = df[df['id'] == jogador_id]
+    else:
+        # Se não houver coluna 'id', usa o índice (que passamos como jogador_id)
+        try:
+            jogador = df.iloc[int(jogador_id)]
+            # converte para DataFrame para manter consistência
+            jogador = pd.DataFrame([jogador])
+        except:
+            st.error("Jogador não encontrado.")
+            return
+
+    if jogador.empty:
         st.error("Jogador não encontrado.")
         return
 
-    jogador = df.iloc[jogador_idx]
+    row = jogador.iloc[0]  # primeira linha
 
-    # Cabeçalho com foto
+    # Exibe os dados
     col1, col2 = st.columns([1, 3])
     with col1:
-        exibir_foto(jogador, categoria="Profissional", width=120)
+        exibir_foto(row, categoria="Profissional", width=150)
     with col2:
-        nome = jogador.get('nome_completo', 'N/I')
-        apelido = jogador.get('apelido', 'N/I')
+        nome = row.get('nome_completo', 'N/I')
+        apelido = row.get('apelido', 'N/I')
         st.subheader(f"⚽ {nome} ({apelido})")
-        st.write(f"**Posição:** {jogador.get('Posicao_Principal', 'N/I')}")
-        st.write(f"**Idade:** {jogador.get('Idade', 'N/I')} anos")
-        st.write(f"**Estado Físico:** {jogador.get('Estado_Fisico', 'N/I')}")
+        st.write(f"**Posição:** {row.get('Posicao_Principal', 'N/I')}")
+        st.write(f"**Idade:** {row.get('Idade', 'N/I')} anos")
+        if 'numero' in row:
+            st.write(f"**Número:** {row.get('numero', 'N/I')}")
 
     # Dados pessoais
     st.subheader("📋 Dados Pessoais")
     col1, col2 = st.columns(2)
     with col1:
-        st.write(f"**Data Nascimento:** {jogador.get('data_nascimento', 'N/I')}")
-        st.write(f"**Altura:** {jogador.get('altura_cm', 'N/I')} cm")
-        st.write(f"**Peso:** {jogador.get('peso_kg', 'N/I')} kg")
-        st.write(f"**IMC:** {jogador.get('IMC', 'N/I')}")
+        st.write(f"**Data Nascimento:** {row.get('data_nascimento', 'N/I')}")
+        st.write(f"**Altura:** {row.get('altura_cm', 'N/I')} cm")
+        st.write(f"**Peso:** {row.get('peso_kg', 'N/I')} kg")
     with col2:
-        st.write(f"**Cidade:** {jogador.get('cidade_nascimento', 'N/I')}")
-        st.write(f"**UF:** {jogador.get('uf_nascimento', 'N/I')}")
-        st.write(f"**País:** {jogador.get('pais_nascimento', 'N/I')}")
-        st.write(f"**Pé Preferido:** {jogador.get('pe_pref', 'N/I')}")
+        st.write(f"**Cidade:** {row.get('cidade_nascimento', 'N/I')}")
+        st.write(f"**UF:** {row.get('uf_nascimento', 'N/I')}")
+        st.write(f"**País:** {row.get('pais_nascimento', 'N/I')}")
 
-    # Atributos FM26 (se houver)
-    atributos_fm26 = [
-        'finalizacao', 'passe', 'drible', 'desarme', 'velocidade_maxima',
-        'resistencia', 'forca_fisica', 'reflexos', 'jogo_aereo_goleiro',
-        'defesas_goleiro', 'marcacao', 'cabecada', 'antecipacao', 'posicionamento'
-    ]
-    atributos_exib = {attr: jogador.get(attr) for attr in atributos_fm26 if pd.notna(jogador.get(attr))}
-    if atributos_exib:
+    # Condição física
+    if 'IMC' in row and pd.notna(row['IMC']):
+        st.subheader("📊 Condição Física")
+        st.write(f"**IMC:** {row['IMC']:.1f}" if pd.notna(row['IMC']) else "N/I")
+        st.write(f"**% Gordura:** {row.get('Gordura_Corporal_%', 'N/I')}")
+        st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
+
+    # Atributos FM26 (se existirem)
+    atributos_fm26 = ['finalizacao', 'passe', 'drible', 'desarme', 'velocidade_maxima', 'resistencia', 'forca_fisica', 'reflexos', 'jogo_aereo_goleiro', 'defesas_goleiro']
+    attrs = {attr: row.get(attr) for attr in atributos_fm26 if attr in row and pd.notna(row[attr])}
+    if attrs:
         st.subheader("🎮 Atributos FM26")
-        df_atributos = pd.DataFrame([atributos_exib])
-        st.dataframe(df_atributos, use_container_width=True)
+        st.dataframe(pd.DataFrame([attrs]), width='stretch')
 
     # Histórico de clubes
-    if jogador.get('historico'):
+    if row.get('historico'):
         st.subheader("📜 Histórico de Clubes")
-        st.write(jogador['historico'])
+        st.write(row['historico'])
 
-    # Cartões (buscar do JSON)
+    # Cartões (buscar do banco SQLite ou JSON)
     st.subheader("🟨 Cartões e Suspensões")
-    cartoes, _ = carregar_cartoes_json('profissional')
-    nome_canonico = mapear_nome_para_canonico(jogador.get('nome_completo'))
-    if nome_canonico and nome_canonico in cartoes:
-        dados = cartoes[nome_canonico]
-        amarelos = dados.get('amarelos', 0)
-        vermelho = dados.get('vermelho', False)
-        suspenso = dados.get('suspenso_proxima', False)
-        st.write(f"🟨 Amarelos: {amarelos}")
-        st.write(f"🟥 Vermelhos: {'Sim' if vermelho else 'Não'}")
-        st.write(f"⚠️ Suspenso: {'Sim' if suspenso else 'Não'}")
-        if amarelos >= 3:
-            st.warning("⚠️ Jogador está suspenso por acúmulo de amarelos.")
-        if vermelho:
-            st.warning("⚠️ Jogador possui cartão vermelho.")
-        # Histórico
-        historico_cartoes = dados.get('historico', [])
-        if historico_cartoes:
-            st.write("**Histórico de cartões:**")
-            df_hist = pd.DataFrame(historico_cartoes)
-            st.dataframe(df_hist, use_container_width=True)
-    else:
-        st.write("Nenhum cartão registrado para este jogador.")
+    # Aqui podemos integrar com a função de cartões, mas para simplificar, mostraremos uma mensagem.
+    st.info("Os cartões podem ser visualizados na página de Cartões.")
 
     # Botão voltar
     if st.button("← Voltar para lista"):
