@@ -13,40 +13,6 @@ from utils import (
 )
 
 # ============================================================
-# INICIALIZAÇÃO DO SESSION_STATE (FORA DA FUNÇÃO)
-# ============================================================
-if "monitoramento_ativo" not in st.session_state:
-    st.session_state.monitoramento_ativo = False
-if "fixture_id" not in st.session_state:
-    st.session_state.fixture_id = None
-if "titulares" not in st.session_state:
-    st.session_state.titulares = []
-if "reservas" not in st.session_state:
-    st.session_state.reservas = []
-if "gols" not in st.session_state:
-    st.session_state.gols = []
-if "eventos" not in st.session_state:
-    st.session_state.eventos = []
-if "substituicoes" not in st.session_state:
-    st.session_state.substituicoes = []
-if "total_substituicoes" not in st.session_state:
-    st.session_state.total_substituicoes = 0
-if "ultimo_placar" not in st.session_state:
-    st.session_state.ultimo_placar = (0, 0)
-if "linhares_e_casa" not in st.session_state:
-    st.session_state.linhares_e_casa = True
-if "data_jogo" not in st.session_state:
-    st.session_state.data_jogo = ""
-if "adversario" not in st.session_state:
-    st.session_state.adversario = ""
-if "cartoes" not in st.session_state:
-    st.session_state.cartoes = {}
-if "worker_ativo" not in st.session_state:
-    st.session_state.worker_ativo = False
-if "ultima_atualizacao" not in st.session_state:
-    st.session_state.ultima_atualizacao = None
-
-# ============================================================
 # CONFIGURAÇÕES
 # ============================================================
 TEAM_ID = 12928
@@ -87,7 +53,6 @@ def obter_players_stats(fixture_id):
     return chamar_api(f"/api/fixtures/{fixture_id}/players")
 
 def buscar_jogos_competicao():
-    """Busca jogos do Linhares FC na competição via FastAPI."""
     jogos = chamar_api("/api/fixtures", params={
         "league": 1147,
         "season": 2027,
@@ -205,6 +170,38 @@ def montar_time(formacao_str, incluir_lesionados=False):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
+    # ===== INICIALIZAÇÃO OBRIGATÓRIA DO SESSION_STATE =====
+    if "monitoramento_ativo" not in st.session_state:
+        st.session_state.monitoramento_ativo = False
+    if "fixture_id" not in st.session_state:
+        st.session_state.fixture_id = None
+    if "titulares" not in st.session_state:
+        st.session_state.titulares = []
+    if "reservas" not in st.session_state:
+        st.session_state.reservas = []
+    if "gols" not in st.session_state:
+        st.session_state.gols = []
+    if "eventos" not in st.session_state:
+        st.session_state.eventos = []
+    if "substituicoes" not in st.session_state:
+        st.session_state.substituicoes = []
+    if "total_substituicoes" not in st.session_state:
+        st.session_state.total_substituicoes = 0
+    if "ultimo_placar" not in st.session_state:
+        st.session_state.ultimo_placar = (0, 0)
+    if "linhares_e_casa" not in st.session_state:
+        st.session_state.linhares_e_casa = True
+    if "data_jogo" not in st.session_state:
+        st.session_state.data_jogo = ""
+    if "adversario" not in st.session_state:
+        st.session_state.adversario = ""
+    if "cartoes" not in st.session_state:
+        st.session_state.cartoes = {}
+    if "worker_ativo" not in st.session_state:
+        st.session_state.worker_ativo = False
+    if "ultima_atualizacao" not in st.session_state:
+        st.session_state.ultima_atualizacao = None
+
     inicializar_banco()
 
     st.title("📊 Monitoramento ao Vivo")
@@ -214,15 +211,14 @@ def show():
     st.sidebar.header("Selecionar Partida")
     conn = sqlite3.connect('meu_futebol.db', timeout=10)
 
-    # Filtra apenas jogos do Linhares a partir de hoje
-    hoje = datetime.now().strftime("%Y-%m-%d")
+    # Filtra jogos do Linhares a partir de hoje
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, 
                    status, data_hora, formacao_casa, formacao_fora 
             FROM jogos 
             WHERE (time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID})
-              AND substr(data_hora, 1, 10) >= '{hoje}'
+              AND substr(data_hora, 1, 10) >= date('now')
             ORDER BY data_hora ASC
         """, conn)
     except Exception as e:
@@ -251,10 +247,9 @@ def show():
                 for jogo in jogos_api:
                     cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo['id'],))
                     if not cursor.fetchone():
-                        # Define time_casa_id e time_fora_id com base no local
                         if jogo['local'] == 'Casa':
                             time_casa = TEAM_ID
-                            time_fora = 0  # placeholder, você pode ajustar com o ID real
+                            time_fora = 0
                         else:
                             time_casa = 0
                             time_fora = TEAM_ID
@@ -282,12 +277,12 @@ def show():
         st.sidebar.warning("Nenhum jogo disponível.")
         st.stop()
 
-    # Seleção do jogo (se houver, seleciona o primeiro = mais próximo)
+    # Seleciona o primeiro (mais próximo)
     jogo_selecionado_id = st.sidebar.selectbox(
         "Escolha a partida",
         options=[op[0] for op in opcoes],
         format_func=lambda x: next(op[1] for op in opcoes if op[0] == x),
-        index=0  # seleciona o primeiro (mais próximo)
+        index=0
     )
 
     # ===== CORPO PRINCIPAL =====
@@ -309,7 +304,7 @@ def show():
     status = jogo['status']
     data_hora = jogo.get('data_hora', '')
 
-    # Verifica se a data do jogo é hoje (para liberar monitoramento)
+    # Verifica se a data do jogo é hoje
     data_jogo = datetime.strptime(data_hora[:10], "%Y-%m-%d").date() if data_hora else None
     hoje = date.today()
     eh_hoje = (data_jogo == hoje) if data_jogo else False
