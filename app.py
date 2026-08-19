@@ -283,8 +283,11 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                 st.info("Nenhum cartão registrado.")
 
 def exibir_detalhes_comissao(row, categoria, cartoes):
-    with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
-        col1, col2 = st.columns([1,2])
+    nome_exibicao = row.get('nome', row.get('nome_completo', 'Membro'))
+    
+    with st.expander(f"📋 DETALHES - {nome_exibicao}", expanded=True):
+        col1, col2 = st.columns([1, 2])
+        
         with col1:
             caminho_foto = obter_caminho_foto(row, categoria)
             if caminho_foto:
@@ -292,23 +295,74 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             else:
                 with st.container(border=True):
                     st.write("📷 Sem foto")
+                    
         with col2:
             with st.container(border=True):
-                st.write(f"**Nome:** {row.get('nome', 'N/I')}")
+                nome_completo = row.get('nome_completo')
+                st.write(f"**Nome Completo:** {nome_completo if pd.notna(nome_completo) and str(nome_completo).strip() else 'N/I'}")
+                st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
                 st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
-                st.write(f"**Idade:** {row.get('idade', 'N/I')}")
+                
+                idade = row.get('idade')
+                st.write(f"**Idade:** {int(idade) if pd.notna(idade) else 'N/I'} anos")
                 st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
                 st.write(f"**País:** {row.get('pais', 'N/I')}")
-                nome_canonico = row.get('nome_canonico', row['nome'])
+                
+                qualificacao = row.get('qualificacoes_treinador')
+                st.write(f"**Licença/Qualificação:** {qualificacao if pd.notna(qualificacao) and str(qualificacao).strip() else 'Sem registro'}")
+                
+                # Atributos CA e PA do FM26
+                ca = row.get('ca')
+                pa = row.get('pa')
+                st.write(f"**Rating Atual (CA):** {ca if pd.notna(ca) else 'N/I'} | **Potencial (PA):** {pa if pd.notna(pa) else 'N/I'}")
+                
+                nome_canonico = row.get('nome_canonico', row.get('nome', ''))
                 suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
                 st.write(f"**Suspenso:** {suspenso}")
+
         st.divider()
+
+        # 1. Histórico Profissional / Comissão
         st.subheader("📜 Histórico Profissional")
-        with st.container(border=True):
-            st.write(row.get('historico_profissional', 'Não informado'))
+        hist_prof = str(row.get('historico_profissional', '')).strip()
+        if hist_prof and hist_prof.lower() != 'nan' and hist_prof.lower() != 'não informado':
+            with st.container(border=True):
+                st.write(hist_prof)
+        else:
+            st.info("Nenhum histórico profissional registrado.")
+
+        # 2. Histórico de Jogador
         st.subheader("⚽ Histórico como Jogador")
+        hist_jog = str(row.get('historico_jogador', '')).strip()
+        if hist_jog and hist_jog.lower() != 'nan' and hist_jog.lower() != 'não informado':
+            with st.container(border=True):
+                st.write(hist_jog)
+        else:
+            st.info("Sem histórico de carreira como jogador registrado.")
+
+        # 3. Atributos de Treino e Gestão (FM26)
+        st.subheader("📊 Atributos de Treinamento (FM26)")
         with st.container(border=True):
-            st.write(row.get('historico_jogador', 'Não informado'))
+            cols_attr = st.columns(3)
+            atributos_comissao = {
+                'Ataque': 'coachingattributes_attacking',
+                'Defesa': 'coachingattributes_defending',
+                'Físico': 'coachingattributes_fitness',
+                'Goleiros': 'coachingattributes_goalkeeping',
+                'Tática': 'coachingattributes_tactical',
+                'Técnica': 'coachingattributes_technical',
+                'Gestão de Pessoas': 'coachingattributes_peoplemanagement',
+                'Trabalho c/ Jovens': 'coachingattributes_workingwithyoungsters',
+                'Bolas Paradas': 'coachingattributes_setpieces'
+            }
+            
+            for i, (label, col_name) in enumerate(atributos_comissao.items()):
+                val = row.get(col_name, np.nan)
+                val_str = f"{int(val)}" if pd.notna(val) and str(val).lower() != 'nan' else "N/I"
+                with cols_attr[i % 3]:
+                    st.write(f"**{label}:** {val_str}")
+
+        # 4. Cartões
         st.subheader("🟨 Histórico de Cartões")
         with st.container(border=True):
             if nome_canonico in cartoes:
