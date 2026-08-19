@@ -5,16 +5,16 @@ import numpy as np
 import os
 import re
 import unicodedata
-import sqlite3
 import json
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
 from typing import Dict, Optional, List
 import openpyxl
 from openpyxl.styles import Font
 from io import BytesIO
 
 # =============================================
-# CAMINHOS DOS CSVs
+# CONSTANTES DE CAMINHOS (CSVs)
 # =============================================
 ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"
 ARQUIVO_CSV_SUB20 = "perfil_completo_jogadores_Sub20_2026.csv"
@@ -25,7 +25,7 @@ ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
 ARQUIVO_CRONO_SUB20 = "cronograma_sub20_2026.csv"
 
 # =============================================
-# PASTAS DE ESTATÍSTICAS PARA CARTÕES
+# CONSTANTES DE PASTAS DE ESTATÍSTICAS
 # =============================================
 PASTA_ESTATISTICAS_PROFISSIONAL = "data/estatisticas_jogadores/"
 PASTA_ESTATISTICAS_SUB20 = "data/estatisticas_sub20/"
@@ -35,7 +35,7 @@ PASTA_ESTATISTICAS_COMISSAO_SUB20 = "data/estatisticas_comissao_tecnica_sub20/"
 PASTA_ESTATISTICAS_COMISSAO_SUB17 = "data/estatisticas_comissao_tecnica_sub17/"
 
 # =============================================
-# ARQUIVOS DE CARTÕES (JSON)
+# CONSTANTES DOS ARQUIVOS DE CARTÕES (JSON)
 # =============================================
 CAMINHO_CARTOES_PROFISSIONAL = "cartoes_acumulados_profissional.json"
 CAMINHO_CARTOES_SUB20 = "cartoes_acumulados_sub20.json"
@@ -192,20 +192,14 @@ def extrair_id_jogo(caminho_arquivo):
     return None
 
 def extrair_data_jogo(caminho_arquivo):
-    """Extrai a data do jogo do nome do arquivo ou do conteúdo."""
-    nome = os.path.basename(caminho_arquivo)
-    # Tenta extrair do nome
-    match = re.search(r'(\d{4}-\d{2}-\d{2})', nome)
+    """Extrai data do nome do arquivo ou retorna None."""
+    match = re.search(r'(\d{4}-\d{2}-\d{2})', caminho_arquivo)
     if match:
         try:
             return datetime.strptime(match.group(1), "%Y-%m-%d")
         except:
             pass
-    # Fallback: data de modificação
-    try:
-        return datetime.fromtimestamp(os.path.getmtime(caminho_arquivo))
-    except:
-        return None
+    return None
 
 # =============================================
 # CLASSIFICAÇÕES
@@ -246,7 +240,6 @@ def inicializar_banco():
     """Cria todas as tabelas necessárias se não existirem."""
     conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
-
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -336,20 +329,17 @@ def inicializar_banco():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tecnicos (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
             cargo TEXT,
             idade INTEGER,
             data_nascimento TEXT,
             historico_profissional TEXT,
-            historico_jogador TEXT,
-            time_id INTEGER
+            historico_jogador TEXT
         )
     ''')
-
     conn.commit()
     conn.close()
-    print("✅ Banco de dados inicializado com sucesso.")
 
 # =============================================
 # CARREGAMENTO DOS DADOS (CSVs)
@@ -483,6 +473,13 @@ def carregar_comissao() -> pd.DataFrame:
         else:
             df['idade'] = np.nan
         df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+        # Adiciona colunas de staff se existirem no CSV
+        staff_cols = [col for col in df.columns if col.startswith('staff_')]
+        if not staff_cols:
+            # Cria colunas vazias para evitar erros
+            for col in ['staff_lideranca', 'staff_motivacao', 'staff_tatica']:
+                if col not in df.columns:
+                    df[col] = np.nan
         return df
     except Exception as e:
         st.error(f"Erro ao carregar comissão: {e}")
@@ -520,6 +517,11 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
 # EXIBIR FOTO
 # =============================================
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
+    """
+    Exibe a foto do jogador/membro.
+    Busca na pasta correta usando apelido ou nome.
+    """
+    # 1) Tenta usar a coluna 'foto' se existir
     foto = pessoa_row.get('foto')
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
@@ -532,6 +534,8 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
         elif os.path.exists(caminho):
             st.image(caminho, width=width)
             return
+
+    # 2) Busca na pasta correta usando apelido ou nome
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
         nome_clean = normalizar_texto(nome).replace(' ', '_')
@@ -552,6 +556,8 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
                 if os.path.exists(caminho):
                     st.image(caminho, width=width)
                     return
+
+    # 3) Fallback: ícone
     st.write("📷")
 
 # =============================================
@@ -562,7 +568,7 @@ def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
         'Profissional': PASTA_ESTATISTICAS_PROFISSIONAL,
         'Sub-20': PASTA_ESTATISTICAS_SUB20,
         'Sub-17': PASTA_ESTATISTICAS_SUB17
-    }.get(categoria, '')
+    }.get(categoria, PASTA_ESTATISTICAS_PROFISSIONAL)
     if not os.path.exists(pasta):
         return []
     return [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
@@ -573,21 +579,9 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
     stats = {}
     colunas_minutos_possiveis = ['minutos', 'minutos_jogados', 'minutos_totais', 'minuto', 'tempo_jogado', 'min']
-    coluna_minutos_encontrada = None
-
     for arq in arquivos:
         try:
-            df = None
-            for sep in [';', ',']:
-                try:
-                    df_temp = pd.read_csv(arq, sep=sep, encoding='utf-8-sig', on_bad_lines='skip')
-                    if len(df_temp.columns) > 1:
-                        df = df_temp
-                        break
-                except:
-                    continue
-            if df is None:
-                continue
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
             col_min = None
             for col in colunas_minutos_possiveis:
@@ -601,9 +595,7 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                         break
                 if col_min is None:
                     continue
-            if coluna_minutos_encontrada is None:
-                coluna_minutos_encontrada = col_min
-            df[col_min] = df[col_min].astype(str).str.replace(',', '.').astype(float, errors='coerce').fillna(0)
+            df[col_min] = pd.to_numeric(df[col_min], errors='coerce').fillna(0)
             for _, row in df.iterrows():
                 jogador = row.get('jogador', '')
                 if pd.isna(jogador) or jogador == '':
@@ -631,7 +623,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                     stats[canonico]['starts'] += 1
         except Exception as e:
             st.warning(f"Erro ao ler {arq}: {e}")
-
     df_stats = pd.DataFrame.from_dict(stats, orient='index').reset_index()
     df_stats = df_stats.rename(columns={'index': 'jogador_canonico'})
     for col in ['starts', 'jogos_90min', 'minutos_totais']:
@@ -642,7 +633,7 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
     return df_stats
 
 # =============================================
-# FUNÇÕES DE CARTÕES (JSON e inicialização por CSVs)
+# FUNÇÕES DE CARTÕES (JSON)
 # =============================================
 def carregar_cartoes_json(categoria):
     """Retorna (cartoes_dict, datas_globais) do arquivo JSON."""
@@ -685,23 +676,23 @@ def jogador_suspenso(nome, cartoes):
     return cartoes[nome].get('suspenso_proxima', False)
 
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
+    """Recalcula cartões a partir dos CSVs de estatísticas (igual ao PyQt)."""
     st.info(f"🔄 Reinicializando cartões para {categoria}...")
     if categoria == 'profissional':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_PROFISSIONAL, f) for f in os.listdir(PASTA_ESTATISTICAS_PROFISSIONAL) if f.endswith('.csv')]
-        reset_ids = []
-        reset_apos_ids = []
+        pasta = PASTA_ESTATISTICAS_PROFISSIONAL
     elif categoria == 'sub20':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_SUB20, f) for f in os.listdir(PASTA_ESTATISTICAS_SUB20) if f.endswith('.csv')]
-        reset_ids = []
-        reset_apos_ids = []
+        pasta = PASTA_ESTATISTICAS_SUB20
     elif categoria == 'sub17':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_SUB17, f) for f in os.listdir(PASTA_ESTATISTICAS_SUB17) if f.endswith('.csv')]
-        reset_ids = []
-        reset_apos_ids = []
+        pasta = PASTA_ESTATISTICAS_SUB17
     else:
         st.error("Categoria inválida para jogadores.")
         return {}, []
 
+    if not os.path.exists(pasta):
+        st.warning(f"Pasta {pasta} não encontrada.")
+        return {}, []
+
+    lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas encontrado.")
         return {}, []
@@ -721,6 +712,8 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     cartoes = {}
     competicao_anterior = None
     ids_processados = set()
+    reset_ids = []
+    reset_apos_ids = []
 
     for data_jogo, arq in arquivos_com_data:
         jogo_id = extrair_id_jogo(arq)
@@ -730,7 +723,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
             ids_processados.add(jogo_id)
 
         try:
-            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
             competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
@@ -839,20 +832,26 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     return cartoes, datas_globais
 
 def inicializar_cartoes_comissao(categoria):
+    """Recalcula cartões da comissão a partir dos CSVs."""
     st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
     if categoria == 'comissao_profissional':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL) if f.endswith('.csv')]
+        pasta = PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL
         categoria_save = 'comissao_profissional'
     elif categoria == 'comissao_sub20':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_SUB20, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_SUB20) if f.endswith('.csv')]
+        pasta = PASTA_ESTATISTICAS_COMISSAO_SUB20
         categoria_save = 'comissao_sub20'
     elif categoria == 'comissao_sub17':
-        lista_arquivos = [os.path.join(PASTA_ESTATISTICAS_COMISSAO_SUB17, f) for f in os.listdir(PASTA_ESTATISTICAS_COMISSAO_SUB17) if f.endswith('.csv')]
+        pasta = PASTA_ESTATISTICAS_COMISSAO_SUB17
         categoria_save = 'comissao_sub17'
     else:
         st.error("Categoria inválida para comissão.")
         return {}, []
 
+    if not os.path.exists(pasta):
+        st.warning(f"Pasta {pasta} não encontrada.")
+        return {}, []
+
+    lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas da comissão encontrado.")
         return {}, []
@@ -883,7 +882,7 @@ def inicializar_cartoes_comissao(categoria):
             ids_processados.add(jogo_id)
 
         try:
-            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
             competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'

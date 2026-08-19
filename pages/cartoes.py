@@ -50,7 +50,7 @@ def show():
             st.rerun()
         return
 
-    # Exibe lista de jogadores/membros com cartões
+    # Exibe lista de pessoas com cartões
     st.subheader(f"📋 {len(cartoes)} pessoas com cartões")
 
     # Tabela resumo
@@ -71,14 +71,15 @@ def show():
     # Histórico detalhado de um jogador selecionado
     st.subheader("🔍 Histórico de Cartões por Pessoa")
     nomes = sorted(cartoes.keys())
-    escolha = st.selectbox("Selecione uma pessoa", nomes)
-    if escolha:
-        historico = cartoes[escolha].get('historico', [])
-        if historico:
-            df_hist = pd.DataFrame(historico)
-            st.dataframe(df_hist, use_container_width=True)
-        else:
-            st.write("Nenhum evento de cartão registrado.")
+    if nomes:
+        escolha = st.selectbox("Selecione uma pessoa", nomes)
+        if escolha:
+            historico = cartoes[escolha].get('historico', [])
+            if historico:
+                df_hist = pd.DataFrame(historico)
+                st.dataframe(df_hist, use_container_width=True)
+            else:
+                st.write("Nenhum evento de cartão registrado.")
 
     # Botão para reinicializar
     st.markdown("---")
