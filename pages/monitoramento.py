@@ -113,6 +113,26 @@ def atualizar_status_sqlite(jogo_id, status):
     conn.close()
 
 # ============================================================
+# NOVA FUNÇÃO: ATUALIZAR ÁRBITRO
+# ============================================================
+def atualizar_arbitro_sqlite(jogo_id, arbitro_id):
+    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE jogos SET arbitro_id = ? WHERE id = ?", (arbitro_id, jogo_id))
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# FUNÇÃO PARA CARREGAR ÁRBITROS
+# ============================================================
+@st.cache_data
+def carregar_arbitros():
+    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
+    conn.close()
+    return df
+
+# ============================================================
 # FUNÇÃO AUXILIAR PARA MONTAR TIME
 # ============================================================
 def montar_time(formacao_str, incluir_lesionados=False):
@@ -170,13 +190,11 @@ def montar_time(formacao_str, incluir_lesionados=False):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # ===== INICIALIZAÇÃO OBRIGATÓRIA DE TODAS AS VARIÁVEIS =====
+    # ===== INICIALIZAÇÃO =====
     if "monitoramento_ativo" not in st.session_state:
         st.session_state.monitoramento_ativo = False
     if "fixture_id" not in st.session_state:
         st.session_state.fixture_id = None
-    # Não precisa das outras, mas vamos garantir as principais
-    # (as demais só serão usadas se tiverem sido inicializadas)
 
     inicializar_banco()
 
@@ -190,7 +208,7 @@ def show():
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, 
-                   status, data_hora, formacao_casa, formacao_fora 
+                   status, data_hora, formacao_casa, formacao_fora, arbitro_id
             FROM jogos 
             WHERE (time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID})
               AND substr(data_hora, 1, 10) >= date('now')
@@ -276,21 +294,46 @@ def show():
     gols_fora = jogo['gols_fora'] or 0
     status = jogo['status']
     data_hora = jogo.get('data_hora', '')
+    arbitro_id_atual = jogo.get('arbitro_id')
 
-    # Verifica se a data do jogo é hoje
-    data_jogo = datetime.strptime(data_hora[:10], "%Y-%m-%d").date() if data_hora else None
-    hoje = date.today()
-    eh_hoje = (data_jogo == hoje) if data_jogo else False
+    # ===== CARREGAR ÁRBITROS =====
+    arbitros_df = carregar_arbitros()
+    arbitros_dict = dict(zip(arbitros_df['id'], arbitros_df['nome']))
+    nome_arbitro_atual = arbitros_dict.get(arbitro_id_atual, 'Não definido')
 
-    # ===== PLACAR E STATUS =====
+    # ===== PLACAR E STATUS COM ÁRBITRO =====
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
-    col1, col2 = st.columns([2, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         st.write(f"**Status:** {status} | **Data:** {data_hora}")
     with col2:
         st.write(f"**Data:** {data_hora}")
+    with col3:
+        st.write(f"**🟨 Árbitro:** {nome_arbitro_atual}")
 
     st.markdown("---")
+
+    # ===== EXPANSOR PARA ASSOCIAR ÁRBITRO =====
+    if not arbitros_df.empty:
+        with st.expander("👨‍⚖️ Associar / Alterar Árbitro", expanded=False):
+            with st.form(key='arbitro_form'):
+                # Define índice inicial
+                current_index = 0
+                if arbitro_id_atual in arbitros_df['id'].values:
+                    current_index = arbitros_df[arbitros_df['id'] == arbitro_id_atual].index[0]
+                
+                arbitro_id = st.selectbox(
+                    "Selecione o árbitro",
+                    options=arbitros_df['id'].tolist(),
+                    format_func=lambda x: f"{arbitros_df[arbitros_df['id'] == x]['nome'].iloc[0]} ({arbitros_df[arbitros_df['id'] == x]['categoria'].iloc[0]})",
+                    index=current_index
+                )
+                if st.form_submit_button("Salvar Árbitro"):
+                    atualizar_arbitro_sqlite(jogo_selecionado_id, arbitro_id)
+                    st.success("Árbitro associado com sucesso!")
+                    st.rerun()
+    else:
+        st.warning("Nenhum árbitro cadastrado. Cadastre árbitros na seção apropriada.")
 
     # ===== EVENTOS RECENTES =====
     conn = sqlite3.connect('meu_futebol.db', timeout=10)
@@ -310,16 +353,16 @@ def show():
 
     with col1:
         st.write("**Controle de Status**")
-        if status == 'NS' and st.button("▶️ Iniciar 1º Tempo", width='stretch'):
+        if status == 'NS' and st.button("▶️ Iniciar 1º Tempo", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, '1H')
             st.rerun()
-        elif status == '1H' and st.button("⏸️ Intervalo", width='stretch'):
+        elif status == '1H' and st.button("⏸️ Intervalo", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, 'HT')
             st.rerun()
-        elif status == 'HT' and st.button("▶️ Iniciar 2º Tempo", width='stretch'):
+        elif status == 'HT' and st.button("▶️ Iniciar 2º Tempo", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, '2H')
             st.rerun()
-        elif status == '2H' and st.button("⏹️ Encerrar", width='stretch'):
+        elif status == '2H' and st.button("⏹️ Encerrar", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, 'FT')
             st.success("Partida encerrada!")
             st.rerun()
@@ -329,11 +372,11 @@ def show():
     with col2:
         st.write("**Adicionar Gol**")
         if status in ['1H', '2H', 'HT']:
-            if st.button(f"⚽ {time_casa}", width='stretch'):
+            if st.button(f"⚽ {time_casa}", use_container_width=True):
                 atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
                 salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_casa}")
                 st.rerun()
-            if st.button(f"⚽ {time_fora}", width='stretch'):
+            if st.button(f"⚽ {time_fora}", use_container_width=True):
                 atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
                 salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_fora}")
                 st.rerun()
@@ -347,7 +390,7 @@ def show():
                 tempo = st.number_input("Minuto", 0, 120, 0, step=1)
                 tipo = st.selectbox("Tipo", ['Goal', 'Card', 'subst', 'Var'])
                 detalhes = st.text_input("Detalhes")
-                if st.form_submit_button("Adicionar Evento", width='stretch'):
+                if st.form_submit_button("Adicionar Evento", use_container_width=True):
                     salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, 0, detalhes)
                     st.success("Evento adicionado!")
                     st.rerun()
@@ -365,7 +408,7 @@ def show():
             formacao_fora = jogo.get('formacao_fora', '')
             nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
             nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
-            if st.form_submit_button("Salvar Formações", width='stretch'):
+            if st.form_submit_button("Salvar Formações", use_container_width=True):
                 conn = sqlite3.connect('meu_futebol.db')
                 cursor = conn.cursor()
                 cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
@@ -414,7 +457,7 @@ def show():
             st.warning("Elenco não carregado. Importe os dados primeiro.")
         else:
             formacao_manual = st.text_input("Formação para escalação automática", value="4-4-2")
-            if st.button("⚽ Montar Time Automaticamente", width='stretch'):
+            if st.button("⚽ Montar Time Automaticamente", use_container_width=True):
                 titulares, reservas = montar_time(formacao_manual)
                 if titulares:
                     conn = sqlite3.connect('meu_futebol.db')
@@ -434,8 +477,12 @@ def show():
 
     st.markdown("---")
 
-    # ===== MONITORAMENTO AUTOMÁTICO (com .get() para segurança) =====
+    # ===== MONITORAMENTO AUTOMÁTICO =====
     st.subheader("🔄 Monitoramento Automático")
+
+    data_jogo = datetime.strptime(data_hora[:10], "%Y-%m-%d").date() if data_hora else None
+    hoje = date.today()
+    eh_hoje = (data_jogo == hoje) if data_jogo else False
 
     if not eh_hoje:
         st.warning("⚠️ O monitoramento só pode ser iniciado no dia da partida.")
@@ -444,7 +491,7 @@ def show():
         monitor_habilitado = True
 
     if monitor_habilitado:
-        if st.button("🔍 Verificar Jogo ao Vivo", width='stretch'):
+        if st.button("🔍 Verificar Jogo ao Vivo", use_container_width=True):
             fixture_id = verificar_jogo_ao_vivo()
             if fixture_id:
                 st.session_state.fixture_id = fixture_id
@@ -454,7 +501,7 @@ def show():
             else:
                 st.warning("Nenhum jogo ao vivo encontrado. Tente novamente quando a partida começar.")
     else:
-        st.button("🔍 Verificar Jogo ao Vivo", width='stretch', disabled=True)
+        st.button("🔍 Verificar Jogo ao Vivo", use_container_width=True, disabled=True)
 
     # Leitura segura usando .get()
     if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
@@ -501,7 +548,7 @@ def show():
             conn.close()
             st.rerun()
 
-        if st.button("⏹️ Parar Monitoramento", width='stretch'):
+        if st.button("⏹️ Parar Monitoramento", use_container_width=True):
             st.session_state.monitoramento_ativo = False
             st.session_state.fixture_id = None
             st.rerun()
