@@ -439,14 +439,12 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
     """
     Exibe a foto do jogador/membro.
-    Tenta: 1) coluna 'foto' (caminho/URL), 2) pasta 'fotos/' com nome ou apelido.
-    Fallback: ícone 📷.
+    Busca na pasta correta usando apelido ou nome.
     """
+    # 1) Tenta usar a coluna 'foto' se existir
     foto = pessoa_row.get('foto')
-    # 1) Tenta usar o caminho da coluna 'foto'
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
-        # Se for URL ou caminho absoluto/relativo
         if caminho.startswith('http'):
             try:
                 st.image(caminho, width=width)
@@ -456,30 +454,34 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
         elif os.path.exists(caminho):
             st.image(caminho, width=width)
             return
-        # Se não existir, tenta ajustar o caminho relativo (ex: 'fotos/wendy.png')
-        if not os.path.exists(caminho):
-            # Tenta remover prefixos comuns
-            nome_base = os.path.basename(caminho)
-            for subdir in ['fotos/', 'fotos_sistema_Analise_Elenco/Jogadores/Profissional/']:
-                tentativa = os.path.join(subdir, nome_base)
-                if os.path.exists(tentativa):
-                    st.image(tentativa, width=width)
-                    return
-    # 2) Fallback: busca por apelido ou nome na pasta 'fotos/'
+
+    # 2) Busca na pasta correta usando apelido ou nome
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
+        # Remove acentos e espaços para formar nome do arquivo
+        nome_clean = normalizar_texto(nome).replace(' ', '_')
+        # Pastas possíveis
+        pastas = [
+            "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
+            "fotos_sistema_Analise_Elenco/Jogadores/Sub20",
+            "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+            "fotos"
+        ]
         for ext in ['.png', '.jpg', '.jpeg']:
-            caminho = os.path.join("fotos", f"{nome}{ext}")
-            if os.path.exists(caminho):
-                st.image(caminho, width=width)
-                return
-            # Tenta com nome normalizado
-            nome_norm = normalizar_texto(nome).replace(' ', '_')
-            caminho = os.path.join("fotos", f"{nome_norm}{ext}")
-            if os.path.exists(caminho):
-                st.image(caminho, width=width)
-                return
-    # 3) Nada encontrado: mostra ícone
+            for pasta in pastas:
+                # tenta com nome original
+                caminho = os.path.join(pasta, f"{nome}{ext}")
+                if os.path.exists(caminho):
+                    st.image(caminho, width=width)
+                    return
+                # tenta com nome limpo
+                caminho = os.path.join(pasta, f"{nome_clean}{ext}")
+                if os.path.exists(caminho):
+                    st.image(caminho, width=width)
+                    return
+
+    # 3) Fallback: ícone
     st.write("📷")
 
 # =============================================
@@ -500,7 +502,24 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         try:
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-            df['minutos'] = pd.to_numeric(df['minutos'], errors='coerce').fillna(0)
+
+            # Identifica coluna de minutos (pode ser 'minutos', 'minutos_jogados', 'minutos_totais')
+            col_minutos = None
+            for col in ['minutos', 'minutos_jogados', 'minutos_totais']:
+                if col in df.columns:
+                    col_minutos = col
+                    break
+            if col_minutos is None:
+                # Tenta qualquer coluna que contenha 'minuto'
+                for col in df.columns:
+                    if 'minuto' in col:
+                        col_minutos = col
+                        break
+            if col_minutos is None:
+                continue  # pula arquivo se não encontrar coluna de minutos
+
+            df[col_minutos] = pd.to_numeric(df[col_minutos], errors='coerce').fillna(0)
+
             for _, row in df.iterrows():
                 jogador = row.get('jogador', '')
                 if pd.isna(jogador) or jogador == '':
@@ -509,10 +528,12 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                 if canonico:
                     if canonico not in stats:
                         stats[canonico] = {'starts': 0, 'jogos_90min': 0, 'minutos_totais': 0}
-                    minutos = row.get('minutos', 0)
+                    minutos = row.get(col_minutos, 0)
                     stats[canonico]['minutos_totais'] += minutos
                     if minutos >= 90:
                         stats[canonico]['jogos_90min'] += 1
+
+            # Titulares (linhas 2 a 12)
             if len(df) > 12:
                 titulares_df = df.iloc[1:12]
             else:
@@ -528,6 +549,7 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                     stats[canonico]['starts'] += 1
         except Exception as e:
             st.warning(f"Erro ao ler {arq}: {e}")
+
     df_stats = pd.DataFrame.from_dict(stats, orient='index').reset_index()
     df_stats = df_stats.rename(columns={'index': 'jogador_canonico'})
     for col in ['starts', 'jogos_90min', 'minutos_totais']:
