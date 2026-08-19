@@ -496,30 +496,42 @@ def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
 def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
     arquivos = listar_arquivos_estatisticas(categoria)
     if not arquivos:
+        st.warning("Nenhum CSV de estatísticas encontrado na pasta 'data/estatisticas_jogadores/'.")
         return pd.DataFrame()
+
     stats = {}
+    colunas_minutos_possiveis = ['minutos', 'minutos_jogados', 'minutos_totais', 'minuto', 'tempo_jogado', 'min']
+    coluna_minutos_encontrada = None
+    total_linhas = 0
+
     for arq in arquivos:
         try:
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+            total_linhas += len(df)
 
-            # Identifica coluna de minutos (pode ser 'minutos', 'minutos_jogados', 'minutos_totais')
-            col_minutos = None
-            for col in ['minutos', 'minutos_jogados', 'minutos_totais']:
+            # 1) Encontra a coluna de minutos
+            col_min = None
+            for col in colunas_minutos_possiveis:
                 if col in df.columns:
-                    col_minutos = col
+                    col_min = col
                     break
-            if col_minutos is None:
+            if col_min is None:
                 # Tenta qualquer coluna que contenha 'minuto'
                 for col in df.columns:
                     if 'minuto' in col:
-                        col_minutos = col
+                        col_min = col
                         break
-            if col_minutos is None:
-                continue  # pula arquivo se não encontrar coluna de minutos
+                if col_min is None:
+                    st.warning(f"⚠️ Nenhuma coluna de minutos encontrada em {os.path.basename(arq)}. Colunas: {list(df.columns)}")
+                    continue
 
-            df[col_minutos] = pd.to_numeric(df[col_minutos], errors='coerce').fillna(0)
+            if coluna_minutos_encontrada is None:
+                coluna_minutos_encontrada = col_min
 
+            df[col_min] = pd.to_numeric(df[col_min], errors='coerce').fillna(0)
+
+            # 2) Processa jogadores
             for _, row in df.iterrows():
                 jogador = row.get('jogador', '')
                 if pd.isna(jogador) or jogador == '':
@@ -528,12 +540,13 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                 if canonico:
                     if canonico not in stats:
                         stats[canonico] = {'starts': 0, 'jogos_90min': 0, 'minutos_totais': 0}
-                    minutos = row.get(col_minutos, 0)
-                    stats[canonico]['minutos_totais'] += minutos
-                    if minutos >= 90:
+                    minutos = row.get(col_min, 0)
+                    stats[canonico]['minutos_totais'] += int(minutos)
+                    if int(minutos) >= 90:
                         stats[canonico]['jogos_90min'] += 1
+                # else: se não mapear, podemos ignorar ou avisar (opcional)
 
-            # Titulares (linhas 2 a 12)
+            # 3) Titulares (linhas 2 a 12)
             if len(df) > 12:
                 titulares_df = df.iloc[1:12]
             else:
@@ -547,9 +560,17 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
                     if canonico not in stats:
                         stats[canonico] = {'starts': 0, 'jogos_90min': 0, 'minutos_totais': 0}
                     stats[canonico]['starts'] += 1
+
         except Exception as e:
             st.warning(f"Erro ao ler {arq}: {e}")
 
+    # Se nenhum arquivo teve coluna de minutos, exibe aviso
+    if coluna_minutos_encontrada is None:
+        st.error("❌ Nenhuma coluna de minutos foi encontrada em nenhum CSV. Verifique o formato dos arquivos.")
+    else:
+        st.info(f"✅ Coluna de minutos identificada: '{coluna_minutos_encontrada}' em {len(arquivos)} arquivos, {total_linhas} linhas processadas.")
+
+    # Converte para DataFrame
     df_stats = pd.DataFrame.from_dict(stats, orient='index').reset_index()
     df_stats = df_stats.rename(columns={'index': 'jogador_canonico'})
     for col in ['starts', 'jogos_90min', 'minutos_totais']:
@@ -557,6 +578,7 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
             df_stats[col] = df_stats[col].fillna(0).astype(int)
         else:
             df_stats[col] = 0
+
     return df_stats
 
 # =============================================
