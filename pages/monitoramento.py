@@ -9,52 +9,48 @@ from utils import (
     carregar_elenco_profissional,
     interpretar_formacao,
     mapear_nome_para_canonico,
-    formatar_cartoes,
     inicializar_banco
 )
+
+# ============================================================
+# INICIALIZAÇÃO DO SESSION_STATE (FORA DA FUNÇÃO)
+# ============================================================
+if "monitoramento_ativo" not in st.session_state:
+    st.session_state.monitoramento_ativo = False
+if "fixture_id" not in st.session_state:
+    st.session_state.fixture_id = None
+if "titulares" not in st.session_state:
+    st.session_state.titulares = []
+if "reservas" not in st.session_state:
+    st.session_state.reservas = []
+if "gols" not in st.session_state:
+    st.session_state.gols = []
+if "eventos" not in st.session_state:
+    st.session_state.eventos = []
+if "substituicoes" not in st.session_state:
+    st.session_state.substituicoes = []
+if "total_substituicoes" not in st.session_state:
+    st.session_state.total_substituicoes = 0
+if "ultimo_placar" not in st.session_state:
+    st.session_state.ultimo_placar = (0, 0)
+if "linhares_e_casa" not in st.session_state:
+    st.session_state.linhares_e_casa = True
+if "data_jogo" not in st.session_state:
+    st.session_state.data_jogo = ""
+if "adversario" not in st.session_state:
+    st.session_state.adversario = ""
+if "cartoes" not in st.session_state:
+    st.session_state.cartoes = {}
+if "worker_ativo" not in st.session_state:
+    st.session_state.worker_ativo = False
+if "ultima_atualizacao" not in st.session_state:
+    st.session_state.ultima_atualizacao = None
 
 # ============================================================
 # CONFIGURAÇÕES
 # ============================================================
 TEAM_ID = 12928
 BASE_URL_FASTAPI = "http://localhost:8000"
-
-# ============================================================
-# INICIALIZAÇÃO DO ESTADO DA SESSÃO
-# ============================================================
-def init_session_state():
-    if "monitoramento_ativo" not in st.session_state:
-        st.session_state.monitoramento_ativo = False
-    if "fixture_id" not in st.session_state:
-        st.session_state.fixture_id = None
-    if "titulares" not in st.session_state:
-        st.session_state.titulares = []
-    if "reservas" not in st.session_state:
-        st.session_state.reservas = []
-    if "gols" not in st.session_state:
-        st.session_state.gols = []
-    if "eventos" not in st.session_state:
-        st.session_state.eventos = []
-    if "substituicoes" not in st.session_state:
-        st.session_state.substituicoes = []
-    if "total_substituicoes" not in st.session_state:
-        st.session_state.total_substituicoes = 0
-    if "ultimo_placar" not in st.session_state:
-        st.session_state.ultimo_placar = (0, 0)
-    if "linhares_e_casa" not in st.session_state:
-        st.session_state.linhares_e_casa = True
-    if "data_jogo" not in st.session_state:
-        st.session_state.data_jogo = ""
-    if "adversario" not in st.session_state:
-        st.session_state.adversario = ""
-    if "cartoes" not in st.session_state:
-        st.session_state.cartoes = {}
-    if "worker_ativo" not in st.session_state:
-        st.session_state.worker_ativo = False
-    if "ultima_atualizacao" not in st.session_state:
-        st.session_state.ultima_atualizacao = None
-
-init_session_state()
 
 # ============================================================
 # FUNÇÕES DE COMUNICAÇÃO COM A FASTAPI
@@ -90,6 +86,40 @@ def obter_lineups_jogo(fixture_id):
 def obter_players_stats(fixture_id):
     return chamar_api(f"/api/fixtures/{fixture_id}/players")
 
+def buscar_jogos_competicao():
+    """Busca jogos do Linhares FC na competição via FastAPI."""
+    jogos = chamar_api("/api/fixtures", params={
+        "league": 1147,
+        "season": 2027,
+        "team": TEAM_ID,
+        "from": "2026-07-12",
+        "to": "2026-08-29"
+    })
+    if not jogos:
+        return []
+    jogos_resumidos = []
+    for jogo in jogos:
+        if jogo['teams']['home']['id'] == TEAM_ID:
+            adversario = jogo['teams']['away']['name']
+            local = "Casa"
+        else:
+            adversario = jogo['teams']['home']['name']
+            local = "Fora"
+        status = jogo['fixture']['status']['short']
+        data = jogo['fixture']['date'][:10]
+        gols_casa = jogo['goals']['home']
+        gols_fora = jogo['goals']['away']
+        jogos_resumidos.append({
+            'id': jogo['fixture']['id'],
+            'data': data,
+            'adversario': adversario,
+            'local': local,
+            'status': status,
+            'gols_casa': gols_casa,
+            'gols_fora': gols_fora
+        })
+    return jogos_resumidos
+
 # ============================================================
 # FUNÇÕES DE ATUALIZAÇÃO (SQLite)
 # ============================================================
@@ -118,6 +148,60 @@ def atualizar_status_sqlite(jogo_id, status):
     conn.close()
 
 # ============================================================
+# FUNÇÃO AUXILIAR PARA MONTAR TIME
+# ============================================================
+def montar_time(formacao_str, incluir_lesionados=False):
+    df = carregar_elenco_profissional()
+    if df.empty:
+        st.error("Elenco não carregado.")
+        return None, None
+    defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_str)
+    if not posicoes:
+        st.error("Formação inválida.")
+        return None, None
+    titulares = []
+    reservas = []
+    jogadores_usados = []
+    for pos_exibida, pos_tipo in posicoes:
+        candidatos = df.copy()
+        if pos_tipo == 'Goleiro':
+            candidatos = candidatos[candidatos['Posicao_Principal'] == 'Goleiro']
+        else:
+            candidatos = candidatos[~candidatos['Posicao_Principal'].isin(['Goleiro'])]
+        if not incluir_lesionados and 'lesionado' in candidatos.columns:
+            candidatos = candidatos[~candidatos['lesionado']]
+        candidatos = candidatos[~candidatos['nome_completo'].isin(jogadores_usados)]
+        if not candidatos.empty:
+            melhor = candidatos.sort_values('Rating_Geral_FM26', ascending=False).iloc[0]
+            titulares.append({
+                'posicao_exibida': pos_exibida,
+                'posicao_tipo': pos_tipo,
+                'nome': melhor['nome_completo'],
+                'apelido': melhor['apelido'],
+                'row': melhor
+            })
+            jogadores_usados.append(melhor['nome_completo'])
+        else:
+            titulares.append({
+                'posicao_exibida': pos_exibida,
+                'posicao_tipo': pos_tipo,
+                'nome': 'N/D',
+                'apelido': 'N/D',
+                'row': None
+            })
+    reservas_df = df[~df['nome_completo'].isin(jogadores_usados)]
+    if not incluir_lesionados and 'lesionado' in reservas_df.columns:
+        reservas_df = reservas_df[~reservas_df['lesionado']]
+    reservas_df = reservas_df.sort_values('Rating_Geral_FM26', ascending=False)
+    for _, row in reservas_df.head(12).iterrows():
+        reservas.append({
+            'nome': row['nome_completo'],
+            'apelido': row['apelido'],
+            'row': row
+        })
+    return titulares, reservas
+
+# ============================================================
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
@@ -126,19 +210,19 @@ def show():
     st.title("📊 Monitoramento ao Vivo")
     st.markdown("---")
 
-    # ===== SIDEBAR: SELEÇÃO DE JOGO (apenas jogos do Linhares) =====
+    # ===== SIDEBAR: SELEÇÃO DE JOGO (apenas jogos do Linhares e futuros) =====
     st.sidebar.header("Selecionar Partida")
-
     conn = sqlite3.connect('meu_futebol.db', timeout=10)
 
-    # Filtra apenas jogos onde Linhares é time da casa ou visitante
+    # Filtra apenas jogos do Linhares a partir de hoje
+    hoje = datetime.now().strftime("%Y-%m-%d")
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, 
                    status, data_hora, formacao_casa, formacao_fora 
             FROM jogos 
-            WHERE time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID}
-                AND data_hora >= date('now')
+            WHERE (time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID})
+              AND substr(data_hora, 1, 10) >= '{hoje}'
             ORDER BY data_hora ASC
         """, conn)
     except Exception as e:
@@ -158,9 +242,8 @@ def show():
     times_dict = dict(zip(times_df['id'], times_df['nome']))
 
     if df_jogos.empty:
-        st.sidebar.warning("Nenhum jogo do Linhares FC cadastrado.")
+        st.sidebar.warning("Nenhum jogo futuro do Linhares FC cadastrado.")
         if st.sidebar.button("📥 Buscar jogos da competição"):
-            from monitoramento import buscar_jogos_competicao
             jogos_api = buscar_jogos_competicao()
             if jogos_api:
                 conn = sqlite3.connect('meu_futebol.db', timeout=10)
@@ -168,12 +251,17 @@ def show():
                 for jogo in jogos_api:
                     cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo['id'],))
                     if not cursor.fetchone():
+                        # Define time_casa_id e time_fora_id com base no local
+                        if jogo['local'] == 'Casa':
+                            time_casa = TEAM_ID
+                            time_fora = 0  # placeholder, você pode ajustar com o ID real
+                        else:
+                            time_casa = 0
+                            time_fora = TEAM_ID
                         cursor.execute('''
                             INSERT INTO jogos (id, time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (jogo['id'], TEAM_ID if jogo['local'] == 'Casa' else 0, 
-                              0 if jogo['local'] == 'Casa' else TEAM_ID,
-                              jogo['gols_casa'], jogo['gols_fora'], jogo['status'], jogo['data']))
+                        ''', (jogo['id'], time_casa, time_fora, jogo['gols_casa'], jogo['gols_fora'], jogo['status'], jogo['data']))
                 conn.commit()
                 conn.close()
                 st.success(f"{len(jogos_api)} jogos importados!")
@@ -194,10 +282,12 @@ def show():
         st.sidebar.warning("Nenhum jogo disponível.")
         st.stop()
 
+    # Seleção do jogo (se houver, seleciona o primeiro = mais próximo)
     jogo_selecionado_id = st.sidebar.selectbox(
         "Escolha a partida",
         options=[op[0] for op in opcoes],
-        format_func=lambda x: next(op[1] for op in opcoes if op[0] == x)
+        format_func=lambda x: next(op[1] for op in opcoes if op[0] == x),
+        index=0  # seleciona o primeiro (mais próximo)
     )
 
     # ===== CORPO PRINCIPAL =====
@@ -298,10 +388,87 @@ def show():
 
     st.markdown("---")
 
+    # ===== ESCALAÇÃO E FORMAÇÃO =====
+    st.subheader("📋 Escalação e Formação")
+
+    with st.expander("✏️ Definir Formações", expanded=False):
+        with st.form("formacao_form"):
+            formacao_casa = jogo.get('formacao_casa', '')
+            formacao_fora = jogo.get('formacao_fora', '')
+            nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
+            nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
+            if st.form_submit_button("Salvar Formações", width='stretch'):
+                conn = sqlite3.connect('meu_futebol.db')
+                cursor = conn.cursor()
+                cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
+                conn.commit()
+                conn.close()
+                st.success("Formações atualizadas!")
+                st.rerun()
+
+    # Escalação
+    conn = sqlite3.connect('meu_futebol.db')
+    df_lineup = pd.read_sql_query(f"SELECT * FROM eventos WHERE jogo_id = {jogo_selecionado_id} AND tipo = 'Lineup'", conn)
+    conn.close()
+
+    if not df_lineup.empty:
+        st.info("Escalação já registrada.")
+        conn = sqlite3.connect('meu_futebol.db')
+        df_elenco = pd.read_sql_query("SELECT id, nome, posicao FROM elenco", conn)
+        conn.close()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**{time_casa}**")
+            titulares_casa = df_lineup[df_lineup['detalhes'].str.contains('Titular', na=False)]
+            for _, row in titulares_casa.iterrows():
+                jogador = df_elenco[df_elenco['id'] == row['jogador_id']]
+                if not jogador.empty:
+                    nome = jogador.iloc[0]['nome']
+                    pos = jogador.iloc[0]['posicao'] or ''
+                    st.write(f"• {nome} ({pos})")
+                else:
+                    st.write("• Desconhecido")
+        with col2:
+            st.write(f"**{time_fora}**")
+            titulares_fora = df_lineup[df_lineup['detalhes'].str.contains('Visitante', na=False)]
+            for _, row in titulares_fora.iterrows():
+                jogador = df_elenco[df_elenco['id'] == row['jogador_id']]
+                if not jogador.empty:
+                    nome = jogador.iloc[0]['nome']
+                    pos = jogador.iloc[0]['posicao'] or ''
+                    st.write(f"• {nome} ({pos})")
+                else:
+                    st.write("• Desconhecido")
+    else:
+        st.write("**Definir escalação manual:**")
+        df_elenco = carregar_elenco_profissional()
+        if df_elenco.empty:
+            st.warning("Elenco não carregado. Importe os dados primeiro.")
+        else:
+            formacao_manual = st.text_input("Formação para escalação automática", value="4-4-2")
+            if st.button("⚽ Montar Time Automaticamente", width='stretch'):
+                titulares, reservas = montar_time(formacao_manual)
+                if titulares:
+                    conn = sqlite3.connect('meu_futebol.db')
+                    cursor = conn.cursor()
+                    for jog in titulares:
+                        if jog['row'] is not None:
+                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Titular')",
+                                           (jogo_selecionado_id, jog['row']['id']))
+                    for jog in reservas:
+                        if jog['row'] is not None:
+                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Reserva')",
+                                           (jogo_selecionado_id, jog['row']['id']))
+                    conn.commit()
+                    conn.close()
+                    st.success("Escalação salva!")
+                    st.rerun()
+
+    st.markdown("---")
+
     # ===== MONITORAMENTO AUTOMÁTICO =====
     st.subheader("🔄 Monitoramento Automático")
 
-    # Verifica se a data do jogo é hoje
     if not eh_hoje:
         st.warning("⚠️ O monitoramento só pode ser iniciado no dia da partida.")
         monitor_habilitado = False
