@@ -71,7 +71,7 @@ from utils import (
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para mudar a cor do texto de mensagens para preto
+# CSS para mudar a cor do texto de mensagens para preto e formatar caixas de texto
 st.markdown("""
 <style>
     div[data-testid="stAlert"] {
@@ -82,6 +82,13 @@ st.markdown("""
     }
     .stAlert {
         color: black !important;
+    }
+    .string-box {
+        border: 1px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 5px 0px;
+        background-color: rgba(255, 255, 255, 0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -171,91 +178,98 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             if caminho_foto:
                 st.image(caminho_foto, width=150)
             else:
-                st.write("📷 Sem foto")
+                with st.container(border=True):
+                    st.write("📷 Sem foto")
         with col2:
-            st.write(f"**Nome:** {row.get('nome_completo', 'N/I')}")
-            st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
-            data_nasc = row.get('data_nascimento', '')
-            idade = row.get('Idade', 'N/I')
-            st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
-            cidade = row.get('cidade_nascimento', '')
-            uf = row.get('uf_nascimento', '')
-            pais = row.get('pais_nascimento', '')
-            st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
-            st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
-            st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
-            pos_sec = row.get('Posicoes_Secundarias', [])
-            if isinstance(pos_sec, list):
-                pos_sec_str = ", ".join(pos_sec) if pos_sec else "Nenhuma"
-            else:
-                pos_sec_str = str(pos_sec) if pd.notna(pos_sec) else "Nenhuma"
-            st.write(f"**Pos. Secundárias:** {pos_sec_str}")
-            pe = row.get('pe_pref', '')
-            pe_map = {np.nan: 'N/I', 'D': 'Destro', 'C': 'Canhoto', 'A': 'Ambidestro'}
-            pe_str = pe_map.get(pe, str(pe)) if pd.notna(pe) else 'N/I'
-            st.write(f"**Pé Preferencial:** {pe_str}")
-            rating = row.get('Rating_Geral_FM26', 0)
-            st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
-            st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
-            st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
-            lesao = obter_lesao_atual(row, categoria)
-            st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
-            imc = row.get('IMC')
-            if pd.notna(imc):
-                st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
-            gordura = row.get('Gordura_Corporal_%')
-            if pd.notna(gordura):
-                st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
-            massa_magra = row.get('Massa_Magra_kg')
-            if pd.notna(massa_magra):
-                st.write(f"**Massa Magra:** {massa_magra:.1f} kg")
-            massa_muscular = row.get('Massa_Muscular_Estimada_kg')
-            if pd.notna(massa_muscular):
-                st.write(f"**Massa Muscular Estimada:** {massa_muscular:.1f} kg")
+            with st.container(border=True):
+                st.write(f"**Nome:** {row.get('nome_completo', 'N/I')}")
+                st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
+                data_nasc = row.get('data_nascimento', '')
+                idade = row.get('Idade', 'N/I')
+                st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
+                cidade = row.get('cidade_nascimento', '')
+                uf = row.get('uf_nascimento', '')
+                pais = row.get('pais_nascimento', '')
+                st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
+                st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
+                st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
+                pos_sec = row.get('Posicoes_Secundarias', [])
+                if isinstance(pos_sec, list):
+                    pos_sec_str = ", ".join(pos_sec) if pos_sec else "Nenhuma"
+                else:
+                    pos_sec_str = str(pos_sec) if pd.notna(pos_sec) else "Nenhuma"
+                st.write(f"**Pos. Secundárias:** {pos_sec_str}")
+                pe = row.get('pe_pref', '')
+                pe_map = {np.nan: 'N/I', 'D': 'Destro', 'C': 'Canhoto', 'A': 'Ambidestro'}
+                pe_str = pe_map.get(pe, str(pe)) if pd.notna(pe) else 'N/I'
+                st.write(f"**Pé Preferencial:** {pe_str}")
+                rating = row.get('Rating_Geral_FM26', 0)
+                st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
+                st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
+                st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
+                lesao = obter_lesao_atual(row, categoria)
+                st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
+                imc = row.get('IMC')
+                if pd.notna(imc):
+                    st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
+                gordura = row.get('Gordura_Corporal_%')
+                if pd.notna(gordura):
+                    st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
+                massa_magra = row.get('Massa_Magra_kg')
+                if pd.notna(massa_magra):
+                    st.write(f"**Massa Magra:** {massa_magra:.1f} kg")
+                massa_muscular = row.get('Massa_Muscular_Estimada_kg')
+                if pd.notna(massa_muscular):
+                    st.write(f"**Massa Muscular Estimada:** {massa_muscular:.1f} kg")
         st.divider()
         st.subheader("📜 Histórico de Clubes")
-        st.text(obter_historico_clubes(row))
+        with st.container(border=True):
+            st.text(obter_historico_clubes(row))
         st.subheader("🩺 Histórico de Lesões")
-        texto_lesoes = obter_historico_lesoes_texto(row, categoria)
-        st.text(texto_lesoes)
+        with st.container(border=True):
+            texto_lesoes = obter_historico_lesoes_texto(row, categoria)
+            st.text(texto_lesoes)
         st.subheader("📊 Estatísticas da Temporada (oGol)")
-        estatisticas_ogol = {
-            'jogos_temporada': 'Jogos na temporada',
-            'minutos_totais': 'Minutos totais',
-            'media_minutos_por_jogo': 'Média minutos/jogo',
-            'gols_totais': 'Gols',
-            'assistencias_totais': 'Assistências',
-            'cartoes_amarelos_totais': 'Cartões amarelos',
-            'cartoes_vermelhos_totais': 'Cartões vermelhos'
-        }
-        for col_name, label in estatisticas_ogol.items():
-            valor = row.get(col_name, '0')
-            if pd.isna(valor) or str(valor).strip() == '':
-                valor_str = '0'
-            else:
-                valor_str = str(valor).strip()
-                if valor_str.endswith('.0'):
-                    valor_str = valor_str[:-2]
-            st.write(f"**{label}:** {valor_str}")
+        with st.container(border=True):
+            estatisticas_ogol = {
+                'jogos_temporada': 'Jogos na temporada',
+                'minutos_totais': 'Minutos totais',
+                'media_minutos_por_jogo': 'Média minutos/jogo',
+                'gols_totais': 'Gols',
+                'assistencias_totais': 'Assistências',
+                'cartoes_amarelos_totais': 'Cartões amarelos',
+                'cartoes_vermelhos_totais': 'Cartões vermelhos'
+            }
+            for col_name, label in estatisticas_ogol.items():
+                valor = row.get(col_name, '0')
+                if pd.isna(valor) or str(valor).strip() == '':
+                    valor_str = '0'
+                else:
+                    valor_str = str(valor).strip()
+                    if valor_str.endswith('.0'):
+                        valor_str = valor_str[:-2]
+                st.write(f"**{label}:** {valor_str}")
         st.subheader("🎮 Atributos FM26 (todos os 60)")
-        cols_atributos = st.columns(2)
-        for i, attr in enumerate(ATRIBUTOS_FM26):
-            nome_attr = attr.replace('_', ' ').title()
-            valor = row.get(attr, np.nan)
-            valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
-            with cols_atributos[i % 2]:
-                st.write(f"**{nome_attr}:** {valor_str}")
+        with st.container(border=True):
+            cols_atributos = st.columns(2)
+            for i, attr in enumerate(ATRIBUTOS_FM26):
+                nome_attr = attr.replace('_', ' ').title()
+                valor = row.get(attr, np.nan)
+                valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
+                with cols_atributos[i % 2]:
+                    st.write(f"**{nome_attr}:** {valor_str}")
         st.subheader("🟨 Histórico de Cartões")
-        nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
-        if nome_canonico and nome_canonico in cartoes:
-            historico = cartoes[nome_canonico].get('historico', [])
-            if historico:
-                df_hist = pd.DataFrame(historico)
-                st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
+        with st.container(border=True):
+            nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
+            if nome_canonico and nome_canonico in cartoes:
+                historico = cartoes[nome_canonico].get('historico', [])
+                if historico:
+                    df_hist = pd.DataFrame(historico)
+                    st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
+                else:
+                    st.info("Nenhum cartão registrado.")
             else:
                 st.info("Nenhum cartão registrado.")
-        else:
-            st.info("Nenhum cartão registrado.")
 
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
@@ -265,31 +279,36 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             if caminho_foto:
                 st.image(caminho_foto, width=150)
             else:
-                st.write("📷 Sem foto")
+                with st.container(border=True):
+                    st.write("📷 Sem foto")
         with col2:
-            st.write(f"**Nome:** {row.get('nome', 'N/I')}")
-            st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
-            st.write(f"**Idade:** {row.get('idade', 'N/I')}")
-            st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
-            st.write(f"**País:** {row.get('pais', 'N/I')}")
-            nome_canonico = row.get('nome_canonico', row['nome'])
-            suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
-            st.write(f"**Suspenso:** {suspenso}")
+            with st.container(border=True):
+                st.write(f"**Nome:** {row.get('nome', 'N/I')}")
+                st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
+                st.write(f"**Idade:** {row.get('idade', 'N/I')}")
+                st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
+                st.write(f"**País:** {row.get('pais', 'N/I')}")
+                nome_canonico = row.get('nome_canonico', row['nome'])
+                suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
+                st.write(f"**Suspenso:** {suspenso}")
         st.divider()
         st.subheader("📜 Histórico Profissional")
-        st.write(row.get('historico_profissional', 'Não informado'))
+        with st.container(border=True):
+            st.write(row.get('historico_profissional', 'Não informado'))
         st.subheader("⚽ Histórico como Jogador")
-        st.write(row.get('historico_jogador', 'Não informado'))
+        with st.container(border=True):
+            st.write(row.get('historico_jogador', 'Não informado'))
         st.subheader("🟨 Histórico de Cartões")
-        if nome_canonico in cartoes:
-            historico = cartoes[nome_canonico].get('historico', [])
-            if historico:
-                df_hist = pd.DataFrame(historico)
-                st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
+        with st.container(border=True):
+            if nome_canonico in cartoes:
+                historico = cartoes[nome_canonico].get('historico', [])
+                if historico:
+                    df_hist = pd.DataFrame(historico)
+                    st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
+                else:
+                    st.info("Nenhum cartão registrado.")
             else:
                 st.info("Nenhum cartão registrado.")
-        else:
-            st.info("Nenhum cartão registrado.")
 
 # ======================================================================
 # AUTENTICAÇÃO
@@ -319,9 +338,10 @@ def login():
 
 def abrir_gerenciador_usuarios():
     with st.expander("Gerenciar Usuários", expanded=True):
-        st.write("**Usuários cadastrados:**")
-        for u in listar_usuarios():
-            st.write(f"- {u}")
+        with st.container(border=True):
+            st.write("**Usuários cadastrados:**")
+            for u in listar_usuarios():
+                st.write(f"- {u}")
         st.divider()
         with st.form("novo_usuario"):
             novo_user = st.text_input("Novo usuário")
@@ -499,8 +519,9 @@ with tabs[0]:
         elif opcao_analise == "Condição física detalhada":
             for estado in sorted(df_analise['Estado_Fisico'].unique()):
                 grupo = df_analise[df_analise['Estado_Fisico'] == estado]
-                st.write(f"**{estado}** ({len(grupo)} jogadores)")
-                st.dataframe(grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']])
+                with st.container(border=True):
+                    st.write(f"**{estado}** ({len(grupo)} jogadores)")
+                    st.dataframe(grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']])
 
         elif opcao_analise == "Origem (UF/País)":
             st.subheader("Distribuição por UF")
@@ -516,7 +537,8 @@ with tabs[0]:
             carencias = contagem[contagem < 3]
             if not carencias.empty:
                 st.warning("Posições carentes (menos de 3 jogadores):")
-                st.write(carencias)
+                with st.container(border=True):
+                    st.write(carencias)
             else:
                 st.success("Todas as posições têm pelo menos 3 jogadores.")
             criticos = df_analise[df_analise['Estado_Fisico'] == 'Crítico']
@@ -536,7 +558,8 @@ with tabs[0]:
                     comp_texto += f"**{cat}**: {len(df_cat)} jogadores, "
                     comp_texto += f"idade média {df_cat['Idade'].mean():.1f}, "
                     comp_texto += f"rating médio {df_cat['Rating_Geral_FM26'].mean():.1f}\n"
-            st.text(comp_texto)
+            with st.container(border=True):
+                st.text(comp_texto)
 
         elif opcao_analise == "Filtrar por posição":
             pos = st.selectbox("Posição", df_analise['Posicao_Principal'].unique())
@@ -560,7 +583,8 @@ with tabs[0]:
             lesionados = df_analise[df_analise['lesionado'] == True]
             if not lesionados.empty:
                 for _, row in lesionados.iterrows():
-                    st.write(f"• {row['nome_completo']} ({row['apelido']}) - {obter_lesao_atual(row, cat_analise)}")
+                    with st.container(border=True):
+                        st.write(f"• {row['nome_completo']} ({row['apelido']}) - {obter_lesao_atual(row, cat_analise)}")
             else:
                 st.info("Nenhum lesionado.")
     else:
