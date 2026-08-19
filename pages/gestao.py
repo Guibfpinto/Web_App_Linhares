@@ -16,13 +16,17 @@ ARQUIVO_GPS = 'dados/gps.csv'
 BANCO_DADOS = 'meu_futebol.db'
 
 # ============================================================
-# FUNÇÕES DE ACESSO AO BANCO (cada uma com sua própria conexão)
+# FUNÇÕES DE ACESSO AO BANCO (thread-safe com check_same_thread=False)
 # ============================================================
+
+def get_connection():
+    """Retorna uma nova conexão SQLite com check_same_thread=False."""
+    return sqlite3.connect(BANCO_DADOS, timeout=10, check_same_thread=False)
 
 def carregar_jogos():
     """Carrega jogos com JOINs, usando conexão local e fechando imediatamente."""
     try:
-        with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+        with get_connection() as conn:
             query = """
                 SELECT 
                     j.id AS Jogo_ID,
@@ -40,12 +44,11 @@ def carregar_jogos():
                 LEFT JOIN arbitros a ON j.arbitro_id = a.id
                 ORDER BY j.data_hora DESC
             """
-            df = pd.read_sql_query(query, conn)
-            return df
+            return pd.read_sql_query(query, conn)
     except sqlite3.OperationalError as e:
         # Se a tabela venues ou arbitros não existir, tenta sem os JOINs
         if "no such table" in str(e):
-            with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+            with get_connection() as conn:
                 query = """
                     SELECT 
                         j.id AS Jogo_ID,
@@ -64,7 +67,7 @@ def carregar_jogos():
             raise
 
 def adicionar_jogo(time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id=None, venue_id=None):
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO jogos 
@@ -75,19 +78,19 @@ def adicionar_jogo(time_casa_id, time_fora_id, gols_casa, gols_fora, status, dat
         return cursor.lastrowid
 
 def carregar_times():
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+    with get_connection() as conn:
         return pd.read_sql_query("SELECT id, nome FROM times ORDER BY nome", conn)
 
 def carregar_venues():
     try:
-        with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+        with get_connection() as conn:
             return pd.read_sql_query("SELECT id, nome FROM venues ORDER BY nome", conn)
     except sqlite3.OperationalError:
         return pd.DataFrame(columns=['id', 'nome'])
 
 def carregar_arbitros():
     try:
-        with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
+        with get_connection() as conn:
             return pd.read_sql_query("SELECT id, nome FROM arbitros ORDER BY nome", conn)
     except sqlite3.OperationalError:
         return pd.DataFrame(columns=['id', 'nome'])
@@ -165,6 +168,7 @@ def show():
                     salvar_dados_csv(df_tr, ARQUIVO_TREINOS)
                     st.success("Treino salvo no CSV com sucesso!")
                     st.rerun()
+                    return  # Interrompe execução para evitar reexecução
 
         st.dataframe(df_tr, use_container_width=True)
 
@@ -200,6 +204,7 @@ def show():
                     salvar_dados_csv(df_wb, ARQUIVO_WELLBEING)
                     st.success("Well-being salvo no CSV!")
                     st.rerun()
+                    return
 
         st.dataframe(df_wb, use_container_width=True)
 
@@ -232,6 +237,7 @@ def show():
                     salvar_dados_csv(df_les, ARQUIVO_LESOES)
                     st.success("Lesão salva no CSV!")
                     st.rerun()
+                    return
 
         st.dataframe(df_les, use_container_width=True)
 
@@ -305,6 +311,7 @@ def show():
                         if jogo_id:
                             st.success(f"Jogo {jogo_id} adicionado com sucesso!")
                             st.rerun()
+                            return
                         else:
                             st.error("Erro ao adicionar jogo.")
 
@@ -339,5 +346,6 @@ def show():
                     salvar_dados_csv(df_gps, ARQUIVO_GPS)
                     st.success("Dados de GPS salvos no CSV!")
                     st.rerun()
+                    return
 
         st.dataframe(df_gps, use_container_width=True)
