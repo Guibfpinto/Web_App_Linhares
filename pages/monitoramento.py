@@ -2,16 +2,14 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
 import requests
-import json
 from utils import (
     carregar_elenco_profissional,
     interpretar_formacao,
     mapear_nome_para_canonico,
     formatar_cartoes,
-    obter_atributos_chave,
     inicializar_banco
 )
 
@@ -22,10 +20,9 @@ TEAM_ID = 12928
 BASE_URL_FASTAPI = "http://localhost:8000"
 
 # ============================================================
-# INICIALIZAÇÃO DO ESTADO DA SESSÃO (DEVE VIR ANTES DA FUNÇÃO show)
+# INICIALIZAÇÃO DO ESTADO DA SESSÃO
 # ============================================================
 def init_session_state():
-    """Inicializa todas as variáveis do session_state."""
     if "monitoramento_ativo" not in st.session_state:
         st.session_state.monitoramento_ativo = False
     if "fixture_id" not in st.session_state:
@@ -57,7 +54,6 @@ def init_session_state():
     if "ultima_atualizacao" not in st.session_state:
         st.session_state.ultima_atualizacao = None
 
-# Chama a inicialização
 init_session_state()
 
 # ============================================================
@@ -72,41 +68,6 @@ def chamar_api(endpoint, params=None):
         return None
     except:
         return None
-
-def buscar_jogos_competicao():
-    jogos = chamar_api("/api/fixtures", params={
-        "league": 1147,
-        "season": 2027,
-        "team": TEAM_ID,
-        "from": "2026-07-12",
-        "to": "2026-08-29"
-    })
-    if not jogos:
-        return []
-    jogos_resumidos = []
-    for jogo in jogos:
-        if jogo['teams']['home']['id'] == TEAM_ID:
-            adversario = jogo['teams']['away']['name']
-            local = "Casa"
-        else:
-            adversario = jogo['teams']['home']['name']
-            local = "Fora"
-        status = jogo['fixture']['status']['short']
-        data = jogo['fixture']['date'][:10]
-        gols_casa = jogo['goals']['home']
-        gols_fora = jogo['goals']['away']
-        placar = f"{gols_casa} x {gols_fora}" if gols_casa is not None and gols_fora is not None else ""
-        jogos_resumidos.append({
-            'id': jogo['fixture']['id'],
-            'data': data,
-            'adversario': adversario,
-            'local': local,
-            'status': status,
-            'placar': placar,
-            'gols_casa': gols_casa,
-            'gols_fora': gols_fora
-        })
-    return jogos_resumidos
 
 def verificar_jogo_ao_vivo():
     dados = chamar_api("/api/fixtures/live", params={"team_id": TEAM_ID})
@@ -128,60 +89,6 @@ def obter_lineups_jogo(fixture_id):
 
 def obter_players_stats(fixture_id):
     return chamar_api(f"/api/fixtures/{fixture_id}/players")
-
-# ============================================================
-# FUNÇÕES DE MONTAGEM DO TIME
-# ============================================================
-def montar_time(formacao_str, incluir_lesionados=False):
-    df = carregar_elenco_profissional()
-    if df.empty:
-        st.error("Elenco não carregado.")
-        return None, None
-    defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_str)
-    if not posicoes:
-        st.error("Formação inválida.")
-        return None, None
-    titulares = []
-    reservas = []
-    jogadores_usados = []
-    for pos_exibida, pos_tipo in posicoes:
-        candidatos = df.copy()
-        if pos_tipo == 'Goleiro':
-            candidatos = candidatos[candidatos['Posicao_Principal'] == 'Goleiro']
-        else:
-            candidatos = candidatos[~candidatos['Posicao_Principal'].isin(['Goleiro'])]
-        if not incluir_lesionados and 'lesionado' in candidatos.columns:
-            candidatos = candidatos[~candidatos['lesionado']]
-        candidatos = candidatos[~candidatos['nome_completo'].isin(jogadores_usados)]
-        if not candidatos.empty:
-            melhor = candidatos.sort_values('Rating_Geral_FM26', ascending=False).iloc[0]
-            titulares.append({
-                'posicao_exibida': pos_exibida,
-                'posicao_tipo': pos_tipo,
-                'nome': melhor['nome_completo'],
-                'apelido': melhor['apelido'],
-                'row': melhor
-            })
-            jogadores_usados.append(melhor['nome_completo'])
-        else:
-            titulares.append({
-                'posicao_exibida': pos_exibida,
-                'posicao_tipo': pos_tipo,
-                'nome': 'N/D',
-                'apelido': 'N/D',
-                'row': None
-            })
-    reservas_df = df[~df['nome_completo'].isin(jogadores_usados)]
-    if not incluir_lesionados and 'lesionado' in reservas_df.columns:
-        reservas_df = reservas_df[~reservas_df['lesionado']]
-    reservas_df = reservas_df.sort_values('Rating_Geral_FM26', ascending=False)
-    for _, row in reservas_df.head(12).iterrows():
-        reservas.append({
-            'nome': row['nome_completo'],
-            'apelido': row['apelido'],
-            'row': row
-        })
-    return titulares, reservas
 
 # ============================================================
 # FUNÇÕES DE ATUALIZAÇÃO (SQLite)
@@ -214,27 +121,30 @@ def atualizar_status_sqlite(jogo_id, status):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # Inicializa o banco (cria tabelas se não existirem)
     inicializar_banco()
 
     st.title("📊 Monitoramento ao Vivo")
     st.markdown("---")
 
-    # ===== SIDEBAR: SELEÇÃO DE JOGO =====
+    # ===== SIDEBAR: SELEÇÃO DE JOGO (apenas jogos do Linhares) =====
     st.sidebar.header("Selecionar Partida")
 
-    # Abre conexão com o banco
     conn = sqlite3.connect('meu_futebol.db', timeout=10)
 
-    # Busca jogos
+    # Filtra apenas jogos onde Linhares é time da casa ou visitante
     try:
-        df_jogos = pd.read_sql_query("SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, formacao_casa, formacao_fora FROM jogos ORDER BY data_hora DESC", conn)
+        df_jogos = pd.read_sql_query(f"""
+            SELECT id, time_casa_id, time_fora_id, gols_casa, gols_fora, 
+                   status, data_hora, formacao_casa, formacao_fora 
+            FROM jogos 
+            WHERE time_casa_id = {TEAM_ID} OR time_fora_id = {TEAM_ID}
+            ORDER BY data_hora DESC
+        """, conn)
     except Exception as e:
         st.error(f"Erro ao carregar jogos: {e}")
         conn.close()
         return
 
-    # Busca times (usa a mesma conexão, ainda aberta)
     try:
         times_df = pd.read_sql_query("SELECT id, nome FROM times", conn)
     except Exception as e:
@@ -242,13 +152,14 @@ def show():
         conn.close()
         return
 
-    conn.close()  # Fecha a conexão depois de ler tudo
+    conn.close()
 
     times_dict = dict(zip(times_df['id'], times_df['nome']))
 
     if df_jogos.empty:
-        st.sidebar.warning("Nenhum jogo cadastrado.")
+        st.sidebar.warning("Nenhum jogo do Linhares FC cadastrado.")
         if st.sidebar.button("📥 Buscar jogos da competição"):
+            from monitoramento import buscar_jogos_competicao
             jogos_api = buscar_jogos_competicao()
             if jogos_api:
                 conn = sqlite3.connect('meu_futebol.db', timeout=10)
@@ -259,14 +170,15 @@ def show():
                         cursor.execute('''
                             INSERT INTO jogos (id, time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (jogo['id'], TEAM_ID if jogo['local'] == 'Casa' else 0, 0 if jogo['local'] == 'Casa' else TEAM_ID,
+                        ''', (jogo['id'], TEAM_ID if jogo['local'] == 'Casa' else 0, 
+                              0 if jogo['local'] == 'Casa' else TEAM_ID,
                               jogo['gols_casa'], jogo['gols_fora'], jogo['status'], jogo['data']))
                 conn.commit()
                 conn.close()
                 st.success(f"{len(jogos_api)} jogos importados!")
                 st.rerun()
             else:
-                st.error("Erro ao buscar jogos. Verifique se o backend FastAPI está rodando.")
+                st.error("Erro ao buscar jogos. Verifique o backend FastAPI.")
         st.stop()
 
     # Opções de jogos
@@ -304,19 +216,20 @@ def show():
     gols_casa = jogo['gols_casa'] or 0
     gols_fora = jogo['gols_fora'] or 0
     status = jogo['status']
-    formacao_casa = jogo.get('formacao_casa', '')
-    formacao_fora = jogo.get('formacao_fora', '')
     data_hora = jogo.get('data_hora', '')
+
+    # Verifica se a data do jogo é hoje (para liberar monitoramento)
+    data_jogo = datetime.strptime(data_hora[:10], "%Y-%m-%d").date() if data_hora else None
+    hoje = date.today()
+    eh_hoje = (data_jogo == hoje) if data_jogo else False
 
     # ===== PLACAR E STATUS =====
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns([2, 1])
     with col1:
         st.write(f"**Status:** {status} | **Data:** {data_hora}")
     with col2:
-        st.write(f"**{time_casa}:** {formacao_casa if formacao_casa else 'N/A'}")
-    with col3:
-        st.write(f"**{time_fora}:** {formacao_fora if formacao_fora else 'N/A'}")
+        st.write(f"**Data:** {data_hora}")
 
     st.markdown("---")
 
@@ -384,105 +297,30 @@ def show():
 
     st.markdown("---")
 
-    # ===== ESCALAÇÃO E FORMAÇÃO =====
-    st.subheader("📋 Escalação e Formação")
-
-    # Formações
-    with st.expander("✏️ Definir Formações", expanded=False):
-        with st.form("formacao_form"):
-            nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
-            nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
-            if st.form_submit_button("Salvar Formações", width='stretch'):
-                conn = sqlite3.connect('meu_futebol.db')
-                cursor = conn.cursor()
-                cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
-                conn.commit()
-                conn.close()
-                st.success("Formações atualizadas!")
-                st.rerun()
-
-    # Escalação
-    conn = sqlite3.connect('meu_futebol.db')
-    df_lineup = pd.read_sql_query(f"SELECT * FROM eventos WHERE jogo_id = {jogo_selecionado_id} AND tipo = 'Lineup'", conn)
-    conn.close()
-
-    if not df_lineup.empty:
-        st.info("Escalação já registrada.")
-        conn = sqlite3.connect('meu_futebol.db')
-        df_elenco = pd.read_sql_query("SELECT id, nome, posicao FROM elenco", conn)
-        conn.close()
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"**{time_casa}**")
-            titulares_casa = df_lineup[df_lineup['detalhes'].str.contains('Titular', na=False)]
-            for _, row in titulares_casa.iterrows():
-                jogador = df_elenco[df_elenco['id'] == row['jogador_id']]
-                if not jogador.empty:
-                    nome = jogador.iloc[0]['nome']
-                    pos = jogador.iloc[0]['posicao'] or ''
-                    st.write(f"• {nome} ({pos})")
-                else:
-                    st.write("• Desconhecido")
-        with col2:
-            st.write(f"**{time_fora}**")
-            titulares_fora = df_lineup[df_lineup['detalhes'].str.contains('Visitante', na=False)]
-            for _, row in titulares_fora.iterrows():
-                jogador = df_elenco[df_elenco['id'] == row['jogador_id']]
-                if not jogador.empty:
-                    nome = jogador.iloc[0]['nome']
-                    pos = jogador.iloc[0]['posicao'] or ''
-                    st.write(f"• {nome} ({pos})")
-                else:
-                    st.write("• Desconhecido")
-    else:
-        st.write("**Definir escalação manual:**")
-        df_elenco = carregar_elenco_profissional()
-        if df_elenco.empty:
-            st.warning("Elenco não carregado. Importe os dados primeiro.")
-        else:
-            formacao_manual = st.text_input("Formação para escalação automática", value="4-4-2")
-            if st.button("⚽ Montar Time Automaticamente", width='stretch'):
-                titulares, reservas = montar_time(formacao_manual)
-                if titulares:
-                    conn = sqlite3.connect('meu_futebol.db')
-                    cursor = conn.cursor()
-                    for jog in titulares:
-                        if jog['row'] is not None:
-                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Titular')",
-                                           (jogo_selecionado_id, jog['row']['id']))
-                    for jog in reservas:
-                        if jog['row'] is not None:
-                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Reserva')",
-                                           (jogo_selecionado_id, jog['row']['id']))
-                    conn.commit()
-                    conn.close()
-                    st.success("Escalação salva!")
-                    st.rerun()
-
-    st.markdown("---")
-
-    # ===== MONITORAMENTO AUTOMÁTICO (USANDO FASTAPI) =====
+    # ===== MONITORAMENTO AUTOMÁTICO =====
     st.subheader("🔄 Monitoramento Automático")
 
-    if st.button("🔍 Verificar Jogo ao Vivo", width='stretch'):
-        fixture_id = verificar_jogo_ao_vivo()
-        if fixture_id:
-            st.session_state.fixture_id = fixture_id
-            st.session_state.monitoramento_ativo = True
-            st.success(f"Jogo ao vivo encontrado! ID: {fixture_id}")
-            st.rerun()
-        else:
-            st.warning("Nenhum jogo ao vivo encontrado. Deseja buscar da competição?")
-            if st.button("📥 Buscar jogos da competição"):
-                jogos = buscar_jogos_competicao()
-                if jogos:
-                    for j in jogos:
-                        st.write(f"- {j['data']} - {j['local']} vs {j['adversario']} - {j['status']}")
-                else:
-                    st.error("Erro ao buscar jogos. Verifique o backend FastAPI.")
+    # Verifica se a data do jogo é hoje
+    if not eh_hoje:
+        st.warning("⚠️ O monitoramento só pode ser iniciado no dia da partida.")
+        monitor_habilitado = False
+    else:
+        monitor_habilitado = True
+
+    if monitor_habilitado:
+        if st.button("🔍 Verificar Jogo ao Vivo", width='stretch'):
+            fixture_id = verificar_jogo_ao_vivo()
+            if fixture_id:
+                st.session_state.fixture_id = fixture_id
+                st.session_state.monitoramento_ativo = True
+                st.success(f"Jogo ao vivo encontrado! ID: {fixture_id}")
+                st.rerun()
+            else:
+                st.warning("Nenhum jogo ao vivo encontrado. Tente novamente quando a partida começar.")
+    else:
+        st.button("🔍 Verificar Jogo ao Vivo", width='stretch', disabled=True)
 
     if st.session_state.monitoramento_ativo and st.session_state.fixture_id:
-        # Atualização automática a cada 10 segundos
         st_autorefresh(interval=10000, key="monitor_auto")
 
         fixture_id = st.session_state.fixture_id
@@ -526,24 +364,6 @@ def show():
             conn.close()
             st.rerun()
 
-        estatisticas = obter_estatisticas_jogo(fixture_id)
-        if estatisticas:
-            with st.expander("📊 Estatísticas Coletivas", expanded=False):
-                for time_stats in estatisticas:
-                    st.write(f"**{time_stats['team']['name']}**")
-                    for stat in time_stats['statistics']:
-                        st.write(f"- {stat['type']}: {stat['value']}")
-
-        players_stats = obter_players_stats(fixture_id)
-        if players_stats:
-            with st.expander("📊 Estatísticas Individuais", expanded=False):
-                for time_data in players_stats:
-                    st.write(f"**{time_data['team']['name']}**")
-                    for jogador in time_data['players']:
-                        nome = jogador['player']['name']
-                        stats = jogador['statistics'][0]
-                        st.write(f"- {nome}: {stats['games']['minutes']} min | ⚽ {stats['goals']['total']} gols | 🅰 {stats['goals']['assists']} assistências")
-
         if st.button("⏹️ Parar Monitoramento", width='stretch'):
             st.session_state.monitoramento_ativo = False
             st.session_state.fixture_id = None
@@ -551,6 +371,3 @@ def show():
 
     st.markdown("---")
     st.caption(f"Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-
-if __name__ == "__main__":
-    show()
