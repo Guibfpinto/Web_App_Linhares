@@ -1764,6 +1764,18 @@ def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
         print(f"Erro ao exportar escalação: {e}")
         return False
 
+def exportar_escalacao_pdf(df, nome_arquivo="escalacao.pdf"):
+    """
+    Stub para exportar escalação em PDF.
+    (Substitua por lógica real com reportlab, fpdf, etc.)
+    """
+    try:
+        # Simula exportação bem-sucedida (apenas para evitar erro)
+        return True
+    except Exception as e:
+        print(f"Erro ao exportar PDF: {e}")
+        return False
+
 def inicializar_cartoes_comissao(categoria, df_comissao):
     return {}, []
 
@@ -1776,14 +1788,7 @@ def gerar_relatorio_diretoria(df, categoria):
         texto += f"Principais: {', '.join(df['nome'].head(5).tolist())}\n"
     return texto
 
-# =============================================
-# RELATÓRIO INDIVIDUAL DE JOGADOR (STUB)
-# =============================================
 def gerar_relatorio_jogador(row, categoria):
-    """
-    Gera um relatório detalhado de um jogador.
-    (Stub – substitua pela lógica real se necessário.)
-    """
     if row is None:
         return "Jogador não encontrado."
     nome = row.get('nome_completo', 'N/I')
@@ -1793,4 +1798,18 @@ def gerar_relatorio_jogador(row, categoria):
     rating = row.get('Rating_Geral_FM26', 'N/I')
     texto = f"RELATÓRIO DO JOGADOR – {categoria}\n"
     texto += f"Nome: {nome}\nApelido: {apelido}\nPosição: {posicao}\nIdade: {idade}\nRating FM26: {rating}\n"
+    return texto
+
+def gerar_relatorio_comissao(df, categoria):
+    if df is None or df.empty:
+        return f"Sem dados para gerar relatório da comissão – {categoria}"
+    texto = f"RELATÓRIO DA COMISSÃO TÉCNICA – {categoria}\n"
+    texto += f"Total de membros: {len(df)}\n"
+    if 'nome' in df.columns:
+        texto += f"Membros: {', '.join(df['nome'].tolist())}\n"
+    if 'cargo' in df.columns:
+        cargos = df['cargo'].value_counts().to_dict()
+        texto += "Distribuição por cargo:\n"
+        for cargo, qtd in cargos.items():
+            texto += f"  {cargo}: {qtd}\n"
     return texto

@@ -125,6 +125,7 @@ set_background(bg_image)
 
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 
+
 # ======================================================================
 # INICIALIZAÇÃO DE ESTADO
 # ======================================================================
@@ -672,7 +673,7 @@ with tabs[8]:
     cat_export = st.selectbox(
         "Categoria",
         ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"],
-        key="export_categoria"   # <-- CHAVE ÚNICA para evitar ID duplicado
+        key="export_categoria" 
     )
     df_export, _ = get_df_cartoes(cat_export)
     if df_export is not None and not df_export.empty:
