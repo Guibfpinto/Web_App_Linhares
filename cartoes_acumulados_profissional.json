@@ -1,0 +1,210 @@
+{
+  "cartoes": {
+    "Rayner": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "05/08/2026",
+          "adversario": "CTE Colatina",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1175696
+    },
+    "Junior Espeto": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": null
+    },
+    "Gabriel Amorim": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1542489
+    },
+    "João Firmino": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "14/08/2026",
+          "adversario": "Doze FC",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 649473
+    },
+    "Wendy": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": true
+        }
+      ],
+      "ogol_id": 391833
+    },
+    "Borjão": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "19/07/2026",
+          "adversario": "Doze FC",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": true
+        }
+      ],
+      "ogol_id": 481421
+    },
+    "Yuri Ribeiro": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "28/07/2026",
+          "adversario": "GEL",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1461714
+    },
+    "Kaká": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "05/08/2026",
+          "adversario": "CTE Colatina",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 807983
+    },
+    "Lucas Titol": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "05/08/2026",
+          "adversario": "CTE Colatina",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 973784
+    }
+  },
+  "datas_globais": [
+    "2026-07-12",
+    "2026-07-19",
+    "2026-07-28",
+    "2026-08-05",
+    "2026-08-08",
+    "2026-08-14"
+  ]
+}

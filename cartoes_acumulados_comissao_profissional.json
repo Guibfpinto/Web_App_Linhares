@@ -1,0 +1,35 @@
+{
+  "cartoes": {
+    "Yupi Silva": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": true
+        }
+      ]
+    }
+  },
+  "datas_globais": [
+    "2026-07-12",
+    "2026-07-19",
+    "2026-07-28",
+    "2026-08-05",
+    "2026-08-08",
+    "2026-08-14"
+  ]
+}
