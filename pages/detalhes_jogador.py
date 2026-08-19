@@ -1,94 +1,65 @@
 # pages/detalhes_jogador.py
 import streamlit as st
+import sqlite3
 import pandas as pd
-from utils import carregar_elenco_profissional, exibir_foto, inicializar_banco
+from utils import exibir_foto, inicializar_banco, mapear_nome_para_canonico
 
 def show():
     inicializar_banco()
     st.title("👤 Detalhes do Jogador")
 
     jogador_id = st.session_state.get("jogador_id")
-    if jogador_id is None:
+    if not jogador_id:
         st.warning("Nenhum jogador selecionado.")
         if st.button("Voltar para análise"):
             st.switch_page("pages/analise.py")
         return
 
-    # Carrega o DataFrame completo
-    df = carregar_elenco_profissional()
-    if df.empty:
-        st.error("Dados do elenco não carregados.")
-        return
+    # Carrega dados do jogador do SQLite (ou do CSV)
+    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM elenco WHERE id = ?", (jogador_id,))
+    row = cursor.fetchone()
+    conn.close()
 
-    # Tenta encontrar o jogador pelo ID (se existir) ou pelo índice
-    # Verifica se 'id' é uma coluna no DataFrame
-    if 'id' in df.columns:
-        jogador = df[df['id'] == jogador_id]
-    else:
-        # Se não houver coluna 'id', usa o índice (que passamos como jogador_id)
-        try:
-            jogador = df.iloc[int(jogador_id)]
-            # converte para DataFrame para manter consistência
-            jogador = pd.DataFrame([jogador])
-        except:
+    if not row:
+        # Fallback: tenta buscar do CSV
+        from utils import carregar_elenco_profissional
+        df = carregar_elenco_profissional()
+        if jogador_id < len(df):
+            row = df.iloc[jogador_id].to_dict()
+        else:
             st.error("Jogador não encontrado.")
             return
 
-    if jogador.empty:
-        st.error("Jogador não encontrado.")
-        return
+    # Se row for um dicionário (do CSV), usa diretamente, senão converte
+    if isinstance(row, tuple):
+        colunas = [desc[0] for desc in cursor.description] if 'cursor' in locals() else ['id', 'nome', 'apelido', 'posicao', 'idade']
+        jogador = dict(zip(colunas, row))
+    else:
+        jogador = row
 
-    row = jogador.iloc[0]  # primeira linha
-
-    # Exibe os dados
+    # Exibe dados
     col1, col2 = st.columns([1, 3])
     with col1:
-        exibir_foto(row, categoria="Profissional", width=150)
+        exibir_foto(jogador, categoria="Profissional", width=120)
     with col2:
-        nome = row.get('nome_completo', 'N/I')
-        apelido = row.get('apelido', 'N/I')
-        st.subheader(f"⚽ {nome} ({apelido})")
-        st.write(f"**Posição:** {row.get('Posicao_Principal', 'N/I')}")
-        st.write(f"**Idade:** {row.get('Idade', 'N/I')} anos")
-        if 'numero' in row:
-            st.write(f"**Número:** {row.get('numero', 'N/I')}")
+        st.subheader(f"⚽ {jogador.get('nome', jogador.get('nome_completo', 'N/I'))} ({jogador.get('apelido', 'N/I')})")
+        st.write(f"**Posição:** {jogador.get('posicao', 'N/I')}")
+        st.write(f"**Idade:** {jogador.get('idade', jogador.get('Idade', 'N/I'))} anos")
+        st.write(f"**Número:** {jogador.get('numero', 'N/I')}")
 
-    # Dados pessoais
+    # Mais detalhes (físicos, atributos, etc.)
     st.subheader("📋 Dados Pessoais")
     col1, col2 = st.columns(2)
     with col1:
-        st.write(f"**Data Nascimento:** {row.get('data_nascimento', 'N/I')}")
-        st.write(f"**Altura:** {row.get('altura_cm', 'N/I')} cm")
-        st.write(f"**Peso:** {row.get('peso_kg', 'N/I')} kg")
+        st.write(f"**Altura:** {jogador.get('altura_cm', 'N/I')} cm")
+        st.write(f"**Peso:** {jogador.get('peso_kg', 'N/I')} kg")
+        st.write(f"**IMC:** {jogador.get('IMC', 'N/I')}")
     with col2:
-        st.write(f"**Cidade:** {row.get('cidade_nascimento', 'N/I')}")
-        st.write(f"**UF:** {row.get('uf_nascimento', 'N/I')}")
-        st.write(f"**País:** {row.get('pais_nascimento', 'N/I')}")
+        st.write(f"**Cidade:** {jogador.get('cidade_nascimento', 'N/I')}")
+        st.write(f"**UF:** {jogador.get('uf_nascimento', 'N/I')}")
+        st.write(f"**País:** {jogador.get('pais_nascimento', 'N/I')}")
 
-    # Condição física
-    if 'IMC' in row and pd.notna(row['IMC']):
-        st.subheader("📊 Condição Física")
-        st.write(f"**IMC:** {row['IMC']:.1f}" if pd.notna(row['IMC']) else "N/I")
-        st.write(f"**% Gordura:** {row.get('Gordura_Corporal_%', 'N/I')}")
-        st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
-
-    # Atributos FM26 (se existirem)
-    atributos_fm26 = ['finalizacao', 'passe', 'drible', 'desarme', 'velocidade_maxima', 'resistencia', 'forca_fisica', 'reflexos', 'jogo_aereo_goleiro', 'defesas_goleiro']
-    attrs = {attr: row.get(attr) for attr in atributos_fm26 if attr in row and pd.notna(row[attr])}
-    if attrs:
-        st.subheader("🎮 Atributos FM26")
-        st.dataframe(pd.DataFrame([attrs]), width='stretch')
-
-    # Histórico de clubes
-    if row.get('historico'):
-        st.subheader("📜 Histórico de Clubes")
-        st.write(row['historico'])
-
-    # Cartões (buscar do banco SQLite ou JSON)
-    st.subheader("🟨 Cartões e Suspensões")
-    # Aqui podemos integrar com a função de cartões, mas para simplificar, mostraremos uma mensagem.
-    st.info("Os cartões podem ser visualizados na página de Cartões.")
-
-    # Botão voltar
     if st.button("← Voltar para lista"):
         st.switch_page("pages/analise.py")
