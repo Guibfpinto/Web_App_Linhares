@@ -24,7 +24,7 @@ def show():
 
     st.subheader(f"{len(df)} membros encontrados")
 
-    # Exibe lista em cards
+    # Exibe lista em cards com botão "Ver detalhes"
     for idx, row in df.iterrows():
         col1, col2 = st.columns([1, 4])
         with col1:
@@ -36,8 +36,10 @@ def show():
             st.write(f"**{nome}**")
             st.write(f"Cargo: {cargo} | Idade: {idade if pd.notna(idade) else 'N/I'} anos")
             # Botão para ver detalhes
-            if st.button(f"Ver detalhes", key=f"btn_{idx}"):
+            if st.button("Ver detalhes", key=f"btn_{idx}"):
+                # Armazena o índice do membro no session_state
                 st.session_state.membro_comissao_idx = idx
                 st.session_state.membro_comissao_nome = nome
+                # Navega para a página de detalhes da comissão
                 st.switch_page("pages/detalhes_comissao.py")
         st.divider()

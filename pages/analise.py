@@ -9,7 +9,8 @@ from utils import (
     exibir_foto,
     carregar_estatisticas_partidas,
     mapear_nome_para_canonico,
-    inicializar_banco
+    inicializar_banco,
+    listar_arquivos_estatisticas
 )
 
 def show():
@@ -62,27 +63,28 @@ def show():
 
     st.subheader(f"Total: {len(df_filtrado)} registros")
 
-    # Exibição com foto (usando a função corrigida)
-    if 'foto' in df_filtrado.columns or True:
-        for idx, row in df_filtrado.iterrows():
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                exibir_foto(row, categoria="Profissional", width=80)
-            with col2:
-                st.write(f"**{row.get('nome_completo', 'N/I')}** ({row.get('apelido', 'N/I')})")
-                info = f"{row.get('Posicao_Principal', 'N/I')} | {row.get('Idade', 'N/I')} anos | {row.get('Estado_Fisico', 'N/I')}"
-                if 'starts' in row:
-                    info += f" | ⭐ {row['starts']} titularidades"
-                if 'minutos_totais' in row:
-                    info += f" | ⏱️ {row['minutos_totais']} min"
-                st.write(info)
-                # Botão para ver detalhes
-                if st.button(f"Ver detalhes", key=f"detalhes_{row.get('id', idx)}"):
-                    st.session_state.jogador_id = row.get('id', idx)
-                    st.switch_page("pages/detalhes_jogador.py")
-            st.divider()
-    else:
-        st.dataframe(df_filtrado, use_container_width=True)
+    # Exibição com foto e botão "Ver detalhes"
+    for idx, row in df_filtrado.iterrows():
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            exibir_foto(row, categoria="Profissional", width=80)
+        with col2:
+            nome = row.get('nome_completo', 'N/I')
+            apelido = row.get('apelido', 'N/I')
+            st.write(f"**{nome}** ({apelido})")
+            info = f"{row.get('Posicao_Principal', 'N/I')} | {row.get('Idade', 'N/I')} anos | {row.get('Estado_Fisico', 'N/I')}"
+            if 'starts' in row:
+                info += f" | ⭐ {row['starts']} titularidades"
+            if 'minutos_totais' in row:
+                info += f" | ⏱️ {row['minutos_totais']} min"
+            st.write(info)
+            # Botão para ver detalhes (usa switch_page)
+            if st.button("Ver detalhes", key=f"detalhes_{idx}"):
+                # Armazena o ID do jogador no session_state
+                st.session_state.jogador_id = row.get('id', idx)
+                # Navega para a página de detalhes
+                st.switch_page("pages/detalhes_jogador.py")
+        st.divider()
 
     # Métricas
     st.subheader("📊 Estatísticas Gerais")
@@ -121,10 +123,9 @@ def show():
     st.markdown("---")
     st.subheader("📊 Minutagem por Jogador")
 
-    from utils import listar_arquivos_estatisticas
     arquivos = listar_arquivos_estatisticas("Profissional")
     if not arquivos:
-        st.info("Nenhum CSV de estatísticas de partidas encontrado. Coloque os arquivos 'jogo_*.csv' na pasta 'data/estatisticas_jogadores/'.")
+        st.info("Nenhum CSV de estatísticas de partidas encontrado.")
     else:
         with st.spinner("Carregando dados de minutagem..."):
             dados_minutos = {}
@@ -152,7 +153,7 @@ def show():
                     st.warning(f"Erro ao ler {arq}: {e}")
 
             if not jogos_identificadores:
-                st.warning("Nenhum dado de minutagem encontrado nos CSVs.")
+                st.warning("Nenhum dado de minutagem encontrado.")
             else:
                 df_heatmap = pd.DataFrame.from_dict(dados_minutos, orient='index').fillna(0)
                 jogos_existentes = [j for j in jogos_identificadores if j in df_heatmap.columns]
