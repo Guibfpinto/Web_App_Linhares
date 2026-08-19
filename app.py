@@ -320,25 +320,28 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
                 suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
                 st.write(f"**Suspenso:** {suspenso}")
 
-        st.divider()
+                st.divider()
 
-        # 1. Histórico Profissional / Comissão
-        st.subheader("📜 Histórico Profissional")
-        hist_prof = str(row.get('historico_profissional', '')).strip()
-        if hist_prof and hist_prof.lower() != 'nan' and hist_prof.lower() != 'não informado':
-            with st.container(border=True):
-                st.write(hist_prof)
-        else:
-            st.info("Nenhum histórico profissional registrado.")
+                # ==================== COLE AQUI ====================
+                # 1. Histórico Profissional / Comissão
+                st.subheader("📜 Histórico Profissional")
+                hist_prof = str(row.get('historico_comissao', row.get('historico_profissional', ''))).strip()
+    
+                if pd.notna(hist_prof) and hist_prof and hist_prof.lower() not in ['nan', 'não informado', 'none', '']:
+                    with st.container(border=True):
+                        st.write(hist_prof)
+                else:
+                    st.info("Nenhum histórico profissional registrado.")
 
-        # 2. Histórico de Jogador
-        st.subheader("⚽ Histórico como Jogador")
-        hist_jog = str(row.get('historico_jogador', '')).strip()
-        if hist_jog and hist_jog.lower() != 'nan' and hist_jog.lower() != 'não informado':
-            with st.container(border=True):
-                st.write(hist_jog)
-        else:
-            st.info("Sem histórico de carreira como jogador registrado.")
+                # 2. Histórico de Jogador
+                st.subheader("⚽ Histórico como Jogador")
+                hist_jog = str(row.get('historico_jogador', '')).strip()
+    
+                if pd.notna(hist_jog) and hist_jog and hist_jog.lower() not in ['nan', 'não informado', 'none', '']:
+                    with st.container(border=True):
+                        st.write(hist_jog)
+                else:
+                    st.info("Sem histórico de carreira como jogador registrado.")
 
         # 3. Atributos de Treino e Gestão (FM26)
         st.subheader("📊 Atributos de Treinamento (FM26)")
