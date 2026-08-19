@@ -19,6 +19,15 @@ TEAM_ID = 12928
 BASE_URL_FASTAPI = "http://localhost:8000"
 
 # ============================================================
+# CONEXÃO SQLITE CENTRALIZADA (thread-safe)
+# ============================================================
+def get_connection():
+    """Retorna uma nova conexão SQLite com check_same_thread=False.
+    Necessário porque o st_autorefresh desta página força reruns
+    automáticos que o Streamlit pode executar em threads diferentes."""
+    return sqlite3.connect('meu_futebol.db', timeout=10, check_same_thread=False)
+
+# ============================================================
 # FUNÇÕES DE COMUNICAÇÃO COM A FASTAPI
 # ============================================================
 def chamar_api(endpoint, params=None):
@@ -89,7 +98,7 @@ def buscar_jogos_competicao():
 # FUNÇÕES DE ATUALIZAÇÃO (SQLite)
 # ============================================================
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes)
@@ -99,14 +108,14 @@ def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes):
     conn.close()
 
 def atualizar_placar_sqlite(jogo_id, gols_casa, gols_fora):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET gols_casa = ?, gols_fora = ? WHERE id = ?", (gols_casa, gols_fora, jogo_id))
     conn.commit()
     conn.close()
 
 def atualizar_status_sqlite(jogo_id, status):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET status = ? WHERE id = ?", (status, jogo_id))
     conn.commit()
@@ -116,7 +125,7 @@ def atualizar_status_sqlite(jogo_id, status):
 # NOVA FUNÇÃO: ATUALIZAR ÁRBITRO
 # ============================================================
 def atualizar_arbitro_sqlite(jogo_id, arbitro_id):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET arbitro_id = ? WHERE id = ?", (arbitro_id, jogo_id))
     conn.commit()
@@ -127,7 +136,7 @@ def atualizar_arbitro_sqlite(jogo_id, arbitro_id):
 # ============================================================
 @st.cache_data
 def carregar_arbitros():
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
     conn.close()
     return df
@@ -203,7 +212,7 @@ def show():
 
     # ===== SIDEBAR: SELEÇÃO DE JOGO (apenas jogos do Linhares e futuros) =====
     st.sidebar.header("Selecionar Partida")
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
 
     try:
         df_jogos = pd.read_sql_query(f"""
@@ -235,7 +244,7 @@ def show():
         if st.sidebar.button("📥 Buscar jogos da competição"):
             jogos_api = buscar_jogos_competicao()
             if jogos_api:
-                conn = sqlite3.connect('meu_futebol.db', timeout=10)
+                conn = get_connection()
                 cursor = conn.cursor()
                 for jogo in jogos_api:
                     cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo['id'],))
@@ -277,7 +286,7 @@ def show():
     )
 
     # ===== CORPO PRINCIPAL =====
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM jogos WHERE id = ?", (jogo_selecionado_id,))
     colunas = [desc[0] for desc in cursor.description]
@@ -336,7 +345,7 @@ def show():
         st.warning("Nenhum árbitro cadastrado. Cadastre árbitros na seção apropriada.")
 
     # ===== EVENTOS RECENTES =====
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = get_connection()
     df_eventos = pd.read_sql_query(f"SELECT * FROM eventos WHERE jogo_id = {jogo_selecionado_id} ORDER BY tempo DESC LIMIT 10", conn)
     conn.close()
     st.write("**📋 Últimos eventos:**")
@@ -409,7 +418,7 @@ def show():
             nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
             nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
             if st.form_submit_button("Salvar Formações", use_container_width=True):
-                conn = sqlite3.connect('meu_futebol.db')
+                conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
                 conn.commit()
@@ -418,13 +427,13 @@ def show():
                 st.rerun()
 
     # Escalação
-    conn = sqlite3.connect('meu_futebol.db')
+    conn = get_connection()
     df_lineup = pd.read_sql_query(f"SELECT * FROM eventos WHERE jogo_id = {jogo_selecionado_id} AND tipo = 'Lineup'", conn)
     conn.close()
 
     if not df_lineup.empty:
         st.info("Escalação já registrada.")
-        conn = sqlite3.connect('meu_futebol.db')
+        conn = get_connection()
         df_elenco = pd.read_sql_query("SELECT id, nome, posicao FROM elenco", conn)
         conn.close()
         col1, col2 = st.columns(2)
@@ -460,7 +469,7 @@ def show():
             if st.button("⚽ Montar Time Automaticamente", use_container_width=True):
                 titulares, reservas = montar_time(formacao_manual)
                 if titulares:
-                    conn = sqlite3.connect('meu_futebol.db')
+                    conn = get_connection()
                     cursor = conn.cursor()
                     for jog in titulares:
                         if jog['row'] is not None:
@@ -527,7 +536,7 @@ def show():
 
         eventos_api = obter_eventos_jogo(fixture_id)
         if eventos_api:
-            conn = sqlite3.connect('meu_futebol.db')
+            conn = get_connection()
             cursor = conn.cursor()
             for ev in eventos_api:
                 cursor.execute("SELECT id FROM eventos WHERE jogo_id = ? AND tempo = ? AND tipo = ? AND jogador_id = ?",

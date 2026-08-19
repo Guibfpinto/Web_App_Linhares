@@ -278,7 +278,7 @@ def estado_fisico(imc_class, gor_class):
 # INICIALIZAÇÃO DO BANCO SQLITE
 # =============================================
 def inicializar_banco():
-    conn = sqlite3.connect('meu_futebol.db')
+    conn = sqlite3.connect('meu_futebol.db', timeout=10, check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
