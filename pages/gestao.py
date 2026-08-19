@@ -6,14 +6,121 @@ import sqlite3
 from utils import carregar_elenco_profissional
 
 # ============================================================
-# CONSTANTES E CONFIGURAÇÕES
+# CONSTANTES
 # ============================================================
 ARQUIVO_TREINOS = 'dados/treinos.csv'
 ARQUIVO_WELLBEING = 'dados/wellbeing.csv'
 ARQUIVO_LESOES = 'dados/lesoes.csv'
 ARQUIVO_JOGOS = 'dados/jogos.csv'
 ARQUIVO_GPS = 'dados/gps.csv'
-BANCO_DADOS = 'meu_futebol.db'  # <-- caminho correto
+BANCO_DADOS = 'meu_futebol.db'
+
+# ============================================================
+# FUNÇÕES DE ACESSO AO BANCO (100% thread-safe)
+# ============================================================
+def conectar():
+    """Retorna uma nova conexão SQLite (thread-safe)."""
+    # check_same_thread=False permite usar em threads diferentes (emergência)
+    return sqlite3.connect(BANCO_DADOS, timeout=10, check_same_thread=False)
+
+def executar_consulta(query, params=None):
+    """
+    Executa uma consulta SQL e retorna um DataFrame.
+    A conexão é criada e fechada dentro da função.
+    """
+    with conectar() as conn:
+        if params:
+            return pd.read_sql_query(query, conn, params=params)
+        else:
+            return pd.read_sql_query(query, conn)
+
+def executar_comando(query, params=None):
+    """
+    Executa um comando SQL (INSERT, UPDATE, DELETE) e retorna o número de linhas afetadas.
+    """
+    with conectar() as conn:
+        cursor = conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        conn.commit()
+        return cursor.rowcount
+
+def obter_colunas(tabela):
+    """Retorna lista de nomes de colunas de uma tabela."""
+    with conectar() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({tabela})")
+        return [row[1] for row in cursor.fetchall()]
+
+def obter_tabelas():
+    with conectar() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        return [row[0] for row in cursor.fetchall()]
+
+def carregar_jogos():
+    """Carrega jogos com JOINs seguros, verificando colunas existentes."""
+    tabelas_existentes = obter_tabelas()
+    colunas_jogos = obter_colunas('jogos') if 'jogos' in tabelas_existentes else []
+    colunas_times = obter_colunas('times') if 'times' in tabelas_existentes else []
+    colunas_venues = obter_colunas('venues') if 'venues' in tabelas_existentes else []
+    colunas_arbitros = obter_colunas('arbitros') if 'arbitros' in tabelas_existentes else []
+
+    select_parts = [
+        "j.id AS Jogo_ID",
+        "j.data_hora",
+        "j.gols_casa",
+        "j.gols_fora",
+        "tc.nome AS Mandante",
+        "tf.nome AS Visitante"
+    ]
+    if 'logo_url' in colunas_times:
+        select_parts.append("tc.logo_url AS Escudo_Mandante")
+        select_parts.append("tf.logo_url AS Escudo_Visitante")
+    if 'venue_id' in colunas_jogos and 'venues' in tabelas_existentes:
+        select_parts.append("v.nome AS Estadio")
+        if 'endereco' in colunas_venues:
+            select_parts.append("v.endereco AS Endereco_Estadio")
+        if 'imagem' in colunas_venues:
+            select_parts.append("v.imagem AS Foto_Estadio")
+    if 'arbitro_id' in colunas_jogos and 'arbitros' in tabelas_existentes:
+        select_parts.append("a.nome AS Arbitro")
+
+    select_str = ",\n        ".join(select_parts)
+
+    joins = []
+    joins.append("INNER JOIN times tc ON j.time_casa_id = tc.id")
+    joins.append("INNER JOIN times tf ON j.time_fora_id = tf.id")
+    if 'venue_id' in colunas_jogos and 'venues' in tabelas_existentes:
+        joins.append("LEFT JOIN venues v ON j.venue_id = v.id")
+    if 'arbitro_id' in colunas_jogos and 'arbitros' in tabelas_existentes:
+        joins.append("LEFT JOIN arbitros a ON j.arbitro_id = a.id")
+
+    query = f"""
+        SELECT
+            {select_str}
+        FROM jogos j
+        {' '.join(joins)}
+        ORDER BY j.data_hora DESC
+    """
+
+    # Executa a consulta com a função segura
+    return executar_consulta(query)
+
+def adicionar_jogo(time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id=None, venue_id=None):
+    query = """
+        INSERT INTO jogos 
+        (time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id, venue_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id, venue_id)
+    with conectar() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        conn.commit()
+        return cursor.lastrowid
 
 def carregar_dados_csv(caminho: str, colunas_padrao: list) -> pd.DataFrame:
     if os.path.exists(caminho):
@@ -31,84 +138,6 @@ def salvar_dados_csv(df: pd.DataFrame, caminho: str):
     if pasta:
         os.makedirs(pasta, exist_ok=True)
     df.to_csv(caminho, sep=';', index=False, encoding='utf-8-sig')
-
-# ============================================================
-# FUNÇÕES DE ACESSO AO BANCO (thread-safe)
-# ============================================================
-def obter_colunas(tabela):
-    """Retorna lista de nomes de colunas de uma tabela."""
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"PRAGMA table_info({tabela})")
-        return [row[1] for row in cursor.fetchall()]
-
-def carregar_jogos():
-    """
-    Carrega jogos com JOINs seguros, verificando quais colunas existem.
-    """
-    colunas_jogos = obter_colunas('jogos')
-    colunas_times = obter_colunas('times')
-    colunas_venues = obter_colunas('venues') if 'venues' in [t[0] for t in obter_tabelas()] else []
-    colunas_arbitros = obter_colunas('arbitros') if 'arbitros' in [t[0] for t in obter_tabelas()] else []
-
-    # Monta a consulta dinamicamente
-    select_parts = [
-        "j.id AS Jogo_ID",
-        "j.data_hora",
-        "j.gols_casa",
-        "j.gols_fora",
-        "tc.nome AS Mandante",
-        "tf.nome AS Visitante"
-    ]
-    if 'logo_url' in colunas_times:
-        select_parts.append("tc.logo_url AS Escudo_Mandante")
-        select_parts.append("tf.logo_url AS Escudo_Visitante")
-    if 'venue_id' in colunas_jogos and 'venues' in [t[0] for t in obter_tabelas()]:
-        select_parts.append("v.nome AS Estadio")
-        if 'endereco' in colunas_venues:
-            select_parts.append("v.endereco AS Endereco_Estadio")
-        if 'imagem' in colunas_venues:
-            select_parts.append("v.imagem AS Foto_Estadio")
-    if 'arbitro_id' in colunas_jogos and 'arbitros' in [t[0] for t in obter_tabelas()]:
-        select_parts.append("a.nome AS Arbitro")
-
-    select_str = ",\n        ".join(select_parts)
-
-    joins = []
-    joins.append("INNER JOIN times tc ON j.time_casa_id = tc.id")
-    joins.append("INNER JOIN times tf ON j.time_fora_id = tf.id")
-    if 'venue_id' in colunas_jogos and 'venues' in [t[0] for t in obter_tabelas()]:
-        joins.append("LEFT JOIN venues v ON j.venue_id = v.id")
-    if 'arbitro_id' in colunas_jogos and 'arbitros' in [t[0] for t in obter_tabelas()]:
-        joins.append("LEFT JOIN arbitros a ON j.arbitro_id = a.id")
-
-    query = f"""
-        SELECT
-            {select_str}
-        FROM jogos j
-        {' '.join(joins)}
-        ORDER BY j.data_hora DESC
-    """
-
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
-        return pd.read_sql_query(query, conn)
-
-def obter_tabelas():
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        return cursor.fetchall()
-
-def adicionar_jogo(time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id=None, venue_id=None):
-    with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO jogos 
-            (time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id, venue_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, arbitro_id, venue_id))
-        conn.commit()
-        return cursor.lastrowid
 
 # ============================================================
 # PÁGINA PRINCIPAL
@@ -221,7 +250,7 @@ def show():
 
         st.dataframe(df_les, use_container_width=True)
 
-    # 5. JOGOS (CORRIGIDO com meu_futebol.db e conexões seguras)
+    # 5. JOGOS
     with tabs[4]:
         st.subheader("Jogos")
 
@@ -231,7 +260,7 @@ def show():
             if df_jogos.empty:
                 st.info("Nenhum jogo cadastrado.")
             else:
-                # Ajuste de fuso horário (se coluna existir)
+                # Ajuste de fuso horário
                 if 'data_hora' in df_jogos.columns:
                     df_jogos['data_hora'] = pd.to_datetime(df_jogos['data_hora']) - pd.Timedelta(hours=3)
                     df_jogos['Data_Hora'] = df_jogos['data_hora'].dt.strftime('%d/%m/%Y %H:%M')
@@ -239,7 +268,7 @@ def show():
                     # Formatar placar
                     df_jogos['Placar'] = df_jogos['gols_casa'].astype(str) + " x " + df_jogos['gols_fora'].astype(str)
 
-                    # Selecionar colunas para exibição (apenas as que existem)
+                    # Selecionar colunas para exibição
                     colunas_possiveis = ['Jogo_ID', 'Data_Hora', 'Mandante', 'Escudo_Mandante',
                                          'Placar', 'Visitante', 'Escudo_Visitante',
                                          'Estadio', 'Endereco_Estadio', 'Foto_Estadio', 'Arbitro']
@@ -247,7 +276,7 @@ def show():
                     df_exibicao = df_jogos[colunas_exibicao]
                     st.dataframe(df_exibicao, use_container_width=True)
 
-                    # Exibir fotos dos estádios (se houver)
+                    # Exibir fotos dos estádios
                     if 'Foto_Estadio' in df_jogos.columns:
                         for _, row in df_jogos.iterrows():
                             if row['Foto_Estadio'] and os.path.exists(row['Foto_Estadio']):
@@ -256,13 +285,14 @@ def show():
         except Exception as e:
             st.error(f"Erro ao carregar jogos: {e}")
 
-        # Formulário para adicionar jogo (com selects dinâmicos)
+        # Formulário para adicionar jogo
         with st.expander("➕ Adicionar Novo Jogo", expanded=False):
             with st.form("form_novo_jogo", clear_on_submit=True):
-                with sqlite3.connect(BANCO_DADOS, timeout=10) as conn:
-                    times_df = pd.read_sql_query("SELECT id, nome FROM times ORDER BY nome", conn)
-                    venues_df = pd.read_sql_query("SELECT id, nome FROM venues ORDER BY nome", conn) if 'venues' in [t[0] for t in obter_tabelas()] else pd.DataFrame()
-                    arbitros_df = pd.read_sql_query("SELECT id, nome FROM arbitros ORDER BY nome", conn) if 'arbitros' in [t[0] for t in obter_tabelas()] else pd.DataFrame()
+                # Carregar dados para selects (com conexões locais)
+                tabelas = obter_tabelas()
+                times_df = executar_consulta("SELECT id, nome FROM times ORDER BY nome")
+                venues_df = executar_consulta("SELECT id, nome FROM venues ORDER BY nome") if 'venues' in tabelas else pd.DataFrame()
+                arbitros_df = executar_consulta("SELECT id, nome FROM arbitros ORDER BY nome") if 'arbitros' in tabelas else pd.DataFrame()
 
                 time_casa = st.selectbox("Time da Casa", times_df['id'].tolist(), format_func=lambda x: times_df[times_df['id']==x]['nome'].iloc[0])
                 time_fora = st.selectbox("Time Visitante", times_df['id'].tolist(), format_func=lambda x: times_df[times_df['id']==x]['nome'].iloc[0])
