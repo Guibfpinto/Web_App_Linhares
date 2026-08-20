@@ -179,11 +179,11 @@ TRADUCAO_ATRIBUTOS = {
 }
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO - FUNDO PRETO
+# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO (com imagem de fundo + boxes pretas)
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS com fundo preto para todos os componentes (sobrescreve qualquer imagem/gradiente)
+# CSS para fundo preto nos elementos internos, mantendo a imagem de fundo
 st.markdown("""
 <style>
     /* ===== ALERTAS ===== */
@@ -191,39 +191,8 @@ st.markdown("""
     div[data-testid="stAlert"] .stAlert { color: black !important; }
     .stAlert { color: black !important; }
 
-    /* ===== FUNDO PRETO EM TODOS OS CONTAINERS ===== */
-    .stApp {
-        background-color: #000000 !important;
-    }
-    .stAppViewContainer {
-        background-color: #000000 !important;
-        background-image: none !important;
-    }
-    .stSidebar {
-        background-color: #111111 !important;
-    }
-    .stMain {
-        background-color: #000000 !important;
-    }
-    .css-1d391kg, .css-1kyxreq {
-        background-color: #111111 !important;
-    }
-    /* Remove qualquer imagem de fundo que possa ter sido colocada */
-    [data-testid="stAppViewContainer"] {
-        background-image: none !important;
-        background: #000000 !important;
-    }
-    /* Fundo preto para todas as áreas internas */
-    div[data-testid="stApp"] {
-        background-color: #000000 !important;
-    }
-    .main {
-        background-color: #000000 !important;
-    }
-    .block-container {
-        background-color: #000000 !important;
-        padding: 1rem 2rem 1rem 2rem !important;
-    }
+    /* ===== NÃO MEXER NO CONTAINER PRINCIPAL PARA MANTER A IMAGEM ===== */
+    /* O fundo da página é definido pela função set_background() */
 
     /* ===== EXPANSORES ===== */
     .streamlit-expanderHeader {
@@ -380,7 +349,7 @@ st.markdown("""
 
     /* ===== SIDEBAR ===== */
     .css-1d391kg, .css-1kyxreq {
-        background-color: #111111 !important;
+        background-color: rgba(0,0,0,0.9) !important;
     }
     .sidebar .stSelectbox label, .sidebar .stTextInput label {
         color: #e0e0e0 !important;
@@ -388,8 +357,46 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Não usamos mais set_background com imagem, então removemos a chamada.
-# Apenas definimos o título.
+def set_background(image_path):
+    """Aplica imagem de fundo (se existir) ou gradiente."""
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as f:
+            img_base64 = base64.b64encode(f.read()).decode()
+        ext = os.path.splitext(image_path)[1].lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg"
+        bg_css = f"""
+        <style>
+        [data-testid="stAppViewContainer"] {{
+            background-image: url("data:{mime};base64,{img_base64}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        [data-testid="stHeader"] {{ background: rgba(0,0,0,0); }}
+        /* Leve escurecimento para melhor contraste */
+        .stApp {{ background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }}
+        [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.75); }}
+        </style>
+        """
+        st.markdown(bg_css, unsafe_allow_html=True)
+    else:
+        # Fallback: gradiente escuro
+        bg_css = """
+        <style>
+        [data-testid="stAppViewContainer"] {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
+            background-attachment: fixed;
+        }
+        [data-testid="stHeader"] { background: rgba(0,0,0,0); }
+        .stApp { background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }
+        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.8); }
+        </style>
+        """
+        st.markdown(bg_css, unsafe_allow_html=True)
+
+bg_image = os.path.join(DATA_DIR, "background.png")
+set_background(bg_image)
+
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 
 # ======================================================================
