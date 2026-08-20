@@ -179,11 +179,11 @@ TRADUCAO_ATRIBUTOS = {
 }
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
+# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO - FUNDO PRETO
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS com fundo preto para todos os componentes
+# CSS com fundo preto para todos os componentes (sobrescreve qualquer imagem/gradiente)
 st.markdown("""
 <style>
     /* ===== ALERTAS ===== */
@@ -192,9 +192,38 @@ st.markdown("""
     .stAlert { color: black !important; }
 
     /* ===== FUNDO PRETO EM TODOS OS CONTAINERS ===== */
-    .stApp { background-color: rgba(0,0,0,0.85) !important; }
-    .stAppViewContainer { background-color: rgba(0,0,0,0.85) !important; }
-    .stSidebar { background-color: rgba(0,0,0,0.9) !important; }
+    .stApp {
+        background-color: #000000 !important;
+    }
+    .stAppViewContainer {
+        background-color: #000000 !important;
+        background-image: none !important;
+    }
+    .stSidebar {
+        background-color: #111111 !important;
+    }
+    .stMain {
+        background-color: #000000 !important;
+    }
+    .css-1d391kg, .css-1kyxreq {
+        background-color: #111111 !important;
+    }
+    /* Remove qualquer imagem de fundo que possa ter sido colocada */
+    [data-testid="stAppViewContainer"] {
+        background-image: none !important;
+        background: #000000 !important;
+    }
+    /* Fundo preto para todas as áreas internas */
+    div[data-testid="stApp"] {
+        background-color: #000000 !important;
+    }
+    .main {
+        background-color: #000000 !important;
+    }
+    .block-container {
+        background-color: #000000 !important;
+        padding: 1rem 2rem 1rem 2rem !important;
+    }
 
     /* ===== EXPANSORES ===== */
     .streamlit-expanderHeader {
@@ -351,7 +380,7 @@ st.markdown("""
 
     /* ===== SIDEBAR ===== */
     .css-1d391kg, .css-1kyxreq {
-        background-color: rgba(0,0,0,0.9) !important;
+        background-color: #111111 !important;
     }
     .sidebar .stSelectbox label, .sidebar .stTextInput label {
         color: #e0e0e0 !important;
@@ -359,43 +388,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def set_background(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            img_base64 = base64.b64encode(f.read()).decode()
-        ext = os.path.splitext(image_path)[1].lower()
-        mime = "image/png" if ext == ".png" else "image/jpeg"
-        bg_css = f"""
-        <style>
-        [data-testid="stAppViewContainer"] {{
-            background-image: url("data:{mime};base64,{img_base64}");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-        }}
-        [data-testid="stHeader"] {{ background: rgba(0,0,0,0); }}
-        .stApp {{ background-color: rgba(0,0,0,0.6); border-radius: 10px; margin: 10px; padding: 10px; }}
-        [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.75); }}
-        </style>
-        """
-        st.markdown(bg_css, unsafe_allow_html=True)
-    else:
-        bg_css = """
-        <style>
-        [data-testid="stAppViewContainer"] {
-            background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
-            background-attachment: fixed;
-        }
-        [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-        .stApp { background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }
-        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.8); }
-        </style>
-        """
-        st.markdown(bg_css, unsafe_allow_html=True)
-
-bg_image = os.path.join(DATA_DIR, "background.png")
-set_background(bg_image)
-
+# Não usamos mais set_background com imagem, então removemos a chamada.
+# Apenas definimos o título.
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 
 # ======================================================================
@@ -709,10 +703,8 @@ def carregar_dfs():
         csv_comissao = "perfil_completo_comissao_2026.csv"
         if os.path.exists(csv_comissao):
             df_completo = pd.read_csv(csv_comissao, sep=';', encoding='utf-8-sig')
-            # Normaliza a coluna 'apelido' para usar como chave para cartões
             if 'apelido' in df_completo.columns:
                 df_completo['nome_canonico'] = df_completo['apelido'].apply(mapear_nome_para_canonico)
-                # Preenche campos ausentes para compatibilidade com a interface
                 if 'nome' not in df_completo.columns:
                     df_completo['nome'] = df_completo['apelido']
                 if 'cargo' not in df_completo.columns:
@@ -734,7 +726,6 @@ def carregar_dfs():
             st.warning(f"Arquivo {csv_comissao} não encontrado.")
             resultado["Comissão Profissional"] = pd.DataFrame()
 
-        # Comissão Sub-20 e Sub-17 (usa o utils, provavelmente vazias)
         resultado["Comissão Sub-20"] = carregar_comissao_sub20()
         resultado["Comissão Sub-17"] = pd.DataFrame()
 
@@ -948,7 +939,6 @@ with tabs[1]:
         # Busca e exibe lista
         busca = st.text_input("Buscar membro")
         if busca:
-            # Procura em várias colunas
             cols_busca = ['apelido', 'nome', 'nome_completo', 'cargo']
             mask = pd.Series([False]*len(df_com))
             for col in cols_busca:
@@ -958,12 +948,10 @@ with tabs[1]:
         else:
             df_com_filtrado = df_com
         
-        # Exibe lista resumida
         cols_exibicao = [c for c in ['apelido', 'cargo', 'idade', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento'] if c in df_com_filtrado.columns]
         st.dataframe(df_com_filtrado[cols_exibicao] if cols_exibicao else df_com_filtrado, width='stretch')
         
         if not df_com_filtrado.empty:
-            # Seletor de membro usando apelido ou nome
             if 'apelido' in df_com_filtrado.columns:
                 membro_opcoes = df_com_filtrado['apelido'].dropna().unique().tolist()
             elif 'nome' in df_com_filtrado.columns:
@@ -974,7 +962,6 @@ with tabs[1]:
             if membro_opcoes:
                 membro_selecionado = st.selectbox("Selecione um membro", membro_opcoes)
                 if membro_selecionado:
-                    # Encontra a linha correspondente
                     if 'apelido' in df_com_filtrado.columns:
                         row = df_com_filtrado[df_com_filtrado['apelido'] == membro_selecionado].iloc[0]
                     elif 'nome' in df_com_filtrado.columns:
@@ -982,10 +969,8 @@ with tabs[1]:
                     else:
                         row = df_com_filtrado.iloc[0]
                     
-                    # Exibe detalhes com todos os atributos
                     exibir_detalhes_comissao(row, cat_com, cartoes_com)
                     
-                    # Botão para registrar cartão
                     if st.button(f"🟨 Registrar cartão para {membro_selecionado}"):
                         with st.expander("Registrar cartão", expanded=True):
                             tipo = st.radio("Tipo", ["Amarelo", "Vermelho"], key="tipo_cartao_com")
