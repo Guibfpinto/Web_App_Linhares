@@ -84,100 +84,98 @@ TRADUCAO_ATRIBUTOS = {
     'gols_sub21': 'Gols Sub-21',
     
     # Chairman
-    'presidente_negocios': 'Presidente - Negócios',
-    'presidente_interferencia': 'Presidente - Interferência',
-    'presidente_paciencia': 'Presidente - Paciência',
-    'presidente_recursos': 'Presidente - Recursos',
+    'chairmanattributes_business': 'Presidente - Negócios',
+    'chairmanattributes_interference': 'Presidente - Interferência',
+    'chairmanattributes_patience': 'Presidente - Paciência',
+    'chairmanattributes_resources': 'Presidente - Recursos',
     
     # Coaching
-    'treinamento_ataque': 'Treinamento - Ataque',
-    'treinamento_defesa': 'Treinamento - Defesa',
-    'treinamento_condicionamento': 'Treinamento - Condicionamento',
-    'treinamento_goleiros': 'Treinamento - Goleiros',
-    'treinamento_posse': 'Treinamento - Posse',
-    'treinamento_jogadores': 'Treinamento - Jogadores',
-    'treinamento_tatica': 'Treinamento - Tática',
-    'treinamento_tecnico': 'Treinamento - Técnico',
-    'treinamento_gestao_pessoas': 'Treinamento - Gestão de Pessoas',
-    'treinamento_trabalho_jovens': 'Treinamento - Trabalho com Jovens',
-    'treinamento_tolerancia_rudes': 'Treinamento - Tolerância a Rudes',
-    'treinamento_versatilidade': 'Treinamento - Versatilidade',
-    'treinamento_bolas_paradas': 'Treinamento - Bolas Paradas',
+    'coachingattributes_attacking': 'Treinamento - Ataque',
+    'coachingattributes_defending': 'Treinamento - Defesa',
+    'coachingattributes_fitness': 'Treinamento - Condicionamento',
+    'coachingattributes_goalkeeping': 'Treinamento - Goleiros',
+    'coachingattributes_possession': 'Treinamento - Posse',
+    'coachingattributes_player': 'Treinamento - Jogadores',
+    'coachingattributes_tactical': 'Treinamento - Tática',
+    'coachingattributes_technical': 'Treinamento - Técnico',
+    'coachingattributes_peoplemanagement': 'Treinamento - Gestão de Pessoas',
+    'coachingattributes_workingwithyoungsters': 'Treinamento - Trabalho com Jovens',
+    'coachingattributes_dirtinessallowance': 'Treinamento - Tolerância a Rudes',
+    'coachingattributes_versatility': 'Treinamento - Versatilidade',
+    'coachingattributes_setpieces': 'Treinamento - Bolas Paradas',
     
     # Staff Mental
-    'adaptabilidade_staff': 'Adaptabilidade (Staff)',
-    'determinacao_staff': 'Determinação (Staff)',
-    'avaliacao_habilidade_jogador': 'Avaliação Habilidade Jogador',
-    'avaliacao_potencial_jogador': 'Avaliação Potencial Jogador',
-    'avaliacao_habilidade_staff': 'Avaliação Habilidade Staff',
-    'negociacao': 'Negociação',
-    'autoridade': 'Autoridade',
-    'motivacao': 'Motivação',
-    'fisioterapia': 'Fisioterapia',
-    'conhecimento_tatico': 'Conhecimento Tático',
+    'staffmentalattributes_adaptability': 'Adaptabilidade (Staff)',
+    'staffmentalattributes_determination': 'Determinação (Staff)',
+    'staffmentalattributes_judgingplayerability': 'Avaliação Habilidade Jogador',
+    'staffmentalattributes_judgingplayerpotential': 'Avaliação Potencial Jogador',
+    'staffmentalattributes_judgingstaffability': 'Avaliação Habilidade Staff',
+    'staffmentalattributes_negotiating': 'Negociação',
+    'staffmentalattributes_authority': 'Autoridade',
+    'staffmentalattributes_motivating': 'Motivação',
+    'staffmentalattributes_physiotherapy': 'Fisioterapia',
+    'staffmentalattributes_tacticalknowledge': 'Conhecimento Tático',
     
     # Non Tactical
-    'compra_jogadores': 'Compra de Jogadores',
-    'intensidade_treino': 'Intensidade do Treino',
-    'jogos_mentais': 'Jogos Mentais',
-    'rotacao_elenco': 'Rotação do Elenco',
+    'nontacticalattributes_buyingplayers': 'Compra de Jogadores',
+    'nontacticalattributes_hardnessoftraining': 'Intensidade do Treino',
+    'nontacticalattributes_mindgames': 'Jogos Mentais',
+    'nontacticalattributes_squadrotation': 'Rotação do Elenco',
     
     # Roles
-    'auxiliar_tecnico': 'Auxiliar Técnico',
-    'treinador': 'Treinador',
-    'preparador_fisico': 'Preparador Físico',
-    'preparador_goleiros': 'Preparador de Goleiros',
-    'treinador_principal': 'Treinador Principal',
-    'fisioterapeuta': 'Fisioterapeuta',
-    'olheiro': 'Olheiro',
-    'presidente': 'Presidente',
-    'diretor_futebol': 'Diretor de Futebol',
-    'chefe_base': 'Chefe da Base',
-    'analista_dados': 'Analista de Dados',
-    'cientista_esporte': 'Cientista do Esporte',
-    'gerente_emprestimos': 'Gerente de Empréstimos',
-    'diretor_tecnico': 'Diretor Técnico',
-    'treinador_bolas_paradas': 'Treinador de Bolas Paradas',
+    'rolesattributes_assistantmanager': 'Auxiliar Técnico',
+    'rolesattributes_coach': 'Treinador',
+    'rolesattributes_fitnesscoach': 'Preparador Físico',
+    'rolesattributes_goalkeepingcoach': 'Preparador de Goleiros',
+    'rolesattributes_manager': 'Treinador Principal',
+    'rolesattributes_physio': 'Fisioterapeuta',
+    'rolesattributes_scout': 'Olheiro',
+    'rolesattributes_chairman': 'Presidente',
+    'rolesattributes_directoroffootball': 'Diretor de Futebol',
+    'rolesattributes_headofyouthdevelopment': 'Chefe da Base',
+    'rolesattributes_dataanalyst': 'Analista de Dados',
+    'rolesattributes_sportsscientist': 'Cientista do Esporte',
+    'rolesattributes_loanmanager': 'Gerente de Empréstimos',
+    'rolesattributes_technicaldirector': 'Diretor Técnico',
+    'rolesattributes_setpiececoach': 'Treinador de Bolas Paradas',
     
     # Tactical
-    'tatica_ataque': 'Tática - Ataque',
-    'profundidade': 'Profundidade',
-    'direcao': 'Direção',
-    'espetacularidade': 'Espetacularidade',
-    'flexibilidade': 'Flexibilidade',
-    'funcoes_livres': 'Funções Livres',
-    'marcacao': 'Marcação',
-    'impedimento': 'Impedimento',
-    'pressao': 'Pressão',
-    'recuar': 'Recuar',
-    'ritmo': 'Ritmo',
-    'uso_armador': 'Uso do Armador',
-    'uso_substituicoes': 'Uso de Substituições',
-    'largura': 'Largura',
+    'tacticalattributes_attacking': 'Tática - Ataque',
+    'tacticalattributes_depth': 'Profundidade',
+    'tacticalattributes_directness': 'Direção',
+    'tacticalattributes_flamboyancy': 'Espetacularidade',
+    'tacticalattributes_flexibility': 'Flexibilidade',
+    'tacticalattributes_freeroles': 'Funções Livres',
+    'tacticalattributes_marking': 'Marcação',
+    'tacticalattributes_offside': 'Impedimento',
+    'tacticalattributes_pressing': 'Pressão',
+    'tacticalattributes_sittingback': 'Recuar',
+    'tacticalattributes_tempo': 'Ritmo',
+    'tacticalattributes_useofplaymaker': 'Uso do Armador',
+    'tacticalattributes_useofsubstitutions': 'Uso de Substituições',
+    'tacticalattributes_width': 'Largura',
     
     # Scouting
-    'avaliacao_dados_jogador': 'Avaliação Dados Jogador',
-    'avaliacao_dados_time': 'Avaliação Dados Time',
-    'apresentacao_dados': 'Apresentação de Dados',
+    'scoutingattributes_judgingplayerdata': 'Avaliação Dados Jogador',
+    'scoutingattributes_judgingteamdata': 'Avaliação Dados Time',
+    'scoutingattributes_presentingdata': 'Apresentação de Dados',
     
     # Medical
-    'ciencia_esporte': 'Ciência do Esporte',
+    'medicalattributes_sportsscience': 'Ciência do Esporte',
     
     # Personality
-    'adaptabilidade_personalidade': 'Adaptabilidade (Personalidade)',
-    'ambicao': 'Ambição',
-    'lealdade': 'Lealdade',
-    'pressao': 'Pressão (Personalidade)',
-    'profissionalismo': 'Profissionalismo',
-    'espirito_esportivo': 'Espírito Esportivo',
-    'temperamento': 'Temperamento',
-    'controversia': 'Controvérsia',
+    'personalityattributes_adaptability': 'Adaptabilidade (Personalidade)',
+    'personalityattributes_ambition': 'Ambição',
+    'personalityattributes_loyalty': 'Lealdade',
+    'personalityattributes_pressure': 'Pressão (Personalidade)',
+    'personalityattributes_professional': 'Profissionalismo',
+    'personalityattributes_sportsmanship': 'Espírito Esportivo',
+    'personalityattributes_temperament': 'Temperamento',
+    'personalityattributes_controversy': 'Controvérsia',
     
     # Nation
     'pais': 'País',
     'sigla_pais': 'Sigla País',
-    
-    # Knowledge
     'conhecimento_valor': 'Conhecimento - Valor',
 }
 
@@ -189,6 +187,7 @@ st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORAD
 # CSS para mudar a cor do texto de mensagens para preto
 st.markdown("""
 <style>
+    /* ===== CORES DE ALERTA ===== */
     div[data-testid="stAlert"] {
         color: black !important;
     }
@@ -197,6 +196,178 @@ st.markdown("""
     }
     .stAlert {
         color: black !important;
+    }
+
+    /* ===== FUNDO PRETO EM TODOS OS CONTAINERS ===== */
+    .stApp {
+        background-color: rgba(0,0,0,0.85) !important;
+    }
+    .stAppViewContainer {
+        background-color: rgba(0,0,0,0.85) !important;
+    }
+    .stSidebar {
+        background-color: rgba(0,0,0,0.9) !important;
+    }
+
+    /* ===== EXPANSORES (expander) ===== */
+    .streamlit-expanderHeader {
+        background-color: #1a1a1a !important;
+        color: #ffffff !important;
+        border: 1px solid #333 !important;
+        border-radius: 5px !important;
+    }
+    .streamlit-expanderContent {
+        background-color: #111111 !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #333 !important;
+        border-top: none !important;
+        border-radius: 0 0 5px 5px !important;
+        padding: 10px !important;
+    }
+
+    /* ===== WIDGETS (selectbox, text_input, etc.) ===== */
+    .stSelectbox label, .stTextInput label, .stNumberInput label,
+    .stDateInput label, .stTextArea label {
+        color: #e0e0e0 !important;
+        font-weight: 500 !important;
+    }
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput input, .stNumberInput input,
+    .stDateInput input, .stTextArea textarea {
+        background-color: #222222 !important;
+        color: #ffffff !important;
+        border: 1px solid #444 !important;
+        border-radius: 4px !important;
+    }
+    .stSelectbox div[data-baseweb="select"] > div:hover,
+    .stTextInput input:hover, .stNumberInput input:hover,
+    .stDateInput input:hover, .stTextArea textarea:hover {
+        border-color: #666 !important;
+    }
+    .stSelectbox div[data-baseweb="select"] > div:focus-within,
+    .stTextInput input:focus, .stNumberInput input:focus,
+    .stDateInput input:focus, .stTextArea textarea:focus {
+        border-color: #1e88e5 !important;
+        box-shadow: 0 0 0 2px rgba(30,136,229,0.3) !important;
+    }
+
+    /* ===== BOTÕES ===== */
+    .stButton button {
+        background-color: #222222 !important;
+        color: #ffffff !important;
+        border: 1px solid #444 !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton button:hover {
+        background-color: #333333 !important;
+        border-color: #666 !important;
+        color: #ffffff !important;
+    }
+    .stButton button:active {
+        background-color: #111111 !important;
+    }
+
+    /* ===== MÉTRICAS ===== */
+    [data-testid="stMetric"] {
+        background-color: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        border-radius: 5px !important;
+        padding: 10px !important;
+        color: #e0e0e0 !important;
+    }
+    [data-testid="stMetric"] label {
+        color: #aaa !important;
+    }
+    [data-testid="stMetric"] .stMetricValue {
+        color: #ffffff !important;
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
+    }
+
+    /* ===== DATAFRAMES ===== */
+    .stDataFrame {
+        background-color: #111111 !important;
+        border: 1px solid #333 !important;
+        border-radius: 5px !important;
+    }
+    .stDataFrame table {
+        color: #e0e0e0 !important;
+    }
+    .stDataFrame thead tr th {
+        background-color: #1a1a1a !important;
+        color: #ffffff !important;
+        border-bottom: 2px solid #444 !important;
+    }
+    .stDataFrame tbody tr {
+        border-bottom: 1px solid #2a2a2a !important;
+    }
+    .stDataFrame tbody tr:hover {
+        background-color: #2a2a2a !important;
+    }
+
+    /* ===== TABELAS EM GERAL (incluindo pandas) ===== */
+    .dataframe {
+        background-color: #111111 !important;
+        color: #e0e0e0 !important;
+    }
+    .dataframe thead th {
+        background-color: #1a1a1a !important;
+        color: #ffffff !important;
+    }
+    .dataframe tbody td {
+        border-color: #2a2a2a !important;
+    }
+
+    /* ===== TEXTOS E TÍTULOS ===== */
+    h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
+        color: #e0e0e0 !important;
+    }
+    .stSubheader {
+        color: #ffffff !important;
+    }
+    .stCaption {
+        color: #888 !important;
+    }
+
+    /* ===== DIVIDERS ===== */
+    hr {
+        border-color: #444 !important;
+    }
+
+    /* ===== MULTISELECT / RADIO ===== */
+    .stRadio label, .stCheckbox label {
+        color: #e0e0e0 !important;
+    }
+    .stRadio div[role="radiogroup"] > label {
+        background-color: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        border-radius: 4px !important;
+        padding: 5px 10px !important;
+        margin: 2px !important;
+        color: #e0e0e0 !important;
+    }
+    .stRadio div[role="radiogroup"] > label:hover {
+        background-color: #2a2a2a !important;
+    }
+
+    /* ===== FILE UPLOADER ===== */
+    .stFileUploader > div {
+        background-color: #1a1a1a !important;
+        border: 2px dashed #444 !important;
+        border-radius: 5px !important;
+        color: #aaa !important;
+    }
+    .stFileUploader > div:hover {
+        border-color: #666 !important;
+    }
+
+    /* ===== SIDEBAR ELEMENTOS ===== */
+    .css-1d391kg, .css-1kyxreq {
+        background-color: rgba(0,0,0,0.9) !important;
+    }
+    .sidebar .stSelectbox label, .sidebar .stTextInput label {
+        color: #e0e0e0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -275,7 +446,7 @@ if "instrucoes_coletivas" not in st.session_state:
     st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (MODIFICADA PARA EXIBIR ATRIBUTOS)
+# FUNÇÃO DETALHES COMISSÃO (com atributos detalhados)
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
@@ -303,7 +474,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         col_hist1, col_hist2 = st.columns(2)
         with col_hist1:
             st.write("**Histórico Profissional:**")
-            st.write(row.get('historico_profissional', 'Não informado'))
+            st.write(row.get('historico_comissao', 'Não informado'))
         with col_hist2:
             st.write("**Histórico como Jogador:**")
             st.write(row.get('historico_jogador', 'Não informado'))
@@ -327,44 +498,50 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         # ===== ATRIBUTOS DETALHADOS (DO CSV) =====
         st.subheader("📊 Atributos Detalhados")
         
-        # Mapeamento das colunas do CSV para as categorias
-        # Vamos usar o dicionário TRADUCAO_ATRIBUTOS para exibir nomes em português
-        # As colunas do CSV já estão em inglês, mas algumas podem estar com nomes diferentes
-        # Vamos criar categorias e exibir os valores
-        
-        # Primeiro, definir grupos de atributos
+        # Grupos de atributos
         grupos = {
             "🔢 Gerais": ['CA', 'PA', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
                           'qualificacoes_treinador', 'tipo_documento', 'jogos_selecao', 'gols_selecao',
                           'jogos_sub21', 'gols_sub21', 'conhecimento_valor'],
-            "👔 Presidente (Chairman)": ['presidente_negocios', 'presidente_interferencia',
-                                         'presidente_paciencia', 'presidente_recursos'],
-            "🧑‍🏫 Treinamento (Coaching)": ['treinamento_ataque', 'treinamento_defesa', 'treinamento_condicionamento',
-                                           'treinamento_goleiros', 'treinamento_posse', 'treinamento_jogadores',
-                                           'treinamento_tatica', 'treinamento_tecnico', 'treinamento_gestao_pessoas',
-                                           'treinamento_trabalho_jovens', 'treinamento_tolerancia_rudes',
-                                           'treinamento_versatilidade', 'treinamento_bolas_paradas'],
-            "🧠 Staff Mental": ['adaptabilidade_staff', 'determinacao_staff', 'avaliacao_habilidade_jogador',
-                                'avaliacao_potencial_jogador', 'avaliacao_habilidade_staff', 'negociacao',
-                                'autoridade', 'motivacao', 'fisioterapia', 'conhecimento_tatico'],
-            "⚙️ Não Tático": ['compra_jogadores', 'intensidade_treino', 'jogos_mentais', 'rotacao_elenco'],
-            "🎯 Funções (Roles)": ['auxiliar_tecnico', 'treinador', 'preparador_fisico', 'preparador_goleiros',
-                                   'treinador_principal', 'fisioterapeuta', 'olheiro', 'presidente',
-                                   'diretor_futebol', 'chefe_base', 'analista_dados', 'cientista_esporte',
-                                   'gerente_emprestimos', 'diretor_tecnico', 'treinador_bolas_paradas'],
-            "📐 Tático": ['tatica_ataque', 'profundidade', 'direcao', 'espetacularidade',
-                          'flexibilidade', 'funcoes_livres', 'marcacao', 'impedimento',
-                          'pressao', 'recuar', 'ritmo', 'uso_armador', 'uso_substituicoes', 'largura'],
-            "🔍 Scouting": ['avaliacao_dados_jogador', 'avaliacao_dados_time', 'apresentacao_dados'],
-            "🏥 Médico": ['ciencia_esporte'],
-            "🧬 Personalidade": ['adaptabilidade_personalidade', 'ambicao', 'lealdade',
-                                 'pressao', 'profissionalismo', 'espirito_esportivo',
-                                 'temperamento', 'controversia'],
+            "👔 Presidente (Chairman)": ['chairmanattributes_business', 'chairmanattributes_interference',
+                                         'chairmanattributes_patience', 'chairmanattributes_resources'],
+            "🧑‍🏫 Treinamento (Coaching)": ['coachingattributes_attacking', 'coachingattributes_defending',
+                                           'coachingattributes_fitness', 'coachingattributes_goalkeeping',
+                                           'coachingattributes_possession', 'coachingattributes_player',
+                                           'coachingattributes_tactical', 'coachingattributes_technical',
+                                           'coachingattributes_peoplemanagement', 'coachingattributes_workingwithyoungsters',
+                                           'coachingattributes_dirtinessallowance', 'coachingattributes_versatility',
+                                           'coachingattributes_setpieces'],
+            "🧠 Staff Mental": ['staffmentalattributes_adaptability', 'staffmentalattributes_determination',
+                                'staffmentalattributes_judgingplayerability', 'staffmentalattributes_judgingplayerpotential',
+                                'staffmentalattributes_judgingstaffability', 'staffmentalattributes_negotiating',
+                                'staffmentalattributes_authority', 'staffmentalattributes_motivating',
+                                'staffmentalattributes_physiotherapy', 'staffmentalattributes_tacticalknowledge'],
+            "⚙️ Não Tático": ['nontacticalattributes_buyingplayers', 'nontacticalattributes_hardnessoftraining',
+                              'nontacticalattributes_mindgames', 'nontacticalattributes_squadrotation'],
+            "🎯 Funções (Roles)": ['rolesattributes_assistantmanager', 'rolesattributes_coach',
+                                   'rolesattributes_fitnesscoach', 'rolesattributes_goalkeepingcoach',
+                                   'rolesattributes_manager', 'rolesattributes_physio', 'rolesattributes_scout',
+                                   'rolesattributes_chairman', 'rolesattributes_directoroffootball',
+                                   'rolesattributes_headofyouthdevelopment', 'rolesattributes_dataanalyst',
+                                   'rolesattributes_sportsscientist', 'rolesattributes_loanmanager',
+                                   'rolesattributes_technicaldirector', 'rolesattributes_setpiececoach'],
+            "📐 Tático": ['tacticalattributes_attacking', 'tacticalattributes_depth', 'tacticalattributes_directness',
+                          'tacticalattributes_flamboyancy', 'tacticalattributes_flexibility',
+                          'tacticalattributes_freeroles', 'tacticalattributes_marking', 'tacticalattributes_offside',
+                          'tacticalattributes_pressing', 'tacticalattributes_sittingback', 'tacticalattributes_tempo',
+                          'tacticalattributes_useofplaymaker', 'tacticalattributes_useofsubstitutions',
+                          'tacticalattributes_width'],
+            "🔍 Scouting": ['scoutingattributes_judgingplayerdata', 'scoutingattributes_judgingteamdata',
+                            'scoutingattributes_presentingdata'],
+            "🏥 Médico": ['medicalattributes_sportsscience'],
+            "🧬 Personalidade": ['personalityattributes_adaptability', 'personalityattributes_ambition',
+                                 'personalityattributes_loyalty', 'personalityattributes_pressure',
+                                 'personalityattributes_professional', 'personalityattributes_sportsmanship',
+                                 'personalityattributes_temperament', 'personalityattributes_controversy'],
         }
         
-        # Para cada grupo, exibir os atributos que existem no DataFrame
         for grupo_nome, lista_atributos in grupos.items():
-            # Filtra apenas atributos que existem no DataFrame (row)
             atributos_existentes = []
             for attr in lista_atributos:
                 if attr in row.index:
@@ -372,17 +549,15 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             
             if atributos_existentes:
                 st.write(f"**{grupo_nome}**")
-                # Divide em duas colunas para melhor visualização
                 cols = st.columns(2)
                 for i, attr in enumerate(atributos_existentes):
                     valor = row[attr]
                     if pd.isna(valor):
                         valor = "N/I"
-                    # Traduz o nome do atributo (se disponível)
                     nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
                     with cols[i % 2]:
                         st.write(f"• **{nome_attr}:** {valor}")
-                st.write("")  # linha em branco
+                st.write("")
 
 # ======================================================================
 # FUNÇÃO DETALHES JOGADOR (não modificada)
@@ -541,7 +716,7 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # ======================================================================
-# CARREGAMENTO DE DADOS (CACHE)
+# CARREGAMENTO DE DADOS (CACHE) - COM ATRIBUTOS DA COMISSÃO
 # ======================================================================
 @st.cache_data
 def carregar_dfs():
@@ -581,9 +756,79 @@ def carregar_dfs():
         resultado["Sub-20"] = df_sub20
         resultado["Sub-17"] = df_sub17
 
-        resultado["Comissão Profissional"] = carregar_comissao()
+        # ---- COMISSÃO COM ATRIBUTOS DETALHADOS ----
+        # Carrega a comissão básica (do utils)
+        df_com_basico = carregar_comissao()
         resultado["Comissão Sub-20"] = carregar_comissao_sub20()
         resultado["Comissão Sub-17"] = pd.DataFrame()
+
+        # Carrega o CSV completo com todos os atributos
+        if os.path.exists("perfil_completo_comissao_2026.csv"):
+            df_completo = pd.read_csv("perfil_completo_comissao_2026.csv", sep=';', encoding='utf-8-sig')
+            # Renomeia colunas para facilitar (algumas colunas têm nomes estranhos)
+            # Vamos usar o apelido como chave para mesclar
+            if not df_com_basico.empty and not df_completo.empty:
+                # Prepara a coluna de chave (apelido) normalizada
+                df_com_basico['apelido_key'] = df_com_basico['nome'].apply(lambda x: mapear_nome_para_canonico(x) or x)
+                df_completo['apelido_key'] = df_completo['apelido'].apply(lambda x: mapear_nome_para_canonico(x) or x)
+                # Mescla os dois DataFrames
+                df_com_mesclado = pd.merge(df_com_basico, df_completo, on='apelido_key', how='left')
+                # Remove colunas duplicadas (manter as do básico)
+                # Remove colunas extras que podem conflitar
+                colunas_remover = ['nome_y', 'cargo_y', 'data_nascimento_y', 'cidade_nascimento_y',
+                                   'uf_nascimento_y', 'pais_nascimento_y', 'historico_jogador_y',
+                                   'historico_comissao_y', 'apelido_y']
+                for col in colunas_remover:
+                    if col in df_com_mesclado.columns:
+                        df_com_mesclado.drop(columns=[col], inplace=True)
+                # Renomeia colunas básicas para manter o padrão
+                if 'nome_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'nome_x': 'nome'}, inplace=True)
+                if 'cargo_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'cargo_x': 'cargo'}, inplace=True)
+                if 'data_nascimento_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'data_nascimento_x': 'data_nascimento'}, inplace=True)
+                if 'cidade_nascimento_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'cidade_nascimento_x': 'cidade_nascimento'}, inplace=True)
+                if 'uf_nascimento_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'uf_nascimento_x': 'uf_nascimento'}, inplace=True)
+                if 'pais_nascimento_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'pais_nascimento_x': 'pais_nascimento'}, inplace=True)
+                if 'historico_jogador_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'historico_jogador_x': 'historico_jogador'}, inplace=True)
+                if 'historico_comissao_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'historico_comissao_x': 'historico_comissao'}, inplace=True)
+                # Remove a coluna apelido_key e apelido_x (mantém apelido)
+                if 'apelido_key' in df_com_mesclado.columns:
+                    df_com_mesclado.drop(columns=['apelido_key'], inplace=True)
+                if 'apelido_x' in df_com_mesclado.columns:
+                    df_com_mesclado.rename(columns={'apelido_x': 'apelido'}, inplace=True)
+                # Garante que a coluna 'idade' seja calculada (se não tiver)
+                if 'data_nascimento' in df_com_mesclado.columns and 'idade' not in df_com_mesclado.columns:
+                    df_com_mesclado['idade'] = df_com_mesclado['data_nascimento'].apply(
+                        lambda x: calcular_idade(x) if pd.notna(x) else np.nan
+                    )
+                # Preenche 'cidade_uf' se não existir
+                if 'cidade' in df_com_mesclado.columns and 'uf' in df_com_mesclado.columns:
+                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade'].fillna('') + ', ' + df_com_mesclado['uf'].fillna('')
+                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_uf'].str.rstrip(', ')
+                elif 'cidade_nascimento' in df_com_mesclado.columns and 'uf_nascimento' in df_com_mesclado.columns:
+                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_nascimento'].fillna('') + ', ' + df_com_mesclado['uf_nascimento'].fillna('')
+                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_uf'].str.rstrip(', ')
+                # Preenche 'pais' se não existir
+                if 'pais' not in df_com_mesclado.columns and 'pais_nascimento' in df_com_mesclado.columns:
+                    df_com_mesclado['pais'] = df_com_mesclado['pais_nascimento']
+                elif 'pais' not in df_com_mesclado.columns:
+                    df_com_mesclado['pais'] = 'N/I'
+                # Preenche 'nome_canonico'
+                if 'nome' in df_com_mesclado.columns:
+                    df_com_mesclado['nome_canonico'] = df_com_mesclado['nome'].apply(mapear_nome_para_canonico)
+                
+                resultado["Comissão Profissional"] = df_com_mesclado
+            else:
+                resultado["Comissão Profissional"] = df_com_basico
+        else:
+            resultado["Comissão Profissional"] = df_com_basico
 
         df_stats = carregar_estatisticas_partidas()
         if not df_stats.empty and df_prof is not None:
@@ -603,6 +848,33 @@ def carregar_dfs():
         st.error(f"Erro ao carregar dados: {e}")
     return resultado
 
+def calcular_idade(data_nasc_str, data_referencia=None):
+    if pd.isna(data_nasc_str) or not data_nasc_str:
+        return np.nan
+    try:
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                data_nasc = datetime.strptime(str(data_nasc_str).strip(), fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return np.nan
+        hoje = data_referencia if data_referencia else datetime.now()
+        if isinstance(hoje, str):
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    hoje = datetime.strptime(hoje, fmt)
+                    break
+                except ValueError:
+                    continue
+            if isinstance(hoje, str):
+                return np.nan
+        idade = hoje.year - data_nasc.year - ((hoje.month, hoje.day) < (data_nasc.month, data_nasc.day))
+        return idade
+    except Exception:
+        return np.nan
+
 dados = carregar_dfs()
 
 def get_df_cartoes(categoria):
@@ -621,20 +893,20 @@ def get_df_cartoes(categoria):
 # ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
-    "📊 Análise de Elenco",    # direto no app.py
-    "👥 Comissão Técnica",      # direto no app.py (modificada)
-    "⚽ Monitoramento ao Vivo", # pages.monitoramento.show()
-    "🟨 Cartões",               # pages.cartoes.show()
-    "📅 Próximo Jogo",          # pages.proximo_jogo.show()
-    "📐 Escalação Tática",      # pages.tatica_page.show()
-    "⚙️ Gestão",                # pages.gestao.show()
-    "📄 Relatórios",            # pages.relatorios.show()
-    "📤 Exportar",              # pages.exportar.show()
-    "🎥 Visualização Tática"    # pages.visualizacao.show()
+    "📊 Análise de Elenco",
+    "👥 Comissão Técnica",
+    "⚽ Monitoramento ao Vivo",
+    "🟨 Cartões",
+    "📅 Próximo Jogo",
+    "📐 Escalação Tática",
+    "⚙️ Gestão",
+    "📄 Relatórios",
+    "📤 Exportar",
+    "🎥 Visualização Tática"
 ])
 
 # ----------------------------------------------------------------------
-# ABA 1: ANÁLISE DE ELENCO (não modificada)
+# ABA 1: ANÁLISE DE ELENCO
 # ----------------------------------------------------------------------
 with tabs[0]:
     st.header("Análise de Jogadores")
@@ -757,7 +1029,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ----------------------------------------------------------------------
-# ABA 2: COMISSÃO TÉCNICA (MODIFICADA COM ATRIBUTOS)
+# ABA 2: COMISSÃO TÉCNICA (com atributos detalhados)
 # ----------------------------------------------------------------------
 with tabs[1]:
     st.header("👥 Comissão Técnica")
@@ -779,7 +1051,7 @@ with tabs[1]:
             membro = st.selectbox("Selecione um membro", df_com_filtrado['nome'].tolist())
             if membro:
                 row = df_com_filtrado[df_com_filtrado['nome'] == membro].iloc[0]
-                # Usa a nova função que exibe atributos
+                # Usa a função que exibe atributos detalhados
                 exibir_detalhes_comissao(row, cat_com, cartoes_com)
                 
                 # Botão para registrar cartão (mantido)
