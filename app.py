@@ -183,7 +183,6 @@ TRADUCAO_ATRIBUTOS = {
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS com fundo preto sólido no container principal e elementos internos
 st.markdown("""
 <style>
     /* ===== ALERTAS ===== */
@@ -199,33 +198,79 @@ st.markdown("""
         padding: 10px;
     }
 
-    /* ===== EXPANSORES ===== */
+    /* ===== COR DA FONTE: VERMELHO #ff4444 ===== */
+    /* Títulos */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ff4444 !important;
+    }
+    /* Textos gerais */
+    .stMarkdown, .stText, .stSubheader, .stCaption {
+        color: #ff4444 !important;
+    }
+    /* Labels de widgets */
+    .stSelectbox label, .stTextInput label, .stNumberInput label,
+    .stDateInput label, .stTextArea label {
+        color: #ff4444 !important;
+        font-weight: 500 !important;
+    }
+    /* Valores das métricas */
+    [data-testid="stMetric"] .stMetricValue {
+        color: #ff4444 !important;
+    }
+    [data-testid="stMetric"] label {
+        color: #ff4444 !important;
+    }
+    /* Expansores */
     .streamlit-expanderHeader {
+        color: #ff4444 !important;
         background-color: #1a1a1a !important;
-        color: #ffffff !important;
         border: 1px solid #333 !important;
         border-radius: 5px !important;
     }
     .streamlit-expanderContent {
+        color: #ff4444 !important;
         background-color: #111111 !important;
-        color: #e0e0e0 !important;
         border: 1px solid #333 !important;
         border-top: none !important;
         border-radius: 0 0 5px 5px !important;
         padding: 10px !important;
     }
-
-    /* ===== WIDGETS ===== */
-    .stSelectbox label, .stTextInput label, .stNumberInput label,
-    .stDateInput label, .stTextArea label {
-        color: #e0e0e0 !important;
-        font-weight: 500 !important;
+    /* Botões */
+    .stButton button {
+        color: #ff4444 !important;
+        background-color: #222222 !important;
+        border: 1px solid #444 !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
     }
+    .stButton button:hover {
+        background-color: #333333 !important;
+        border-color: #666 !important;
+    }
+    .stButton button:active {
+        background-color: #111111 !important;
+    }
+    /* Radio e Checkbox */
+    .stRadio label, .stCheckbox label {
+        color: #ff4444 !important;
+    }
+    .stRadio div[role="radiogroup"] > label {
+        background-color: #1a1a1a !important;
+        border: 1px solid #333 !important;
+        border-radius: 4px !important;
+        padding: 5px 10px !important;
+        margin: 2px !important;
+        color: #ff4444 !important;
+    }
+    .stRadio div[role="radiogroup"] > label:hover {
+        background-color: #2a2a2a !important;
+    }
+    /* Widgets (inputs, selects) */
     .stSelectbox div[data-baseweb="select"] > div,
     .stTextInput input, .stNumberInput input,
     .stDateInput input, .stTextArea textarea {
         background-color: #222222 !important;
-        color: #ffffff !important;
+        color: #ff4444 !important;
         border: 1px solid #444 !important;
         border-radius: 4px !important;
     }
@@ -240,53 +285,25 @@ st.markdown("""
         border-color: #1e88e5 !important;
         box-shadow: 0 0 0 2px rgba(30,136,229,0.3) !important;
     }
-
-    /* ===== BOTÕES ===== */
-    .stButton button {
-        background-color: #222222 !important;
-        color: #ffffff !important;
-        border: 1px solid #444 !important;
-        border-radius: 4px !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton button:hover {
-        background-color: #333333 !important;
-        border-color: #666 !important;
-        color: #ffffff !important;
-    }
-    .stButton button:active {
-        background-color: #111111 !important;
-    }
-
-    /* ===== MÉTRICAS ===== */
+    /* Métricas */
     [data-testid="stMetric"] {
         background-color: #1a1a1a !important;
         border: 1px solid #333 !important;
         border-radius: 5px !important;
         padding: 10px !important;
-        color: #e0e0e0 !important;
     }
-    [data-testid="stMetric"] label {
-        color: #aaa !important;
-    }
-    [data-testid="stMetric"] .stMetricValue {
-        color: #ffffff !important;
-        font-size: 1.8rem !important;
-        font-weight: 600 !important;
-    }
-
-    /* ===== DATAFRAMES ===== */
+    /* DataFrames / Tabelas */
     .stDataFrame {
         background-color: #111111 !important;
         border: 1px solid #333 !important;
         border-radius: 5px !important;
     }
     .stDataFrame table {
-        color: #e0e0e0 !important;
+        color: #ff4444 !important;
     }
     .stDataFrame thead tr th {
         background-color: #1a1a1a !important;
-        color: #ffffff !important;
+        color: #ff4444 !important;
         border-bottom: 2px solid #444 !important;
     }
     .stDataFrame tbody tr {
@@ -295,53 +312,22 @@ st.markdown("""
     .stDataFrame tbody tr:hover {
         background-color: #2a2a2a !important;
     }
-
-    /* ===== TABELAS EM GERAL ===== */
     .dataframe {
         background-color: #111111 !important;
-        color: #e0e0e0 !important;
+        color: #ff4444 !important;
     }
     .dataframe thead th {
         background-color: #1a1a1a !important;
-        color: #ffffff !important;
+        color: #ff4444 !important;
     }
     .dataframe tbody td {
         border-color: #2a2a2a !important;
     }
-
-    /* ===== TEXTOS E TÍTULOS ===== */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
-        color: #e0e0e0 !important;
-    }
-    .stSubheader {
-        color: #ffffff !important;
-    }
-    .stCaption {
-        color: #888 !important;
-    }
-
-    /* ===== DIVIDERS ===== */
+    /* Dividers */
     hr {
         border-color: #444 !important;
     }
-
-    /* ===== RADIO / CHECKBOX ===== */
-    .stRadio label, .stCheckbox label {
-        color: #e0e0e0 !important;
-    }
-    .stRadio div[role="radiogroup"] > label {
-        background-color: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        border-radius: 4px !important;
-        padding: 5px 10px !important;
-        margin: 2px !important;
-        color: #e0e0e0 !important;
-    }
-    .stRadio div[role="radiogroup"] > label:hover {
-        background-color: #2a2a2a !important;
-    }
-
-    /* ===== FILE UPLOADER ===== */
+    /* File Uploader */
     .stFileUploader > div {
         background-color: #1a1a1a !important;
         border: 2px dashed #444 !important;
@@ -351,13 +337,12 @@ st.markdown("""
     .stFileUploader > div:hover {
         border-color: #666 !important;
     }
-
-    /* ===== SIDEBAR ===== */
+    /* Sidebar */
     .css-1d391kg, .css-1kyxreq {
         background-color: rgba(0,0,0,0.9) !important;
     }
     .sidebar .stSelectbox label, .sidebar .stTextInput label {
-        color: #e0e0e0 !important;
+        color: #ff4444 !important;
     }
 </style>
 """, unsafe_allow_html=True)
