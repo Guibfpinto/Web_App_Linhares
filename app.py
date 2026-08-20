@@ -207,6 +207,10 @@ st.markdown("""
     .stMarkdown, .stText, .stSubheader, .stCaption {
         color: #cc0000 !important;
     }
+    /* Garantir que st.text e st.write também fiquem vermelhos */
+    div.stText, div.stMarkdown, .stText, .stMarkdown {
+        color: #cc0000 !important;
+    }
     /* Labels de widgets */
     .stSelectbox label, .stTextInput label, .stNumberInput label,
     .stDateInput label, .stTextArea label {
