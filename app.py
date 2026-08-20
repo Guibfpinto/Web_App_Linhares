@@ -10,7 +10,6 @@ import random
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch, VerticalPitch
 import sqlite3
-import json
 
 # ======================================================================
 # IMPORTAÇÕES DO UTILS
@@ -67,69 +66,137 @@ from utils import (
     inicializar_banco,
 )
 
-# Definição da função para exibir o próximo jogo
-def renderizar_aba_proximo_jogo():
-    st.subheader("📅 Próximo Jogo")
-    caminho_json = 'dados/jogos.json'
+# ======================================================================
+# DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
+# ======================================================================
+TRADUCAO_ATRIBUTOS = {
+    # Gerais
+    'CA': 'CA (Habilidade Atual)',
+    'PA': 'PA (Potencial)',
+    'reputacao_mundial': 'Reputação Mundial',
+    'reputacao_atual': 'Reputação Atual',
+    'reputacao_local': 'Reputação Local',
+    'qualificacoes_treinador': 'Qualificações de Treinador',
+    'tipo_documento': 'Tipo de Documento',
+    'jogos_selecao': 'Jogos pela Seleção',
+    'gols_selecao': 'Gols pela Seleção',
+    'jogos_sub21': 'Jogos Sub-21',
+    'gols_sub21': 'Gols Sub-21',
     
-    if os.path.exists(caminho_json):
-        with open(caminho_json, 'r', encoding='utf-8') as f:
-            dados = json.load(f)
-            
-        lista_jogos = dados.get('jogos', [])
-        proximo_jogo = next((j for j in lista_jogos if j.get('status') == 'AGENDADO'), None)
-        
-        if proximo_jogo:
-            with st.container(border=True):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write(f"**Confronto:** {proximo_jogo.get('time_casa')} x {proximo_jogo.get('time_fora')}")
-                    st.write(f"**Competição:** {proximo_jogo.get('competicao', 'Capixabão Série B')}")
-                    st.write(f"**Data e Horário:** {proximo_jogo.get('data_jogo')} às {proximo_jogo.get('horario', '15:00')}")
-
-                with col2:
-                    st.write(f"**📍 Estádio:** {proximo_jogo.get('estadio')}")
-                    st.write(f"**🗺️ Endereço:** {proximo_jogo.get('endereco')} ({proximo_jogo.get('cidade')})")
-        else:
-            st.info("Nenhum jogo agendado no momento.")
-    else:
-        st.warning("Arquivo 'dados/jogos.json' não foi encontrado.")
+    # Chairman
+    'presidente_negocios': 'Presidente - Negócios',
+    'presidente_interferencia': 'Presidente - Interferência',
+    'presidente_paciencia': 'Presidente - Paciência',
+    'presidente_recursos': 'Presidente - Recursos',
+    
+    # Coaching
+    'treinamento_ataque': 'Treinamento - Ataque',
+    'treinamento_defesa': 'Treinamento - Defesa',
+    'treinamento_condicionamento': 'Treinamento - Condicionamento',
+    'treinamento_goleiros': 'Treinamento - Goleiros',
+    'treinamento_posse': 'Treinamento - Posse',
+    'treinamento_jogadores': 'Treinamento - Jogadores',
+    'treinamento_tatica': 'Treinamento - Tática',
+    'treinamento_tecnico': 'Treinamento - Técnico',
+    'treinamento_gestao_pessoas': 'Treinamento - Gestão de Pessoas',
+    'treinamento_trabalho_jovens': 'Treinamento - Trabalho com Jovens',
+    'treinamento_tolerancia_rudes': 'Treinamento - Tolerância a Rudes',
+    'treinamento_versatilidade': 'Treinamento - Versatilidade',
+    'treinamento_bolas_paradas': 'Treinamento - Bolas Paradas',
+    
+    # Staff Mental
+    'adaptabilidade_staff': 'Adaptabilidade (Staff)',
+    'determinacao_staff': 'Determinação (Staff)',
+    'avaliacao_habilidade_jogador': 'Avaliação Habilidade Jogador',
+    'avaliacao_potencial_jogador': 'Avaliação Potencial Jogador',
+    'avaliacao_habilidade_staff': 'Avaliação Habilidade Staff',
+    'negociacao': 'Negociação',
+    'autoridade': 'Autoridade',
+    'motivacao': 'Motivação',
+    'fisioterapia': 'Fisioterapia',
+    'conhecimento_tatico': 'Conhecimento Tático',
+    
+    # Non Tactical
+    'compra_jogadores': 'Compra de Jogadores',
+    'intensidade_treino': 'Intensidade do Treino',
+    'jogos_mentais': 'Jogos Mentais',
+    'rotacao_elenco': 'Rotação do Elenco',
+    
+    # Roles
+    'auxiliar_tecnico': 'Auxiliar Técnico',
+    'treinador': 'Treinador',
+    'preparador_fisico': 'Preparador Físico',
+    'preparador_goleiros': 'Preparador de Goleiros',
+    'treinador_principal': 'Treinador Principal',
+    'fisioterapeuta': 'Fisioterapeuta',
+    'olheiro': 'Olheiro',
+    'presidente': 'Presidente',
+    'diretor_futebol': 'Diretor de Futebol',
+    'chefe_base': 'Chefe da Base',
+    'analista_dados': 'Analista de Dados',
+    'cientista_esporte': 'Cientista do Esporte',
+    'gerente_emprestimos': 'Gerente de Empréstimos',
+    'diretor_tecnico': 'Diretor Técnico',
+    'treinador_bolas_paradas': 'Treinador de Bolas Paradas',
+    
+    # Tactical
+    'tatica_ataque': 'Tática - Ataque',
+    'profundidade': 'Profundidade',
+    'direcao': 'Direção',
+    'espetacularidade': 'Espetacularidade',
+    'flexibilidade': 'Flexibilidade',
+    'funcoes_livres': 'Funções Livres',
+    'marcacao': 'Marcação',
+    'impedimento': 'Impedimento',
+    'pressao': 'Pressão',
+    'recuar': 'Recuar',
+    'ritmo': 'Ritmo',
+    'uso_armador': 'Uso do Armador',
+    'uso_substituicoes': 'Uso de Substituições',
+    'largura': 'Largura',
+    
+    # Scouting
+    'avaliacao_dados_jogador': 'Avaliação Dados Jogador',
+    'avaliacao_dados_time': 'Avaliação Dados Time',
+    'apresentacao_dados': 'Apresentação de Dados',
+    
+    # Medical
+    'ciencia_esporte': 'Ciência do Esporte',
+    
+    # Personality
+    'adaptabilidade_personalidade': 'Adaptabilidade (Personalidade)',
+    'ambicao': 'Ambição',
+    'lealdade': 'Lealdade',
+    'pressao': 'Pressão (Personalidade)',
+    'profissionalismo': 'Profissionalismo',
+    'espirito_esportivo': 'Espírito Esportivo',
+    'temperamento': 'Temperamento',
+    'controversia': 'Controvérsia',
+    
+    # Nation
+    'pais': 'País',
+    'sigla_pais': 'Sigla País',
+    
+    # Knowledge
+    'conhecimento_valor': 'Conhecimento - Valor',
+}
 
 # ======================================================================
 # CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para aplicar fundo preto escuro em cards, containers e métricas
+# CSS para mudar a cor do texto de mensagens para preto
 st.markdown("""
 <style>
     div[data-testid="stAlert"] {
         color: black !important;
     }
-    
-    /* Fundo preto para caixas com border=True */
-    div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: #000000 !important;
-        border: 1px solid #333333 !important;
-        border-radius: 8px !important;
-        padding: 15px !important;
+    div[data-testid="stAlert"] .stAlert {
+        color: black !important;
     }
-
-    /* Fundo preto para blocos de métricas */
-    div[data-testid="stMetric"] {
-        background-color: #000000 !important;
-        border: 1px solid #333333 !important;
-        border-radius: 8px !important;
-        padding: 10px 15px !important;
-    }
-
-    /* Fundo escuro para a área central de conteúdo (para não misturar com o escudo) */
-    .block-container {
-        background-color: rgba(0, 0, 0, 0.85) !important;
-        border-radius: 12px;
-        padding: 25px !important;
-        margin-top: 20px;
+    .stAlert {
+        color: black !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -173,7 +240,6 @@ set_background(bg_image)
 
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 
-
 # ======================================================================
 # INICIALIZAÇÃO DE ESTADO
 # ======================================================================
@@ -209,7 +275,117 @@ if "instrucoes_coletivas" not in st.session_state:
     st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÕES DE DETALHES (JOGADOR E COMISSÃO)
+# FUNÇÃO DETALHES COMISSÃO (MODIFICADA PARA EXIBIR ATRIBUTOS)
+# ======================================================================
+def exibir_detalhes_comissao(row, categoria, cartoes):
+    with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            caminho_foto = obter_caminho_foto(row, categoria)
+            if caminho_foto:
+                st.image(caminho_foto, width=150)
+            else:
+                st.write("📷 Sem foto")
+        with col2:
+            st.write(f"**Nome:** {row.get('nome', 'N/I')}")
+            st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
+            st.write(f"**Idade:** {row.get('idade', 'N/I')}")
+            st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
+            st.write(f"**País:** {row.get('pais', 'N/I')}")
+            nome_canonico = row.get('nome_canonico', row['nome'])
+            suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
+            st.write(f"**Suspenso:** {suspenso}")
+        
+        st.divider()
+        
+        # ===== HISTÓRICO =====
+        st.subheader("📜 Histórico")
+        col_hist1, col_hist2 = st.columns(2)
+        with col_hist1:
+            st.write("**Histórico Profissional:**")
+            st.write(row.get('historico_profissional', 'Não informado'))
+        with col_hist2:
+            st.write("**Histórico como Jogador:**")
+            st.write(row.get('historico_jogador', 'Não informado'))
+        
+        st.divider()
+        
+        # ===== CARTÕES =====
+        st.subheader("🟨 Histórico de Cartões")
+        if nome_canonico in cartoes:
+            historico = cartoes[nome_canonico].get('historico', [])
+            if historico:
+                df_hist = pd.DataFrame(historico)
+                st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
+            else:
+                st.info("Nenhum cartão registrado.")
+        else:
+            st.info("Nenhum cartão registrado.")
+        
+        st.divider()
+        
+        # ===== ATRIBUTOS DETALHADOS (DO CSV) =====
+        st.subheader("📊 Atributos Detalhados")
+        
+        # Mapeamento das colunas do CSV para as categorias
+        # Vamos usar o dicionário TRADUCAO_ATRIBUTOS para exibir nomes em português
+        # As colunas do CSV já estão em inglês, mas algumas podem estar com nomes diferentes
+        # Vamos criar categorias e exibir os valores
+        
+        # Primeiro, definir grupos de atributos
+        grupos = {
+            "🔢 Gerais": ['CA', 'PA', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
+                          'qualificacoes_treinador', 'tipo_documento', 'jogos_selecao', 'gols_selecao',
+                          'jogos_sub21', 'gols_sub21', 'conhecimento_valor'],
+            "👔 Presidente (Chairman)": ['presidente_negocios', 'presidente_interferencia',
+                                         'presidente_paciencia', 'presidente_recursos'],
+            "🧑‍🏫 Treinamento (Coaching)": ['treinamento_ataque', 'treinamento_defesa', 'treinamento_condicionamento',
+                                           'treinamento_goleiros', 'treinamento_posse', 'treinamento_jogadores',
+                                           'treinamento_tatica', 'treinamento_tecnico', 'treinamento_gestao_pessoas',
+                                           'treinamento_trabalho_jovens', 'treinamento_tolerancia_rudes',
+                                           'treinamento_versatilidade', 'treinamento_bolas_paradas'],
+            "🧠 Staff Mental": ['adaptabilidade_staff', 'determinacao_staff', 'avaliacao_habilidade_jogador',
+                                'avaliacao_potencial_jogador', 'avaliacao_habilidade_staff', 'negociacao',
+                                'autoridade', 'motivacao', 'fisioterapia', 'conhecimento_tatico'],
+            "⚙️ Não Tático": ['compra_jogadores', 'intensidade_treino', 'jogos_mentais', 'rotacao_elenco'],
+            "🎯 Funções (Roles)": ['auxiliar_tecnico', 'treinador', 'preparador_fisico', 'preparador_goleiros',
+                                   'treinador_principal', 'fisioterapeuta', 'olheiro', 'presidente',
+                                   'diretor_futebol', 'chefe_base', 'analista_dados', 'cientista_esporte',
+                                   'gerente_emprestimos', 'diretor_tecnico', 'treinador_bolas_paradas'],
+            "📐 Tático": ['tatica_ataque', 'profundidade', 'direcao', 'espetacularidade',
+                          'flexibilidade', 'funcoes_livres', 'marcacao', 'impedimento',
+                          'pressao', 'recuar', 'ritmo', 'uso_armador', 'uso_substituicoes', 'largura'],
+            "🔍 Scouting": ['avaliacao_dados_jogador', 'avaliacao_dados_time', 'apresentacao_dados'],
+            "🏥 Médico": ['ciencia_esporte'],
+            "🧬 Personalidade": ['adaptabilidade_personalidade', 'ambicao', 'lealdade',
+                                 'pressao', 'profissionalismo', 'espirito_esportivo',
+                                 'temperamento', 'controversia'],
+        }
+        
+        # Para cada grupo, exibir os atributos que existem no DataFrame
+        for grupo_nome, lista_atributos in grupos.items():
+            # Filtra apenas atributos que existem no DataFrame (row)
+            atributos_existentes = []
+            for attr in lista_atributos:
+                if attr in row.index:
+                    atributos_existentes.append(attr)
+            
+            if atributos_existentes:
+                st.write(f"**{grupo_nome}**")
+                # Divide em duas colunas para melhor visualização
+                cols = st.columns(2)
+                for i, attr in enumerate(atributos_existentes):
+                    valor = row[attr]
+                    if pd.isna(valor):
+                        valor = "N/I"
+                    # Traduz o nome do atributo (se disponível)
+                    nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
+                    with cols[i % 2]:
+                        st.write(f"• **{nome_attr}:** {valor}")
+                st.write("")  # linha em branco
+
+# ======================================================================
+# FUNÇÃO DETALHES JOGADOR (não modificada)
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
@@ -219,242 +395,91 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             if caminho_foto:
                 st.image(caminho_foto, width=150)
             else:
-                with st.container(border=True):
-                    st.write("📷 Sem foto")
+                st.write("📷 Sem foto")
         with col2:
-            with st.container(border=True):
-                st.write(f"**Nome:** {row.get('nome_completo', 'N/I')}")
-                st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
-                data_nasc = row.get('data_nascimento', '')
-                idade = row.get('Idade', 'N/I')
-                st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
-                cidade = row.get('cidade_nascimento', '')
-                uf = row.get('uf_nascimento', '')
-                pais = row.get('pais_nascimento', '')
-                st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
-                st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
-                st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
-                pos_sec = row.get('Posicoes_Secundarias', [])
-                if isinstance(pos_sec, list):
-                    pos_sec_str = ", ".join(pos_sec) if pos_sec else "Nenhuma"
-                else:
-                    pos_sec_str = str(pos_sec) if pd.notna(pos_sec) else "Nenhuma"
-                st.write(f"**Pos. Secundárias:** {pos_sec_str}")
-                pe = row.get('pe_pref', '')
-                pe_map = {np.nan: 'N/I', 'D': 'Destro', 'C': 'Canhoto', 'A': 'Ambidestro'}
-                pe_str = pe_map.get(pe, str(pe)) if pd.notna(pe) else 'N/I'
-                st.write(f"**Pé Preferencial:** {pe_str}")
-                rating = row.get('Rating_Geral_FM26', 0)
-                st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
-                st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
-                st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
-                lesao = obter_lesao_atual(row, categoria)
-                st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
-                imc = row.get('IMC')
-                if pd.notna(imc):
-                    st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
-                gordura = row.get('Gordura_Corporal_%')
-                if pd.notna(gordura):
-                    st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
-                massa_magra = row.get('Massa_Magra_kg')
-                if pd.notna(massa_magra):
-                    st.write(f"**Massa Magra:** {massa_magra:.1f} kg")
-                massa_muscular = row.get('Massa_Muscular_Estimada_kg')
-                if pd.notna(massa_muscular):
-                    st.write(f"**Massa Muscular Estimada:** {massa_muscular:.1f} kg")
+            st.write(f"**Nome:** {row.get('nome_completo', 'N/I')}")
+            st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
+            data_nasc = row.get('data_nascimento', '')
+            idade = row.get('Idade', 'N/I')
+            st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
+            cidade = row.get('cidade_nascimento', '')
+            uf = row.get('uf_nascimento', '')
+            pais = row.get('pais_nascimento', '')
+            st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
+            st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
+            st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
+            pos_sec = row.get('Posicoes_Secundarias', [])
+            if isinstance(pos_sec, list):
+                pos_sec_str = ", ".join(pos_sec) if pos_sec else "Nenhuma"
+            else:
+                pos_sec_str = str(pos_sec) if pd.notna(pos_sec) else "Nenhuma"
+            st.write(f"**Pos. Secundárias:** {pos_sec_str}")
+            pe = row.get('pe_pref', '')
+            pe_map = {np.nan: 'N/I', 'D': 'Destro', 'C': 'Canhoto', 'A': 'Ambidestro'}
+            pe_str = pe_map.get(pe, str(pe)) if pd.notna(pe) else 'N/I'
+            st.write(f"**Pé Preferencial:** {pe_str}")
+            rating = row.get('Rating_Geral_FM26', 0)
+            st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
+            st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
+            st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
+            lesao = obter_lesao_atual(row, categoria)
+            st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
+            imc = row.get('IMC')
+            if pd.notna(imc):
+                st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
+            gordura = row.get('Gordura_Corporal_%')
+            if pd.notna(gordura):
+                st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
+            massa_magra = row.get('Massa_Magra_kg')
+            if pd.notna(massa_magra):
+                st.write(f"**Massa Magra:** {massa_magra:.1f} kg")
+            massa_muscular = row.get('Massa_Muscular_Estimada_kg')
+            if pd.notna(massa_muscular):
+                st.write(f"**Massa Muscular Estimada:** {massa_muscular:.1f} kg")
         st.divider()
         st.subheader("📜 Histórico de Clubes")
-        with st.container(border=True):
-            st.text(obter_historico_clubes(row))
+        st.text(obter_historico_clubes(row))
         st.subheader("🩺 Histórico de Lesões")
-        with st.container(border=True):
-            texto_lesoes = obter_historico_lesoes_texto(row, categoria)
-            st.text(texto_lesoes)
+        texto_lesoes = obter_historico_lesoes_texto(row, categoria)
+        st.text(texto_lesoes)
         st.subheader("📊 Estatísticas da Temporada (oGol)")
-        with st.container(border=True):
-            estatisticas_ogol = {
-                'jogos_temporada': 'Jogos na temporada',
-                'minutos_totais': 'Minutos totais',
-                'media_minutos_por_jogo': 'Média minutos/jogo',
-                'gols_totais': 'Gols',
-                'assistencias_totais': 'Assistências',
-                'cartoes_amarelos_totais': 'Cartões amarelos',
-                'cartoes_vermelhos_totais': 'Cartões vermelhos'
-            }
-            for col_name, label in estatisticas_ogol.items():
-                valor = row.get(col_name, '0')
-                if pd.isna(valor) or str(valor).strip() == '':
-                    valor_str = '0'
-                else:
-                    valor_str = str(valor).strip()
-                    if valor_str.endswith('.0'):
-                        valor_str = valor_str[:-2]
-                st.write(f"**{label}:** {valor_str}")
+        estatisticas_ogol = {
+            'jogos_temporada': 'Jogos na temporada',
+            'minutos_totais': 'Minutos totais',
+            'media_minutos_por_jogo': 'Média minutos/jogo',
+            'gols_totais': 'Gols',
+            'assistencias_totais': 'Assistências',
+            'cartoes_amarelos_totais': 'Cartões amarelos',
+            'cartoes_vermelhos_totais': 'Cartões vermelhos'
+        }
+        for col_name, label in estatisticas_ogol.items():
+            valor = row.get(col_name, '0')
+            if pd.isna(valor) or str(valor).strip() == '':
+                valor_str = '0'
+            else:
+                valor_str = str(valor).strip()
+                if valor_str.endswith('.0'):
+                    valor_str = valor_str[:-2]
+            st.write(f"**{label}:** {valor_str}")
         st.subheader("🎮 Atributos FM26 (todos os 60)")
-        with st.container(border=True):
-            cols_atributos = st.columns(2)
-            for i, attr in enumerate(ATRIBUTOS_FM26):
-                nome_attr = attr.replace('_', ' ').title()
-                valor = row.get(attr, np.nan)
-                valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
-                with cols_atributos[i % 2]:
-                    st.write(f"**{nome_attr}:** {valor_str}")
+        cols_atributos = st.columns(2)
+        for i, attr in enumerate(ATRIBUTOS_FM26):
+            nome_attr = attr.replace('_', ' ').title()
+            valor = row.get(attr, np.nan)
+            valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
+            with cols_atributos[i % 2]:
+                st.write(f"**{nome_attr}:** {valor_str}")
         st.subheader("🟨 Histórico de Cartões")
-        with st.container(border=True):
-            nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
-            if nome_canonico and nome_canonico in cartoes:
-                historico = cartoes[nome_canonico].get('historico', [])
-                if historico:
-                    df_hist = pd.DataFrame(historico)
-                    st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
-                else:
-                    st.info("Nenhum cartão registrado.")
+        nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
+        if nome_canonico and nome_canonico in cartoes:
+            historico = cartoes[nome_canonico].get('historico', [])
+            if historico:
+                df_hist = pd.DataFrame(historico)
+                st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
             else:
                 st.info("Nenhum cartão registrado.")
-
-def exibir_detalhes_comissao(row, categoria, cartoes):
-    nome_exibicao = row.get('nome', row.get('nome_completo', 'Membro'))
-    
-    with st.expander(f"📋 DETALHES - {nome_exibicao}", expanded=True):
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            caminho_foto = obter_caminho_foto(row, categoria)
-            if caminho_foto:
-                st.image(caminho_foto, width=150)
-            else:
-                with st.container(border=True):
-                    st.write("📷 Sem foto")
-                    
-        with col2:
-            with st.container(border=True):
-                nome_completo = row.get('nome_completo')
-                st.write(f"**Nome Completo:** {nome_completo if pd.notna(nome_completo) and str(nome_completo).strip() else 'N/I'}")
-                st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
-                st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
-                
-                idade = row.get('idade')
-                st.write(f"**Idade:** {int(idade) if pd.notna(idade) else 'N/I'} anos")
-                st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
-                st.write(f"**País:** {row.get('pais', 'N/I')}")
-                
-                qualificacao = row.get('qualificacoes_treinador')
-                st.write(f"**Licença/Qualificação:** {qualificacao if pd.notna(qualificacao) and str(qualificacao).strip() else 'Sem registro'}")
-                
-                # Atributos CA e PA do FM26
-                ca = row.get('ca')
-                pa = row.get('pa')
-                st.write(f"**Rating Atual (CA):** {ca if pd.notna(ca) else 'N/I'} | **Potencial (PA):** {pa if pd.notna(pa) else 'N/I'}")
-                
-                nome_canonico = row.get('nome_canonico', row.get('nome', ''))
-                suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
-                st.write(f"**Suspenso:** {suspenso}")
-
-                st.divider()
-
-                # ==================== COLE AQUI ====================
-                # 1. Histórico Profissional / Comissão
-                st.subheader("📜 Histórico Profissional")
-                hist_prof = str(row.get('historico_comissao', row.get('historico_profissional', ''))).strip()
-    
-                if pd.notna(hist_prof) and hist_prof and hist_prof.lower() not in ['nan', 'não informado', 'none', '']:
-                    with st.container(border=True):
-                        st.write(hist_prof)
-                else:
-                    st.info("Nenhum histórico profissional registrado.")
-
-                # 2. Histórico de Jogador
-                st.subheader("⚽ Histórico como Jogador")
-                hist_jog = str(row.get('historico_jogador', '')).strip()
-    
-                if pd.notna(hist_jog) and hist_jog and hist_jog.lower() not in ['nan', 'não informado', 'none', '']:
-                    with st.container(border=True):
-                        st.write(hist_jog)
-                else:
-                    st.info("Sem histórico de carreira como jogador registrado.")
-
-        # 3. Atributos de Treino e Gestão (FM26)
-        st.subheader("📊 Atributos de Treinamento (FM26)")
-        with st.container(border=True):
-            cols_attr = st.columns(3)
-            atributos_comissao = {
-                'Ataque': 'coachingattributes_attacking',
-                'Defesa': 'coachingattributes_defending',
-                'Físico': 'coachingattributes_fitness',
-                'Goleiros': 'coachingattributes_goalkeeping',
-                'Tática': 'coachingattributes_tactical',
-                'Técnica': 'coachingattributes_technical',
-                'Gestão de Pessoas': 'coachingattributes_peoplemanagement',
-                'Trabalho c/ Jovens': 'coachingattributes_workingwithyoungsters',
-                'Bolas Paradas': 'coachingattributes_setpieces'
-            }
-            
-            for i, (label, col_name) in enumerate(atributos_comissao.items()):
-                val = row.get(col_name, np.nan)
-                val_str = f"{int(val)}" if pd.notna(val) and str(val).lower() != 'nan' else "N/I"
-                with cols_attr[i % 3]:
-                    st.write(f"**{label}:** {val_str}")
-
-        # 4. Histórico de Cartões
-        st.subheader("🟨 Histórico de Cartões")
-        with st.container(border=True):
-            # Garante leitura tanto se passar o JSON completo ou apenas a chave 'cartoes'
-            dict_cartoes = cartoes.get('cartoes', cartoes) if isinstance(cartoes, dict) else {}
-
-            # Lista possíveis nomes do membro para busca no JSON
-            nomes_para_busca = [
-                str(row.get('apelido', '')).strip(),
-                str(row.get('nome', '')).strip(),
-                str(row.get('nome_completo', '')).strip(),
-                str(row.get('nome_canonico', '')).strip()
-            ]
-
-            # Busca insensível a maiúsculas/minúsculas
-            dados_membro = None
-            for nome in nomes_para_busca:
-                if not nome:
-                    continue
-                for chave_json, valor_json in dict_cartoes.items():
-                    if chave_json.lower() == nome.lower():
-                        dados_membro = valor_json
-                        break
-                if dados_membro:
-                    break
-
-            if dados_membro:
-                # Métricas do JSON
-                amarelos = dados_membro.get('amarelos', 0)
-                vermelho = dados_membro.get('vermelho', False)
-                suspenso_prox = dados_membro.get('suspenso_proxima', False)
-
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Amarelos Acumulados", amarelos)
-                c2.metric("Cartão Vermelho", "Sim" if vermelho else "Não")
-                c3.metric("Suspenso Próx. Jogo", "Sim" if suspenso_prox else "Não")
-
-                st.divider()
-
-                # Tabela de Histórico
-                historico = dados_membro.get('historico', [])
-                if historico:
-                    df_hist = pd.DataFrame(historico)
-                    
-                    # Formatação das colunas para exibição na tela
-                    colunas_renomear = {
-                        'data': 'Data',
-                        'adversario': 'Adversário',
-                        'cor': 'Cartão',
-                        'terceiro_amarelo': '3º Amarelo',
-                        'suspenso_causada': 'Gera Suspensão',
-                        'suspenso_cumprida': 'Cumprida'
-                    }
-                    df_hist = df_hist.rename(columns=colunas_renomear)
-                    
-                    st.dataframe(df_hist, use_container_width=True, hide_index=True)
-                else:
-                    st.info("Nenhum cartão registrado no histórico deste membro.")
-            else:
-                st.info("Nenhum registro de cartão encontrado no JSON para este membro.")
+        else:
+            st.info("Nenhum cartão registrado.")
 
 # ======================================================================
 # AUTENTICAÇÃO
@@ -484,10 +509,9 @@ def login():
 
 def abrir_gerenciador_usuarios():
     with st.expander("Gerenciar Usuários", expanded=True):
-        with st.container(border=True):
-            st.write("**Usuários cadastrados:**")
-            for u in listar_usuarios():
-                st.write(f"- {u}")
+        st.write("**Usuários cadastrados:**")
+        for u in listar_usuarios():
+            st.write(f"- {u}")
         st.divider()
         with st.form("novo_usuario"):
             novo_user = st.text_input("Novo usuário")
@@ -597,20 +621,20 @@ def get_df_cartoes(categoria):
 # ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
-    "📊 Análise de Elenco",
-    "👥 Comissão Técnica",
-    "⚽ Monitoramento ao Vivo",
-    "🟨 Cartões",
-    "📅 Próximo Jogo",
-    "📐 Escalação Tática",
-    "⚙️ Gestão",
-    "📄 Relatórios",
-    "📤 Exportar",
-    "🎥 Visualização Tática"
+    "📊 Análise de Elenco",    # direto no app.py
+    "👥 Comissão Técnica",      # direto no app.py (modificada)
+    "⚽ Monitoramento ao Vivo", # pages.monitoramento.show()
+    "🟨 Cartões",               # pages.cartoes.show()
+    "📅 Próximo Jogo",          # pages.proximo_jogo.show()
+    "📐 Escalação Tática",      # pages.tatica_page.show()
+    "⚙️ Gestão",                # pages.gestao.show()
+    "📄 Relatórios",            # pages.relatorios.show()
+    "📤 Exportar",              # pages.exportar.show()
+    "🎥 Visualização Tática"    # pages.visualizacao.show()
 ])
 
 # ----------------------------------------------------------------------
-# ABA 1: ANÁLISE DE ELENCO
+# ABA 1: ANÁLISE DE ELENCO (não modificada)
 # ----------------------------------------------------------------------
 with tabs[0]:
     st.header("Análise de Jogadores")
@@ -665,9 +689,8 @@ with tabs[0]:
         elif opcao_analise == "Condição física detalhada":
             for estado in sorted(df_analise['Estado_Fisico'].unique()):
                 grupo = df_analise[df_analise['Estado_Fisico'] == estado]
-                with st.container(border=True):
-                    st.write(f"**{estado}** ({len(grupo)} jogadores)")
-                    st.dataframe(grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']])
+                st.write(f"**{estado}** ({len(grupo)} jogadores)")
+                st.dataframe(grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']])
 
         elif opcao_analise == "Origem (UF/País)":
             st.subheader("Distribuição por UF")
@@ -683,8 +706,7 @@ with tabs[0]:
             carencias = contagem[contagem < 3]
             if not carencias.empty:
                 st.warning("Posições carentes (menos de 3 jogadores):")
-                with st.container(border=True):
-                    st.write(carencias)
+                st.write(carencias)
             else:
                 st.success("Todas as posições têm pelo menos 3 jogadores.")
             criticos = df_analise[df_analise['Estado_Fisico'] == 'Crítico']
@@ -704,8 +726,7 @@ with tabs[0]:
                     comp_texto += f"**{cat}**: {len(df_cat)} jogadores, "
                     comp_texto += f"idade média {df_cat['Idade'].mean():.1f}, "
                     comp_texto += f"rating médio {df_cat['Rating_Geral_FM26'].mean():.1f}\n"
-            with st.container(border=True):
-                st.text(comp_texto)
+            st.text(comp_texto)
 
         elif opcao_analise == "Filtrar por posição":
             pos = st.selectbox("Posição", df_analise['Posicao_Principal'].unique())
@@ -729,31 +750,39 @@ with tabs[0]:
             lesionados = df_analise[df_analise['lesionado'] == True]
             if not lesionados.empty:
                 for _, row in lesionados.iterrows():
-                    with st.container(border=True):
-                        st.write(f"• {row['nome_completo']} ({row['apelido']}) - {obter_lesao_atual(row, cat_analise)}")
+                    st.write(f"• {row['nome_completo']} ({row['apelido']}) - {obter_lesao_atual(row, cat_analise)}")
             else:
                 st.info("Nenhum lesionado.")
     else:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ----------------------------------------------------------------------
-# ABA 2: COMISSÃO TÉCNICA
+# ABA 2: COMISSÃO TÉCNICA (MODIFICADA COM ATRIBUTOS)
 # ----------------------------------------------------------------------
 with tabs[1]:
-    st.header("Comissão Técnica")
+    st.header("👥 Comissão Técnica")
     cat_com = st.selectbox("Categoria", ["Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"])
     df_com, cartoes_com = get_df_cartoes(cat_com)
+    
     if df_com is not None and not df_com.empty:
+        # Busca e exibe lista
         busca = st.text_input("Buscar membro")
         if busca and 'nome' in df_com.columns:
-            df_com = df_com[df_com['nome'].str.contains(busca, case=False, na=False)]
-        cols = [c for c in ['nome','cargo','idade','cidade_uf','pais'] if c in df_com.columns]
-        st.dataframe(df_com[cols], width='stretch')
-        if not df_com.empty and 'nome' in df_com.columns:
-            membro = st.selectbox("Selecione um membro", df_com['nome'].tolist())
+            df_com_filtrado = df_com[df_com['nome'].str.contains(busca, case=False, na=False)]
+        else:
+            df_com_filtrado = df_com
+        
+        cols = [c for c in ['nome','cargo','idade','cidade_uf','pais'] if c in df_com_filtrado.columns]
+        st.dataframe(df_com_filtrado[cols] if cols else df_com_filtrado, width='stretch')
+        
+        if not df_com_filtrado.empty and 'nome' in df_com_filtrado.columns:
+            membro = st.selectbox("Selecione um membro", df_com_filtrado['nome'].tolist())
             if membro:
-                row = df_com[df_com['nome'] == membro].iloc[0]
+                row = df_com_filtrado[df_com_filtrado['nome'] == membro].iloc[0]
+                # Usa a nova função que exibe atributos
                 exibir_detalhes_comissao(row, cat_com, cartoes_com)
+                
+                # Botão para registrar cartão (mantido)
                 if st.button(f"🟨 Registrar cartão para {membro}"):
                     tipo = st.radio("Tipo", ["Amarelo", "Vermelho"], key="tipo_cartao_com")
                     if st.button("Confirmar cartão", key="conf_cartao_com"):
@@ -764,11 +793,25 @@ with tabs[1]:
                             cartoes_com[nome_canonico]['amarelos'] += 1
                             if cartoes_com[nome_canonico]['amarelos'] >= 3:
                                 cartoes_com[nome_canonico]['suspenso_proxima'] = True
-                            cartoes_com[nome_canonico]['historico'].append({'data': datetime.now().strftime("%d/%m/%Y"), 'adversario': "N/I", 'cor': 'amarelo', 'terceiro_amarelo': cartoes_com[nome_canonico]['amarelos']>=3, 'suspenso_causada': cartoes_com[nome_canonico]['amarelos']>=3, 'suspenso_cumprida': False})
+                            cartoes_com[nome_canonico]['historico'].append({
+                                'data': datetime.now().strftime("%d/%m/%Y"),
+                                'adversario': "N/I",
+                                'cor': 'amarelo',
+                                'terceiro_amarelo': cartoes_com[nome_canonico]['amarelos']>=3,
+                                'suspenso_causada': cartoes_com[nome_canonico]['amarelos']>=3,
+                                'suspenso_cumprida': False
+                            })
                         else:
                             cartoes_com[nome_canonico]['vermelho'] = True
                             cartoes_com[nome_canonico]['suspenso_proxima'] = True
-                            cartoes_com[nome_canonico]['historico'].append({'data': datetime.now().strftime("%d/%m/%Y"), 'adversario': "N/I", 'cor': 'vermelho', 'terceiro_amarelo': False, 'suspenso_causada': True, 'suspenso_cumprida': False})
+                            cartoes_com[nome_canonico]['historico'].append({
+                                'data': datetime.now().strftime("%d/%m/%Y"),
+                                'adversario': "N/I",
+                                'cor': 'vermelho',
+                                'terceiro_amarelo': False,
+                                'suspenso_causada': True,
+                                'suspenso_cumprida': False
+                            })
                         salvar_cartoes_json(cartoes_com, cat_com.replace("Comissão ", "").lower())
                         st.success("Cartão registrado!")
                         st.rerun()
@@ -833,7 +876,7 @@ with tabs[7]:
         import pages.relatorios as relatorios
         relatorios.show()
     except ImportError as e:
-        st.error(f"Erro ao carregar página de relatorios: {e}")
+        st.error(f"Erro ao carregar página de relatórios: {e}")
 
 # ----------------------------------------------------------------------
 # ABA 9: EXPORTAR
@@ -843,7 +886,7 @@ with tabs[8]:
     cat_export = st.selectbox(
         "Categoria",
         ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"],
-        key="export_categoria" 
+        key="export_categoria"
     )
     df_export, _ = get_df_cartoes(cat_export)
     if df_export is not None and not df_export.empty:
