@@ -773,6 +773,8 @@ def carregar_dfs():
                 df_completo['apelido_key'] = df_completo['apelido'].apply(lambda x: mapear_nome_para_canonico(x) or x)
                 # Mescla os dois DataFrames
                 df_com_mesclado = pd.merge(df_com_basico, df_completo, on='apelido_key', how='left')
+                st.write("Colunas disponíveis após merge:", df_com_mesclado.columns.tolist())
+                st.write("Primeira linha:", df_com_mesclado.iloc[0].to_dict())
                 # Remove colunas duplicadas (manter as do básico)
                 # Remove colunas extras que podem conflitar
                 colunas_remover = ['nome_y', 'cargo_y', 'data_nascimento_y', 'cidade_nascimento_y',
