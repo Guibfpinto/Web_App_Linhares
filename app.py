@@ -198,37 +198,37 @@ st.markdown("""
         padding: 10px;
     }
 
-    /* ===== COR DA FONTE: VERMELHO #ff4444 ===== */
+    /* ===== COR DA FONTE: VERMELHO #cc0000 ===== */
     /* Títulos */
     h1, h2, h3, h4, h5, h6 {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     /* Textos gerais */
     .stMarkdown, .stText, .stSubheader, .stCaption {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     /* Labels de widgets */
     .stSelectbox label, .stTextInput label, .stNumberInput label,
     .stDateInput label, .stTextArea label {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         font-weight: 500 !important;
     }
     /* Valores das métricas */
     [data-testid="stMetric"] .stMetricValue {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     [data-testid="stMetric"] label {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     /* Expansores */
     .streamlit-expanderHeader {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         background-color: #1a1a1a !important;
         border: 1px solid #333 !important;
         border-radius: 5px !important;
     }
     .streamlit-expanderContent {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         background-color: #111111 !important;
         border: 1px solid #333 !important;
         border-top: none !important;
@@ -237,7 +237,7 @@ st.markdown("""
     }
     /* Botões */
     .stButton button {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         background-color: #222222 !important;
         border: 1px solid #444 !important;
         border-radius: 4px !important;
@@ -252,7 +252,7 @@ st.markdown("""
     }
     /* Radio e Checkbox */
     .stRadio label, .stCheckbox label {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     .stRadio div[role="radiogroup"] > label {
         background-color: #1a1a1a !important;
@@ -260,7 +260,7 @@ st.markdown("""
         border-radius: 4px !important;
         padding: 5px 10px !important;
         margin: 2px !important;
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     .stRadio div[role="radiogroup"] > label:hover {
         background-color: #2a2a2a !important;
@@ -270,7 +270,7 @@ st.markdown("""
     .stTextInput input, .stNumberInput input,
     .stDateInput input, .stTextArea textarea {
         background-color: #222222 !important;
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         border: 1px solid #444 !important;
         border-radius: 4px !important;
     }
@@ -299,11 +299,11 @@ st.markdown("""
         border-radius: 5px !important;
     }
     .stDataFrame table {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     .stDataFrame thead tr th {
         background-color: #1a1a1a !important;
-        color: #ff4444 !important;
+        color: #cc0000 !important;
         border-bottom: 2px solid #444 !important;
     }
     .stDataFrame tbody tr {
@@ -314,11 +314,11 @@ st.markdown("""
     }
     .dataframe {
         background-color: #111111 !important;
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     .dataframe thead th {
         background-color: #1a1a1a !important;
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
     .dataframe tbody td {
         border-color: #2a2a2a !important;
@@ -342,7 +342,7 @@ st.markdown("""
         background-color: rgba(0,0,0,0.9) !important;
     }
     .sidebar .stSelectbox label, .sidebar .stTextInput label {
-        color: #ff4444 !important;
+        color: #cc0000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
