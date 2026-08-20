@@ -179,11 +179,11 @@ TRADUCAO_ATRIBUTOS = {
 }
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO (com imagem de fundo + boxes pretas)
+# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para fundo preto nos elementos internos, mantendo a imagem de fundo
+# CSS com fundo preto sólido no container principal e elementos internos
 st.markdown("""
 <style>
     /* ===== ALERTAS ===== */
@@ -191,8 +191,13 @@ st.markdown("""
     div[data-testid="stAlert"] .stAlert { color: black !important; }
     .stAlert { color: black !important; }
 
-    /* ===== NÃO MEXER NO CONTAINER PRINCIPAL PARA MANTER A IMAGEM ===== */
-    /* O fundo da página é definido pela função set_background() */
+    /* ===== CONTAINER PRINCIPAL COM FUNDO PRETO SÓLIDO ===== */
+    .stApp {
+        background-color: #000000 !important;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+    }
 
     /* ===== EXPANSORES ===== */
     .streamlit-expanderHeader {
@@ -373,14 +378,13 @@ def set_background(image_path):
             background-attachment: fixed;
         }}
         [data-testid="stHeader"] {{ background: rgba(0,0,0,0); }}
-        /* Leve escurecimento para melhor contraste */
-        .stApp {{ background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }}
-        [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.75); }}
+        /* .stApp agora tem fundo preto sólido, então a imagem aparecerá apenas nas bordas ou atrás */
+        .stApp {{ background-color: #000000; border-radius: 10px; margin: 10px; padding: 10px; }}
+        [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.9); }}
         </style>
         """
         st.markdown(bg_css, unsafe_allow_html=True)
     else:
-        # Fallback: gradiente escuro
         bg_css = """
         <style>
         [data-testid="stAppViewContainer"] {
@@ -388,8 +392,8 @@ def set_background(image_path):
             background-attachment: fixed;
         }
         [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-        .stApp { background-color: rgba(0,0,0,0.5); border-radius: 10px; margin: 10px; padding: 10px; }
-        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.8); }
+        .stApp { background-color: #000000; border-radius: 10px; margin: 10px; padding: 10px; }
+        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.9); }
         </style>
         """
         st.markdown(bg_css, unsafe_allow_html=True)
