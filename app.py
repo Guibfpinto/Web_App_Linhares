@@ -18,7 +18,6 @@ from utils import (
     carregar_elenco_profissional,
     carregar_elenco_sub20,
     carregar_elenco_sub17,
-    carregar_comissao,
     carregar_comissao_sub20,
     carregar_cartoes_json,
     salvar_cartoes_json,
@@ -184,32 +183,20 @@ TRADUCAO_ATRIBUTOS = {
 # ======================================================================
 st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
 
-# CSS para mudar a cor do texto de mensagens para preto
+# CSS com fundo preto para todos os componentes
 st.markdown("""
 <style>
-    /* ===== CORES DE ALERTA ===== */
-    div[data-testid="stAlert"] {
-        color: black !important;
-    }
-    div[data-testid="stAlert"] .stAlert {
-        color: black !important;
-    }
-    .stAlert {
-        color: black !important;
-    }
+    /* ===== ALERTAS ===== */
+    div[data-testid="stAlert"] { color: black !important; }
+    div[data-testid="stAlert"] .stAlert { color: black !important; }
+    .stAlert { color: black !important; }
 
     /* ===== FUNDO PRETO EM TODOS OS CONTAINERS ===== */
-    .stApp {
-        background-color: rgba(0,0,0,0.85) !important;
-    }
-    .stAppViewContainer {
-        background-color: rgba(0,0,0,0.85) !important;
-    }
-    .stSidebar {
-        background-color: rgba(0,0,0,0.9) !important;
-    }
+    .stApp { background-color: rgba(0,0,0,0.85) !important; }
+    .stAppViewContainer { background-color: rgba(0,0,0,0.85) !important; }
+    .stSidebar { background-color: rgba(0,0,0,0.9) !important; }
 
-    /* ===== EXPANSORES (expander) ===== */
+    /* ===== EXPANSORES ===== */
     .streamlit-expanderHeader {
         background-color: #1a1a1a !important;
         color: #ffffff !important;
@@ -225,7 +212,7 @@ st.markdown("""
         padding: 10px !important;
     }
 
-    /* ===== WIDGETS (selectbox, text_input, etc.) ===== */
+    /* ===== WIDGETS ===== */
     .stSelectbox label, .stTextInput label, .stNumberInput label,
     .stDateInput label, .stTextArea label {
         color: #e0e0e0 !important;
@@ -306,7 +293,7 @@ st.markdown("""
         background-color: #2a2a2a !important;
     }
 
-    /* ===== TABELAS EM GERAL (incluindo pandas) ===== */
+    /* ===== TABELAS EM GERAL ===== */
     .dataframe {
         background-color: #111111 !important;
         color: #e0e0e0 !important;
@@ -335,7 +322,7 @@ st.markdown("""
         border-color: #444 !important;
     }
 
-    /* ===== MULTISELECT / RADIO ===== */
+    /* ===== RADIO / CHECKBOX ===== */
     .stRadio label, .stCheckbox label {
         color: #e0e0e0 !important;
     }
@@ -362,7 +349,7 @@ st.markdown("""
         border-color: #666 !important;
     }
 
-    /* ===== SIDEBAR ELEMENTOS ===== */
+    /* ===== SIDEBAR ===== */
     .css-1d391kg, .css-1kyxreq {
         background-color: rgba(0,0,0,0.9) !important;
     }
@@ -446,10 +433,10 @@ if "instrucoes_coletivas" not in st.session_state:
     st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (com atributos detalhados)
+# FUNÇÃO DETALHES COMISSÃO (com todos os atributos do CSV)
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
-    with st.expander(f"📋 DETALHES - {row.get('nome', 'Membro')}", expanded=True):
+    with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
             caminho_foto = obter_caminho_foto(row, categoria)
@@ -458,12 +445,14 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             else:
                 st.write("📷 Sem foto")
         with col2:
-            st.write(f"**Nome:** {row.get('nome', 'N/I')}")
+            st.write(f"**Nome:** {row.get('nome_completo', row.get('nome', 'N/I'))}")
+            st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
             st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
+            st.write(f"**Data Nasc.:** {row.get('data_nascimento', 'N/I')}")
             st.write(f"**Idade:** {row.get('idade', 'N/I')}")
-            st.write(f"**Naturalidade:** {row.get('cidade_uf', 'N/I')}")
-            st.write(f"**País:** {row.get('pais', 'N/I')}")
-            nome_canonico = row.get('nome_canonico', row['nome'])
+            st.write(f"**Cidade/UF:** {row.get('cidade_nascimento', 'N/I')} / {row.get('uf_nascimento', 'N/I')}")
+            st.write(f"**País:** {row.get('pais_nascimento', row.get('pais', 'N/I'))}")
+            nome_canonico = mapear_nome_para_canonico(row.get('nome', row.get('apelido')))
             suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
             st.write(f"**Suspenso:** {suspenso}")
         
@@ -495,69 +484,29 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         
         st.divider()
         
-        # ===== ATRIBUTOS DETALHADOS (DO CSV) =====
+        # ===== ATRIBUTOS DETALHADOS – TODOS OS DO CSV =====
         st.subheader("📊 Atributos Detalhados")
         
-        # Grupos de atributos
-        grupos = {
-            "🔢 Gerais": ['CA', 'PA', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
-                          'qualificacoes_treinador', 'tipo_documento', 'jogos_selecao', 'gols_selecao',
-                          'jogos_sub21', 'gols_sub21', 'conhecimento_valor'],
-            "👔 Presidente (Chairman)": ['chairmanattributes_business', 'chairmanattributes_interference',
-                                         'chairmanattributes_patience', 'chairmanattributes_resources'],
-            "🧑‍🏫 Treinamento (Coaching)": ['coachingattributes_attacking', 'coachingattributes_defending',
-                                           'coachingattributes_fitness', 'coachingattributes_goalkeeping',
-                                           'coachingattributes_possession', 'coachingattributes_player',
-                                           'coachingattributes_tactical', 'coachingattributes_technical',
-                                           'coachingattributes_peoplemanagement', 'coachingattributes_workingwithyoungsters',
-                                           'coachingattributes_dirtinessallowance', 'coachingattributes_versatility',
-                                           'coachingattributes_setpieces'],
-            "🧠 Staff Mental": ['staffmentalattributes_adaptability', 'staffmentalattributes_determination',
-                                'staffmentalattributes_judgingplayerability', 'staffmentalattributes_judgingplayerpotential',
-                                'staffmentalattributes_judgingstaffability', 'staffmentalattributes_negotiating',
-                                'staffmentalattributes_authority', 'staffmentalattributes_motivating',
-                                'staffmentalattributes_physiotherapy', 'staffmentalattributes_tacticalknowledge'],
-            "⚙️ Não Tático": ['nontacticalattributes_buyingplayers', 'nontacticalattributes_hardnessoftraining',
-                              'nontacticalattributes_mindgames', 'nontacticalattributes_squadrotation'],
-            "🎯 Funções (Roles)": ['rolesattributes_assistantmanager', 'rolesattributes_coach',
-                                   'rolesattributes_fitnesscoach', 'rolesattributes_goalkeepingcoach',
-                                   'rolesattributes_manager', 'rolesattributes_physio', 'rolesattributes_scout',
-                                   'rolesattributes_chairman', 'rolesattributes_directoroffootball',
-                                   'rolesattributes_headofyouthdevelopment', 'rolesattributes_dataanalyst',
-                                   'rolesattributes_sportsscientist', 'rolesattributes_loanmanager',
-                                   'rolesattributes_technicaldirector', 'rolesattributes_setpiececoach'],
-            "📐 Tático": ['tacticalattributes_attacking', 'tacticalattributes_depth', 'tacticalattributes_directness',
-                          'tacticalattributes_flamboyancy', 'tacticalattributes_flexibility',
-                          'tacticalattributes_freeroles', 'tacticalattributes_marking', 'tacticalattributes_offside',
-                          'tacticalattributes_pressing', 'tacticalattributes_sittingback', 'tacticalattributes_tempo',
-                          'tacticalattributes_useofplaymaker', 'tacticalattributes_useofsubstitutions',
-                          'tacticalattributes_width'],
-            "🔍 Scouting": ['scoutingattributes_judgingplayerdata', 'scoutingattributes_judgingteamdata',
-                            'scoutingattributes_presentingdata'],
-            "🏥 Médico": ['medicalattributes_sportsscience'],
-            "🧬 Personalidade": ['personalityattributes_adaptability', 'personalityattributes_ambition',
-                                 'personalityattributes_loyalty', 'personalityattributes_pressure',
-                                 'personalityattributes_professional', 'personalityattributes_sportsmanship',
-                                 'personalityattributes_temperament', 'personalityattributes_controversy'],
-        }
+        # Lista de colunas que são atributos (exclui colunas básicas e de identificação)
+        colunas_excluir = ['nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento', 
+                           'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
+                           'idade', 'historico_jogador', 'historico_comissao', 
+                           'id_ogol_comissao', 'data_nascimento.1', 'apelido_norm']
+        colunas_atributos = [col for col in row.index if col not in colunas_excluir and not pd.isna(row[col])]
         
-        for grupo_nome, lista_atributos in grupos.items():
-            atributos_existentes = []
-            for attr in lista_atributos:
-                if attr in row.index:
-                    atributos_existentes.append(attr)
-            
-            if atributos_existentes:
-                st.write(f"**{grupo_nome}**")
-                cols = st.columns(2)
-                for i, attr in enumerate(atributos_existentes):
-                    valor = row[attr]
-                    if pd.isna(valor):
-                        valor = "N/I"
-                    nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
-                    with cols[i % 2]:
-                        st.write(f"• **{nome_attr}:** {valor}")
-                st.write("")
+        if colunas_atributos:
+            # Divide em duas colunas
+            col1, col2 = st.columns(2)
+            for i, attr in enumerate(colunas_atributos):
+                valor = row[attr]
+                if pd.isna(valor):
+                    valor = "N/I"
+                # Traduz o nome se disponível
+                nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
+                with col1 if i % 2 == 0 else col2:
+                    st.write(f"• **{nome_attr}:** {valor}")
+        else:
+            st.info("Nenhum atributo detalhado disponível para este membro.")
 
 # ======================================================================
 # FUNÇÃO DETALHES JOGADOR (não modificada)
@@ -716,7 +665,7 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # ======================================================================
-# CARREGAMENTO DE DADOS (CACHE) - COM ATRIBUTOS DA COMISSÃO
+# CARREGAMENTO DE DADOS (CACHE) – USANDO CSV DIRETO PARA COMISSÃO
 # ======================================================================
 @st.cache_data
 def carregar_dfs():
@@ -756,81 +705,38 @@ def carregar_dfs():
         resultado["Sub-20"] = df_sub20
         resultado["Sub-17"] = df_sub17
 
-        # ---- COMISSÃO COM ATRIBUTOS DETALHADOS ----
-        # Carrega a comissão básica (do utils)
-        df_com_basico = carregar_comissao()
-        resultado["Comissão Sub-20"] = carregar_comissao_sub20()
-        resultado["Comissão Sub-17"] = pd.DataFrame()
-
-        # Carrega o CSV completo com todos os atributos
-        if os.path.exists("perfil_completo_comissao_2026.csv"):
-            df_completo = pd.read_csv("perfil_completo_comissao_2026.csv", sep=';', encoding='utf-8-sig')
-            # Renomeia colunas para facilitar (algumas colunas têm nomes estranhos)
-            # Vamos usar o apelido como chave para mesclar
-            if not df_com_basico.empty and not df_completo.empty:
-                # Prepara a coluna de chave (apelido) normalizada
-                df_com_basico['apelido_key'] = df_com_basico['nome'].apply(lambda x: mapear_nome_para_canonico(x) or x)
-                df_completo['apelido_key'] = df_completo['apelido'].apply(lambda x: mapear_nome_para_canonico(x) or x)
-                # Mescla os dois DataFrames
-                df_com_mesclado = pd.merge(df_com_basico, df_completo, on='apelido_key', how='left')
-                st.write("Colunas disponíveis após merge:", df_com_mesclado.columns.tolist())
-                st.write("Primeira linha:", df_com_mesclado.iloc[0].to_dict())
-                # Remove colunas duplicadas (manter as do básico)
-                # Remove colunas extras que podem conflitar
-                colunas_remover = ['nome_y', 'cargo_y', 'data_nascimento_y', 'cidade_nascimento_y',
-                                   'uf_nascimento_y', 'pais_nascimento_y', 'historico_jogador_y',
-                                   'historico_comissao_y', 'apelido_y']
-                for col in colunas_remover:
-                    if col in df_com_mesclado.columns:
-                        df_com_mesclado.drop(columns=[col], inplace=True)
-                # Renomeia colunas básicas para manter o padrão
-                if 'nome_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'nome_x': 'nome'}, inplace=True)
-                if 'cargo_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'cargo_x': 'cargo'}, inplace=True)
-                if 'data_nascimento_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'data_nascimento_x': 'data_nascimento'}, inplace=True)
-                if 'cidade_nascimento_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'cidade_nascimento_x': 'cidade_nascimento'}, inplace=True)
-                if 'uf_nascimento_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'uf_nascimento_x': 'uf_nascimento'}, inplace=True)
-                if 'pais_nascimento_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'pais_nascimento_x': 'pais_nascimento'}, inplace=True)
-                if 'historico_jogador_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'historico_jogador_x': 'historico_jogador'}, inplace=True)
-                if 'historico_comissao_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'historico_comissao_x': 'historico_comissao'}, inplace=True)
-                # Remove a coluna apelido_key e apelido_x (mantém apelido)
-                if 'apelido_key' in df_com_mesclado.columns:
-                    df_com_mesclado.drop(columns=['apelido_key'], inplace=True)
-                if 'apelido_x' in df_com_mesclado.columns:
-                    df_com_mesclado.rename(columns={'apelido_x': 'apelido'}, inplace=True)
-                # Garante que a coluna 'idade' seja calculada (se não tiver)
-                if 'data_nascimento' in df_com_mesclado.columns and 'idade' not in df_com_mesclado.columns:
-                    df_com_mesclado['idade'] = df_com_mesclado['data_nascimento'].apply(
+        # ---- COMISSÃO PROFISSIONAL – DIRETO DO CSV ----
+        csv_comissao = "perfil_completo_comissao_2026.csv"
+        if os.path.exists(csv_comissao):
+            df_completo = pd.read_csv(csv_comissao, sep=';', encoding='utf-8-sig')
+            # Normaliza a coluna 'apelido' para usar como chave para cartões
+            if 'apelido' in df_completo.columns:
+                df_completo['nome_canonico'] = df_completo['apelido'].apply(mapear_nome_para_canonico)
+                # Preenche campos ausentes para compatibilidade com a interface
+                if 'nome' not in df_completo.columns:
+                    df_completo['nome'] = df_completo['apelido']
+                if 'cargo' not in df_completo.columns:
+                    df_completo['cargo'] = 'Membro da Comissão'
+                if 'idade' not in df_completo.columns and 'data_nascimento' in df_completo.columns:
+                    df_completo['idade'] = df_completo['data_nascimento'].apply(
                         lambda x: calcular_idade(x) if pd.notna(x) else np.nan
                     )
-                # Preenche 'cidade_uf' se não existir
-                if 'cidade' in df_com_mesclado.columns and 'uf' in df_com_mesclado.columns:
-                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade'].fillna('') + ', ' + df_com_mesclado['uf'].fillna('')
-                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_uf'].str.rstrip(', ')
-                elif 'cidade_nascimento' in df_com_mesclado.columns and 'uf_nascimento' in df_com_mesclado.columns:
-                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_nascimento'].fillna('') + ', ' + df_com_mesclado['uf_nascimento'].fillna('')
-                    df_com_mesclado['cidade_uf'] = df_com_mesclado['cidade_uf'].str.rstrip(', ')
-                # Preenche 'pais' se não existir
-                if 'pais' not in df_com_mesclado.columns and 'pais_nascimento' in df_com_mesclado.columns:
-                    df_com_mesclado['pais'] = df_com_mesclado['pais_nascimento']
-                elif 'pais' not in df_com_mesclado.columns:
-                    df_com_mesclado['pais'] = 'N/I'
-                # Preenche 'nome_canonico'
-                if 'nome' in df_com_mesclado.columns:
-                    df_com_mesclado['nome_canonico'] = df_com_mesclado['nome'].apply(mapear_nome_para_canonico)
-                
-                resultado["Comissão Profissional"] = df_com_mesclado
+                if 'cidade_uf' not in df_completo.columns and 'cidade_nascimento' in df_completo.columns and 'uf_nascimento' in df_completo.columns:
+                    df_completo['cidade_uf'] = df_completo['cidade_nascimento'].fillna('') + ', ' + df_completo['uf_nascimento'].fillna('')
+                    df_completo['cidade_uf'] = df_completo['cidade_uf'].str.rstrip(', ')
+                if 'pais' not in df_completo.columns and 'pais_nascimento' in df_completo.columns:
+                    df_completo['pais'] = df_completo['pais_nascimento']
+                resultado["Comissão Profissional"] = df_completo
             else:
-                resultado["Comissão Profissional"] = df_com_basico
+                st.warning("O CSV da comissão não tem a coluna 'apelido'.")
+                resultado["Comissão Profissional"] = pd.DataFrame()
         else:
-            resultado["Comissão Profissional"] = df_com_basico
+            st.warning(f"Arquivo {csv_comissao} não encontrado.")
+            resultado["Comissão Profissional"] = pd.DataFrame()
+
+        # Comissão Sub-20 e Sub-17 (usa o utils, provavelmente vazias)
+        resultado["Comissão Sub-20"] = carregar_comissao_sub20()
+        resultado["Comissão Sub-17"] = pd.DataFrame()
 
         df_stats = carregar_estatisticas_partidas()
         if not df_stats.empty and df_prof is not None:
@@ -1031,7 +937,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ----------------------------------------------------------------------
-# ABA 2: COMISSÃO TÉCNICA (com atributos detalhados)
+# ABA 2: COMISSÃO TÉCNICA (com atributos do CSV)
 # ----------------------------------------------------------------------
 with tabs[1]:
     st.header("👥 Comissão Técnica")
@@ -1041,54 +947,78 @@ with tabs[1]:
     if df_com is not None and not df_com.empty:
         # Busca e exibe lista
         busca = st.text_input("Buscar membro")
-        if busca and 'nome' in df_com.columns:
-            df_com_filtrado = df_com[df_com['nome'].str.contains(busca, case=False, na=False)]
+        if busca:
+            # Procura em várias colunas
+            cols_busca = ['apelido', 'nome', 'nome_completo', 'cargo']
+            mask = pd.Series([False]*len(df_com))
+            for col in cols_busca:
+                if col in df_com.columns:
+                    mask |= df_com[col].str.contains(busca, case=False, na=False)
+            df_com_filtrado = df_com[mask]
         else:
             df_com_filtrado = df_com
         
-        cols = [c for c in ['nome','cargo','idade','cidade_uf','pais'] if c in df_com_filtrado.columns]
-        st.dataframe(df_com_filtrado[cols] if cols else df_com_filtrado, width='stretch')
+        # Exibe lista resumida
+        cols_exibicao = [c for c in ['apelido', 'cargo', 'idade', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento'] if c in df_com_filtrado.columns]
+        st.dataframe(df_com_filtrado[cols_exibicao] if cols_exibicao else df_com_filtrado, width='stretch')
         
-        if not df_com_filtrado.empty and 'nome' in df_com_filtrado.columns:
-            membro = st.selectbox("Selecione um membro", df_com_filtrado['nome'].tolist())
-            if membro:
-                row = df_com_filtrado[df_com_filtrado['nome'] == membro].iloc[0]
-                # Usa a função que exibe atributos detalhados
-                exibir_detalhes_comissao(row, cat_com, cartoes_com)
-                
-                # Botão para registrar cartão (mantido)
-                if st.button(f"🟨 Registrar cartão para {membro}"):
-                    tipo = st.radio("Tipo", ["Amarelo", "Vermelho"], key="tipo_cartao_com")
-                    if st.button("Confirmar cartão", key="conf_cartao_com"):
-                        nome_canonico = row.get('nome_canonico', row['nome'])
-                        if nome_canonico not in cartoes_com:
-                            cartoes_com[nome_canonico] = {'amarelos':0, 'vermelho':False, 'suspenso_proxima':False, 'historico':[]}
-                        if tipo == "Amarelo":
-                            cartoes_com[nome_canonico]['amarelos'] += 1
-                            if cartoes_com[nome_canonico]['amarelos'] >= 3:
-                                cartoes_com[nome_canonico]['suspenso_proxima'] = True
-                            cartoes_com[nome_canonico]['historico'].append({
-                                'data': datetime.now().strftime("%d/%m/%Y"),
-                                'adversario': "N/I",
-                                'cor': 'amarelo',
-                                'terceiro_amarelo': cartoes_com[nome_canonico]['amarelos']>=3,
-                                'suspenso_causada': cartoes_com[nome_canonico]['amarelos']>=3,
-                                'suspenso_cumprida': False
-                            })
-                        else:
-                            cartoes_com[nome_canonico]['vermelho'] = True
-                            cartoes_com[nome_canonico]['suspenso_proxima'] = True
-                            cartoes_com[nome_canonico]['historico'].append({
-                                'data': datetime.now().strftime("%d/%m/%Y"),
-                                'adversario': "N/I",
-                                'cor': 'vermelho',
-                                'terceiro_amarelo': False,
-                                'suspenso_causada': True,
-                                'suspenso_cumprida': False
-                            })
-                        salvar_cartoes_json(cartoes_com, cat_com.replace("Comissão ", "").lower())
-                        st.success("Cartão registrado!")
-                        st.rerun()
+        if not df_com_filtrado.empty:
+            # Seletor de membro usando apelido ou nome
+            if 'apelido' in df_com_filtrado.columns:
+                membro_opcoes = df_com_filtrado['apelido'].dropna().unique().tolist()
+            elif 'nome' in df_com_filtrado.columns:
+                membro_opcoes = df_com_filtrado['nome'].dropna().unique().tolist()
+            else:
+                membro_opcoes = df_com_filtrado.index.tolist()
+            
+            if membro_opcoes:
+                membro_selecionado = st.selectbox("Selecione um membro", membro_opcoes)
+                if membro_selecionado:
+                    # Encontra a linha correspondente
+                    if 'apelido' in df_com_filtrado.columns:
+                        row = df_com_filtrado[df_com_filtrado['apelido'] == membro_selecionado].iloc[0]
+                    elif 'nome' in df_com_filtrado.columns:
+                        row = df_com_filtrado[df_com_filtrado['nome'] == membro_selecionado].iloc[0]
+                    else:
+                        row = df_com_filtrado.iloc[0]
+                    
+                    # Exibe detalhes com todos os atributos
+                    exibir_detalhes_comissao(row, cat_com, cartoes_com)
+                    
+                    # Botão para registrar cartão
+                    if st.button(f"🟨 Registrar cartão para {membro_selecionado}"):
+                        with st.expander("Registrar cartão", expanded=True):
+                            tipo = st.radio("Tipo", ["Amarelo", "Vermelho"], key="tipo_cartao_com")
+                            if st.button("Confirmar cartão", key="conf_cartao_com"):
+                                nome_canonico = mapear_nome_para_canonico(membro_selecionado)
+                                if nome_canonico not in cartoes_com:
+                                    cartoes_com[nome_canonico] = {'amarelos':0, 'vermelho':False, 'suspenso_proxima':False, 'historico':[]}
+                                if tipo == "Amarelo":
+                                    cartoes_com[nome_canonico]['amarelos'] += 1
+                                    if cartoes_com[nome_canonico]['amarelos'] >= 3:
+                                        cartoes_com[nome_canonico]['suspenso_proxima'] = True
+                                    cartoes_com[nome_canonico]['historico'].append({
+                                        'data': datetime.now().strftime("%d/%m/%Y"),
+                                        'adversario': "N/I",
+                                        'cor': 'amarelo',
+                                        'terceiro_amarelo': cartoes_com[nome_canonico]['amarelos']>=3,
+                                        'suspenso_causada': cartoes_com[nome_canonico]['amarelos']>=3,
+                                        'suspenso_cumprida': False
+                                    })
+                                else:
+                                    cartoes_com[nome_canonico]['vermelho'] = True
+                                    cartoes_com[nome_canonico]['suspenso_proxima'] = True
+                                    cartoes_com[nome_canonico]['historico'].append({
+                                        'data': datetime.now().strftime("%d/%m/%Y"),
+                                        'adversario': "N/I",
+                                        'cor': 'vermelho',
+                                        'terceiro_amarelo': False,
+                                        'suspenso_causada': True,
+                                        'suspenso_cumprida': False
+                                    })
+                                salvar_cartoes_json(cartoes_com, cat_com.replace("Comissão ", "").lower())
+                                st.success("Cartão registrado!")
+                                st.rerun()
     else:
         st.info("Nenhum dado de comissão disponível.")
 
