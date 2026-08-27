@@ -61,9 +61,9 @@
       "ogol_id": 1542489
     },
     "João Firmino": {
-      "amarelos": 2,
+      "amarelos": 3,
       "vermelho": false,
-      "suspenso_proxima": false,
+      "suspenso_proxima": true,
       "historico": [
         {
           "data": "12/07/2026",
@@ -81,6 +81,15 @@
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "26/08/2026",
+          "adversario": "GEL",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": true,
+          "suspenso_causada": true,
           "suspenso_cumprida": false
         }
       ],
@@ -113,7 +122,7 @@
       "ogol_id": 391833
     },
     "Borjão": {
-      "amarelos": 0,
+      "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
       "historico": [
@@ -134,6 +143,15 @@
           "terceiro_amarelo": false,
           "suspenso_causada": true,
           "suspenso_cumprida": true
+        },
+        {
+          "data": "26/08/2026",
+          "adversario": "GEL",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
         }
       ],
       "ogol_id": 481421
@@ -197,6 +215,23 @@
         }
       ],
       "ogol_id": 973784
+    },
+    "Jeferson Palacios": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "26/08/2026",
+          "adversario": "GEL",
+          "competicao": "Capixabão Série B - 1ª Fase",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 787886
     }
   },
   "datas_globais": [
@@ -205,6 +240,7 @@
     "2026-07-28",
     "2026-08-05",
     "2026-08-08",
-    "2026-08-14"
+    "2026-08-14",
+    "2026-08-26"
   ]
 }
