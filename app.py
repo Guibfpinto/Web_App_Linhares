@@ -16,9 +16,11 @@ import sqlite3
 # ======================================================================
 from utils import (
     carregar_elenco_profissional,
-    carregar_elenco_sub20,
+    carregar_elenco_sub15,
     carregar_elenco_sub17,
-    carregar_comissao_sub20,
+    carregar_comissao,
+    carregar_comissao_sub15,
+    carregar_comissao_sub17,
     carregar_cartoes_json,
     salvar_cartoes_json,
     adicionar_coluna_lesionado,
@@ -55,10 +57,11 @@ from utils import (
     TEMPORADA,
     DATA_DIR,
     ARQUIVO_CSV_PROFISSIONAL,
-    ARQUIVO_CSV_SUB20,
+    ARQUIVO_CSV_SUB15,
     ARQUIVO_CSV_SUB17,
     ARQUIVO_CSV_COMISSAO_PROFISSIONAL,
-    ARQUIVO_CSV_COMISSAO_SUB20,
+    ARQUIVO_CSV_COMISSAO_SUB15,
+    ARQUIVO_CSV_COMISSAO_SUB17,
     obter_proximo_jogo,
     exibir_foto,
     formatar_cartoes,
@@ -185,12 +188,10 @@ st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORAD
 
 st.markdown("""
 <style>
-    /* ===== ALERTAS ===== */
     div[data-testid="stAlert"] { color: black !important; }
     div[data-testid="stAlert"] .stAlert { color: black !important; }
     .stAlert { color: black !important; }
 
-    /* ===== CONTAINER PRINCIPAL COM FUNDO PRETO SÓLIDO ===== */
     .stApp {
         background-color: #000000 !important;
         border-radius: 10px;
@@ -198,33 +199,26 @@ st.markdown("""
         padding: 10px;
     }
 
-    /* ===== COR DA FONTE: VERMELHO #cc0000 ===== */
-    /* Títulos */
     h1, h2, h3, h4, h5, h6 {
         color: #cc0000 !important;
     }
-    /* Textos gerais */
     .stMarkdown, .stText, .stSubheader, .stCaption {
         color: #cc0000 !important;
     }
-    /* Garantir que st.text e st.write também fiquem vermelhos */
     div.stText, div.stMarkdown, .stText, .stMarkdown {
         color: #cc0000 !important;
     }
-    /* Labels de widgets */
     .stSelectbox label, .stTextInput label, .stNumberInput label,
     .stDateInput label, .stTextArea label {
         color: #cc0000 !important;
         font-weight: 500 !important;
     }
-    /* Valores das métricas */
     [data-testid="stMetric"] .stMetricValue {
         color: #cc0000 !important;
     }
     [data-testid="stMetric"] label {
         color: #cc0000 !important;
     }
-    /* Expansores */
     .streamlit-expanderHeader {
         color: #cc0000 !important;
         background-color: #1a1a1a !important;
@@ -239,7 +233,6 @@ st.markdown("""
         border-radius: 0 0 5px 5px !important;
         padding: 10px !important;
     }
-    /* Botões */
     .stButton button {
         color: #cc0000 !important;
         background-color: #222222 !important;
@@ -254,7 +247,6 @@ st.markdown("""
     .stButton button:active {
         background-color: #111111 !important;
     }
-    /* Radio e Checkbox */
     .stRadio label, .stCheckbox label {
         color: #cc0000 !important;
     }
@@ -269,7 +261,6 @@ st.markdown("""
     .stRadio div[role="radiogroup"] > label:hover {
         background-color: #2a2a2a !important;
     }
-    /* Widgets (inputs, selects) */
     .stSelectbox div[data-baseweb="select"] > div,
     .stTextInput input, .stNumberInput input,
     .stDateInput input, .stTextArea textarea {
@@ -289,14 +280,12 @@ st.markdown("""
         border-color: #1e88e5 !important;
         box-shadow: 0 0 0 2px rgba(30,136,229,0.3) !important;
     }
-    /* Métricas */
     [data-testid="stMetric"] {
         background-color: #1a1a1a !important;
         border: 1px solid #333 !important;
         border-radius: 5px !important;
         padding: 10px !important;
     }
-    /* DataFrames / Tabelas */
     .stDataFrame {
         background-color: #111111 !important;
         border: 1px solid #333 !important;
@@ -327,11 +316,9 @@ st.markdown("""
     .dataframe tbody td {
         border-color: #2a2a2a !important;
     }
-    /* Dividers */
     hr {
         border-color: #444 !important;
     }
-    /* File Uploader */
     .stFileUploader > div {
         background-color: #1a1a1a !important;
         border: 2px dashed #444 !important;
@@ -341,7 +328,6 @@ st.markdown("""
     .stFileUploader > div:hover {
         border-color: #666 !important;
     }
-    /* Sidebar */
     .css-1d391kg, .css-1kyxreq {
         background-color: rgba(0,0,0,0.9) !important;
     }
@@ -352,7 +338,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def set_background(image_path):
-    """Aplica imagem de fundo (se existir) ou gradiente."""
     if os.path.exists(image_path):
         with open(image_path, "rb") as f:
             img_base64 = base64.b64encode(f.read()).decode()
@@ -367,7 +352,6 @@ def set_background(image_path):
             background-attachment: fixed;
         }}
         [data-testid="stHeader"] {{ background: rgba(0,0,0,0); }}
-        /* .stApp agora tem fundo preto sólido, então a imagem aparecerá apenas nas bordas ou atrás */
         .stApp {{ background-color: #000000; border-radius: 10px; margin: 10px; padding: 10px; }}
         [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.9); }}
         </style>
@@ -427,7 +411,7 @@ if "instrucoes_coletivas" not in st.session_state:
     st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (com todos os atributos do CSV)
+# FUNÇÃO DETALHES COMISSÃO (com atributos do CSV)
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
@@ -449,10 +433,8 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             nome_canonico = mapear_nome_para_canonico(row.get('nome', row.get('apelido')))
             suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
             st.write(f"**Suspenso:** {suspenso}")
-        
         st.divider()
         
-        # ===== HISTÓRICO =====
         st.subheader("📜 Histórico")
         col_hist1, col_hist2 = st.columns(2)
         with col_hist1:
@@ -461,10 +443,8 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         with col_hist2:
             st.write("**Histórico como Jogador:**")
             st.write(row.get('historico_jogador', 'Não informado'))
-        
         st.divider()
         
-        # ===== CARTÕES =====
         st.subheader("🟨 Histórico de Cartões")
         if nome_canonico in cartoes:
             historico = cartoes[nome_canonico].get('historico', [])
@@ -475,27 +455,20 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
                 st.info("Nenhum cartão registrado.")
         else:
             st.info("Nenhum cartão registrado.")
-        
         st.divider()
         
-        # ===== ATRIBUTOS DETALHADOS – TODOS OS DO CSV =====
         st.subheader("📊 Atributos Detalhados")
-        
-        # Lista de colunas que são atributos (exclui colunas básicas e de identificação)
         colunas_excluir = ['nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento', 
                            'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
                            'idade', 'historico_jogador', 'historico_comissao', 
                            'id_ogol_comissao', 'data_nascimento.1', 'apelido_norm']
         colunas_atributos = [col for col in row.index if col not in colunas_excluir and not pd.isna(row[col])]
-        
         if colunas_atributos:
-            # Divide em duas colunas
             col1, col2 = st.columns(2)
             for i, attr in enumerate(colunas_atributos):
                 valor = row[attr]
                 if pd.isna(valor):
                     valor = "N/I"
-                # Traduz o nome se disponível
                 nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
                 with col1 if i % 2 == 0 else col2:
                     st.write(f"• **{nome_attr}:** {valor}")
@@ -503,7 +476,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.info("Nenhum atributo detalhado disponível para este membro.")
 
 # ======================================================================
-# FUNÇÃO DETALHES JOGADOR (não modificada)
+# FUNÇÃO DETALHES JOGADOR
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
@@ -659,75 +632,49 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # ======================================================================
-# CARREGAMENTO DE DADOS (CACHE) – USANDO CSV DIRETO PARA COMISSÃO
+# CARREGAMENTO DE DADOS (CACHE)
 # ======================================================================
 @st.cache_data
 def carregar_dfs():
     resultado = {
         "Profissional": None,
-        "Sub-20": None,
+        "Sub-15": None,
         "Sub-17": None,
         "Comissão Profissional": None,
-        "Comissão Sub-20": None,
+        "Comissão Sub-15": None,
         "Comissão Sub-17": None,
         "cartoes_prof": {},
-        "cartoes_sub20": {},
+        "cartoes_sub15": {},
         "cartoes_sub17": {},
         "cartoes_com_prof": {},
-        "cartoes_com_sub20": {},
+        "cartoes_com_sub15": {},
         "cartoes_com_sub17": {},
     }
     try:
         df_prof = carregar_elenco_profissional()
-        df_sub20 = carregar_elenco_sub20()
+        df_sub15 = carregar_elenco_sub15()
         df_sub17 = carregar_elenco_sub17()
 
         if df_prof is not None and not df_prof.empty:
             df_prof = adicionar_coluna_lesionado(df_prof, 'profissional')
             bio_prof = carregar_dados_bioimpedancia('profissional')
             df_prof = aplicar_dados_bioimpedancia(df_prof, bio_prof)
-        if df_sub20 is not None and not df_sub20.empty:
-            df_sub20 = adicionar_coluna_lesionado(df_sub20, 'sub20')
-            bio_sub20 = carregar_dados_bioimpedancia('sub20')
-            df_sub20 = aplicar_dados_bioimpedancia(df_sub20, bio_sub20)
+        if df_sub15 is not None and not df_sub15.empty:
+            df_sub15 = adicionar_coluna_lesionado(df_sub15, 'sub15')
+            bio_sub15 = carregar_dados_bioimpedancia('sub15')
+            df_sub15 = aplicar_dados_bioimpedancia(df_sub15, bio_sub15)
         if df_sub17 is not None and not df_sub17.empty:
             df_sub17 = adicionar_coluna_lesionado(df_sub17, 'sub17')
             bio_sub17 = carregar_dados_bioimpedancia('sub17')
             df_sub17 = aplicar_dados_bioimpedancia(df_sub17, bio_sub17)
 
         resultado["Profissional"] = df_prof
-        resultado["Sub-20"] = df_sub20
+        resultado["Sub-15"] = df_sub15
         resultado["Sub-17"] = df_sub17
 
-        # ---- COMISSÃO PROFISSIONAL – DIRETO DO CSV ----
-        csv_comissao = "perfil_completo_comissao_2026.csv"
-        if os.path.exists(csv_comissao):
-            df_completo = pd.read_csv(csv_comissao, sep=';', encoding='utf-8-sig')
-            if 'apelido' in df_completo.columns:
-                df_completo['nome_canonico'] = df_completo['apelido'].apply(mapear_nome_para_canonico)
-                if 'nome' not in df_completo.columns:
-                    df_completo['nome'] = df_completo['apelido']
-                if 'cargo' not in df_completo.columns:
-                    df_completo['cargo'] = 'Membro da Comissão'
-                if 'idade' not in df_completo.columns and 'data_nascimento' in df_completo.columns:
-                    df_completo['idade'] = df_completo['data_nascimento'].apply(
-                        lambda x: calcular_idade(x) if pd.notna(x) else np.nan
-                    )
-                if 'cidade_uf' not in df_completo.columns and 'cidade_nascimento' in df_completo.columns and 'uf_nascimento' in df_completo.columns:
-                    df_completo['cidade_uf'] = df_completo['cidade_nascimento'].fillna('') + ', ' + df_completo['uf_nascimento'].fillna('')
-                    df_completo['cidade_uf'] = df_completo['cidade_uf'].str.rstrip(', ')
-                if 'pais' not in df_completo.columns and 'pais_nascimento' in df_completo.columns:
-                    df_completo['pais'] = df_completo['pais_nascimento']
-                resultado["Comissão Profissional"] = df_completo
-            else:
-                st.warning("O CSV da comissão não tem a coluna 'apelido'.")
-                resultado["Comissão Profissional"] = pd.DataFrame()
-        else:
-            st.warning(f"Arquivo {csv_comissao} não encontrado.")
-            resultado["Comissão Profissional"] = pd.DataFrame()
-
-        resultado["Comissão Sub-20"] = carregar_comissao_sub20()
-        resultado["Comissão Sub-17"] = pd.DataFrame()
+        resultado["Comissão Profissional"] = carregar_comissao()
+        resultado["Comissão Sub-15"] = carregar_comissao_sub15()
+        resultado["Comissão Sub-17"] = carregar_comissao_sub17()
 
         df_stats = carregar_estatisticas_partidas()
         if not df_stats.empty and df_prof is not None:
@@ -735,10 +682,10 @@ def carregar_dfs():
 
         for cat, key in [
             ('profissional', 'cartoes_prof'),
-            ('sub20', 'cartoes_sub20'),
+            ('sub15', 'cartoes_sub15'),
             ('sub17', 'cartoes_sub17'),
             ('comissao_profissional', 'cartoes_com_prof'),
-            ('comissao_sub20', 'cartoes_com_sub20'),
+            ('comissao_sub15', 'cartoes_com_sub15'),
             ('comissao_sub17', 'cartoes_com_sub17')
         ]:
             cart, _ = carregar_cartoes_json(cat)
@@ -747,42 +694,15 @@ def carregar_dfs():
         st.error(f"Erro ao carregar dados: {e}")
     return resultado
 
-def calcular_idade(data_nasc_str, data_referencia=None):
-    if pd.isna(data_nasc_str) or not data_nasc_str:
-        return np.nan
-    try:
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-            try:
-                data_nasc = datetime.strptime(str(data_nasc_str).strip(), fmt)
-                break
-            except ValueError:
-                continue
-        else:
-            return np.nan
-        hoje = data_referencia if data_referencia else datetime.now()
-        if isinstance(hoje, str):
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-                try:
-                    hoje = datetime.strptime(hoje, fmt)
-                    break
-                except ValueError:
-                    continue
-            if isinstance(hoje, str):
-                return np.nan
-        idade = hoje.year - data_nasc.year - ((hoje.month, hoje.day) < (data_nasc.month, data_nasc.day))
-        return idade
-    except Exception:
-        return np.nan
-
 dados = carregar_dfs()
 
 def get_df_cartoes(categoria):
     m = {
         "Profissional": ("Profissional", "cartoes_prof"),
-        "Sub-20": ("Sub-20", "cartoes_sub20"),
+        "Sub-15": ("Sub-15", "cartoes_sub15"),
         "Sub-17": ("Sub-17", "cartoes_sub17"),
         "Comissão Profissional": ("Comissão Profissional", "cartoes_com_prof"),
-        "Comissão Sub-20": ("Comissão Sub-20", "cartoes_com_sub20"),
+        "Comissão Sub-15": ("Comissão Sub-15", "cartoes_com_sub15"),
         "Comissão Sub-17": ("Comissão Sub-17", "cartoes_com_sub17"),
     }
     df_key, cart_key = m.get(categoria, (None, None))
@@ -804,12 +724,12 @@ tabs = st.tabs([
     "🎥 Visualização Tática"
 ])
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 1: ANÁLISE DE ELENCO
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[0]:
     st.header("Análise de Jogadores")
-    cat_analise = st.selectbox("Categoria", ["Profissional", "Sub-20", "Sub-17"])
+    cat_analise = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"])
     df_analise, cartoes_analise = get_df_cartoes(cat_analise)
     if df_analise is not None and not df_analise.empty:
         col1, col2, col3 = st.columns(3)
@@ -891,7 +811,7 @@ with tabs[0]:
 
         elif opcao_analise == "Comparar categorias":
             comp_texto = "Comparação entre categorias:\n\n"
-            for cat in ["Profissional", "Sub-20", "Sub-17"]:
+            for cat in ["Profissional", "Sub-15", "Sub-17"]:
                 df_cat, _ = get_df_cartoes(cat)
                 if df_cat is not None and not df_cat.empty:
                     comp_texto += f"**{cat}**: {len(df_cat)} jogadores, "
@@ -927,16 +847,15 @@ with tabs[0]:
     else:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
-# ----------------------------------------------------------------------
-# ABA 2: COMISSÃO TÉCNICA (com atributos do CSV)
-# ----------------------------------------------------------------------
+# ======================================================================
+# ABA 2: COMISSÃO TÉCNICA
+# ======================================================================
 with tabs[1]:
-    st.header("👥 Comissão Técnica")
-    cat_com = st.selectbox("Categoria", ["Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"])
+    st.header("Comissão Técnica")
+    cat_com = st.selectbox("Categoria", ["Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"])
     df_com, cartoes_com = get_df_cartoes(cat_com)
     
     if df_com is not None and not df_com.empty:
-        # Busca e exibe lista
         busca = st.text_input("Buscar membro")
         if busca:
             cols_busca = ['apelido', 'nome', 'nome_completo', 'cargo']
@@ -1007,9 +926,9 @@ with tabs[1]:
     else:
         st.info("Nenhum dado de comissão disponível.")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 3: MONITORAMENTO AO VIVO
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[2]:
     try:
         import pages.monitoramento as monitoramento
@@ -1017,9 +936,9 @@ with tabs[2]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de monitoramento: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 4: CARTÕES
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[3]:
     try:
         import pages.cartoes as cartoes
@@ -1027,9 +946,9 @@ with tabs[3]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 5: PRÓXIMO JOGO
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[4]:
     try:
         import pages.proximo_jogo as proximo_jogo
@@ -1037,9 +956,9 @@ with tabs[4]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de próximo jogo: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 6: ESCALAÇÃO TÁTICA
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[5]:
     try:
         import pages.tatica_page as tatica_page
@@ -1047,9 +966,9 @@ with tabs[5]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de tática: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 7: GESTÃO
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[6]:
     try:
         import pages.gestao as gestao
@@ -1057,9 +976,9 @@ with tabs[6]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de gestão: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 8: RELATÓRIOS
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[7]:
     try:
         import pages.relatorios as relatorios
@@ -1067,14 +986,14 @@ with tabs[7]:
     except ImportError as e:
         st.error(f"Erro ao carregar página de relatórios: {e}")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 9: EXPORTAR
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[8]:
     st.header("📤 Exportar Dados")
     cat_export = st.selectbox(
         "Categoria",
-        ["Profissional", "Sub-20", "Sub-17", "Comissão Profissional", "Comissão Sub-20", "Comissão Sub-17"],
+        ["Profissional", "Sub-15", "Sub-17", "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"],
         key="export_categoria"
     )
     df_export, _ = get_df_cartoes(cat_export)
@@ -1098,9 +1017,9 @@ with tabs[8]:
     else:
         st.warning("Nenhum dado disponível")
 
-# ----------------------------------------------------------------------
+# ======================================================================
 # ABA 10: VISUALIZAÇÃO TÁTICA
-# ----------------------------------------------------------------------
+# ======================================================================
 with tabs[9]:
     try:
         import pages.visualizacao as visualizacao

@@ -18,45 +18,79 @@ import requests
 import time
 
 # =============================================
+# IMPORTAÇÃO DOS SCRIPTS DE CRONOGRAMA
+# =============================================
+try:
+    from linhares_profissional_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_PROF, obter_proximo_jogo as obter_proximo_jogo_prof
+    CRONO_PROF_DISPONIVEL = True
+except ImportError:
+    JOGOS_PROF = []
+    def obter_proximo_jogo_prof(): return None
+    CRONO_PROF_DISPONIVEL = False
+
+try:
+    from linhares_sub15_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_SUB15, obter_proximo_jogo as obter_proximo_jogo_sub15
+    CRONO_SUB15_DISPONIVEL = True
+except ImportError:
+    JOGOS_SUB15 = []
+    def obter_proximo_jogo_sub15(): return None
+    CRONO_SUB15_DISPONIVEL = False
+
+try:
+    from linhares_sub17_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_SUB17, obter_proximo_jogo as obter_proximo_jogo_sub17
+    CRONO_SUB17_DISPONIVEL = True
+except ImportError:
+    JOGOS_SUB17 = []
+    def obter_proximo_jogo_sub17(): return None
+    CRONO_SUB17_DISPONIVEL = False
+
+# =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
 # =============================================
-ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"
-ARQUIVO_CSV_SUB20 = "perfil_completo_jogadores_Sub20_2026.csv"
-ARQUIVO_CSV_SUB17 = "perfil_completo_jogadores_Sub17_2026.csv"
-ARQUIVO_CSV_COMISSAO_PROFISSIONAL = "perfil_completo_comissao_2026.csv"
-ARQUIVO_CSV_COMISSAO_SUB20 = "perfil_completo_comissao_Sub20_2026.csv"
-ARQUIVO_LESOES_PROFISSIONAL = "jogadores_linhares_profissional_lesoes.csv"
-ARQUIVO_LESOES_SUB20 = "jogadores_linhares_Sub20_lesoes.csv"
-ARQUIVO_LESOES_SUB17 = "jogadores_linhares_Sub17_lesoes.csv"
-ARQUIVO_BIO_PROFISSIONAL = "jogadores_linhares_profissional_Bioimpedancia.csv"
-ARQUIVO_BIO_SUB20 = "jogadores_linhares_Sub20_Bioimpedancia.csv"
-ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia.csv"
-ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
-ARQUIVO_CRONO_SUB20 = "cronograma_sub20_2026.csv"
 
 DATA_DIR = "data"
-RELATORIOS_DIR = "relatorios"
+RELATORIOS_DIR = "relatorios"   # <-- ADICIONADO
 NOME_TIME = "Linhares FC"
 TEMPORADA = str(datetime.now().year)
+
+# Jogadores
+ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"   # <-- CORRIGIDO
+ARQUIVO_CSV_SUB15 = "perfil_completo_jogadores_Sub15_2026.csv"
+ARQUIVO_CSV_SUB17 = "perfil_completo_jogadores_Sub17_2026.csv"
+
+# Comissão
+ARQUIVO_CSV_COMISSAO_PROFISSIONAL = "perfil_completo_comissao_2026.csv"
+ARQUIVO_CSV_COMISSAO_SUB15 = "perfil_completo_comissao_Sub15_2026.csv"
+ARQUIVO_CSV_COMISSAO_SUB17 = "perfil_completo_comissao_Sub17_2026.csv"
+
+# Lesões
+ARQUIVO_LESOES_PROFISSIONAL = "jogadores_linhares_profissional_lesoes.csv"
+ARQUIVO_LESOES_SUB15 = "jogadores_linhares_Sub15_lesoes.csv"
+ARQUIVO_LESOES_SUB17 = "jogadores_linhares_Sub17_lesoes.csv"
+
+# Bioimpedância
+ARQUIVO_BIO_PROFISSIONAL = "jogadores_linhares_profissional_Bioimpedancia.csv"
+ARQUIVO_BIO_SUB15 = "jogadores_linhares_Sub15_Bioimpedancia.csv"
+ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia.csv"
 
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
 # =============================================
 PASTA_ESTATISTICAS_PROFISSIONAL = "data/estatisticas_jogadores/"
-PASTA_ESTATISTICAS_SUB20 = "data/estatisticas_sub20/"
+PASTA_ESTATISTICAS_SUB15 = "data/estatisticas_sub15/"
 PASTA_ESTATISTICAS_SUB17 = "data/estatisticas_sub17/"
 PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = "data/estatisticas_comissao_tecnica_profissional/"
-PASTA_ESTATISTICAS_COMISSAO_SUB20 = "data/estatisticas_comissao_tecnica_sub20/"
+PASTA_ESTATISTICAS_COMISSAO_SUB15 = "data/estatisticas_comissao_tecnica_sub15/"
 PASTA_ESTATISTICAS_COMISSAO_SUB17 = "data/estatisticas_comissao_tecnica_sub17/"
 
 # =============================================
 # CONSTANTES DOS ARQUIVOS DE CARTÕES (JSON)
 # =============================================
 CAMINHO_CARTOES_PROFISSIONAL = "cartoes_acumulados_profissional.json"
-CAMINHO_CARTOES_SUB20 = "cartoes_acumulados_sub20.json"
+CAMINHO_CARTOES_SUB15 = "cartoes_acumulados_sub15.json"
 CAMINHO_CARTOES_SUB17 = "cartoes_acumulados_sub17.json"
 CAMINHO_CARTOES_COMISSAO_PROFISSIONAL = "cartoes_acumulados_comissao_profissional.json"
-CAMINHO_CARTOES_COMISSAO_SUB20 = "cartoes_acumulados_comissao_sub20.json"
+CAMINHO_CARTOES_COMISSAO_SUB15 = "cartoes_acumulados_comissao_sub15.json"
 CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
 
 # =============================================
@@ -127,10 +161,11 @@ MAPEAMENTO_NOMES_PROFISSIONAL = {
     'Gabriel de Jesus Rodrigues': 'Gabriel Jesus',
     'Gabriel Jesus': 'Gabriel Jesus',
 }
-MAPEAMENTO_NOMES_SUB20 = {}
+MAPEAMENTO_NOMES_SUB15 = {}
 MAPEAMENTO_NOMES_SUB17 = {}
 MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL = {}
-MAPEAMENTO_NOMES_COMISSAO_SUB20 = {}
+MAPEAMENTO_NOMES_COMISSAO_SUB15 = {}
+MAPEAMENTO_NOMES_COMISSAO_SUB17 = {}
 
 # =============================================
 # ATRIBUTOS FM26 (GLOBAL)
@@ -195,19 +230,21 @@ def mapear_nome_para_canonico(nome):
     nome = str(nome).strip()
     if nome in MAPEAMENTO_NOMES_PROFISSIONAL:
         return MAPEAMENTO_NOMES_PROFISSIONAL[nome]
-    if nome in MAPEAMENTO_NOMES_SUB20:
-        return MAPEAMENTO_NOMES_SUB20[nome]
+    if nome in MAPEAMENTO_NOMES_SUB15:
+        return MAPEAMENTO_NOMES_SUB15[nome]
     if nome in MAPEAMENTO_NOMES_SUB17:
         return MAPEAMENTO_NOMES_SUB17[nome]
     if nome in MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL:
         return MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL[nome]
-    if nome in MAPEAMENTO_NOMES_COMISSAO_SUB20:
-        return MAPEAMENTO_NOMES_COMISSAO_SUB20[nome]
+    if nome in MAPEAMENTO_NOMES_COMISSAO_SUB15:
+        return MAPEAMENTO_NOMES_COMISSAO_SUB15[nome]
+    if nome in MAPEAMENTO_NOMES_COMISSAO_SUB17:
+        return MAPEAMENTO_NOMES_COMISSAO_SUB17[nome]
     nome_norm = normalizar_texto(nome)
     for var, can in MAPEAMENTO_NOMES_PROFISSIONAL.items():
         if normalizar_texto(var) == nome_norm:
             return can
-    for var, can in MAPEAMENTO_NOMES_SUB20.items():
+    for var, can in MAPEAMENTO_NOMES_SUB15.items():
         if normalizar_texto(var) == nome_norm:
             return can
     for var, can in MAPEAMENTO_NOMES_SUB17.items():
@@ -216,7 +253,10 @@ def mapear_nome_para_canonico(nome):
     for var, can in MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL.items():
         if normalizar_texto(var) == nome_norm:
             return can
-    for var, can in MAPEAMENTO_NOMES_COMISSAO_SUB20.items():
+    for var, can in MAPEAMENTO_NOMES_COMISSAO_SUB15.items():
+        if normalizar_texto(var) == nome_norm:
+            return can
+    for var, can in MAPEAMENTO_NOMES_COMISSAO_SUB17.items():
         if normalizar_texto(var) == nome_norm:
             return can
     return nome
@@ -278,7 +318,7 @@ def estado_fisico(imc_class, gor_class):
 # INICIALIZAÇÃO DO BANCO SQLITE
 # =============================================
 def inicializar_banco():
-    conn = sqlite3.connect('meu_futebol.db', timeout=10, check_same_thread=False)
+    conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
@@ -322,7 +362,8 @@ def inicializar_banco():
             estadio TEXT,
             arbitro TEXT,
             formacao_casa TEXT,
-            formacao_fora TEXT
+            formacao_fora TEXT,
+            arbitro_id INTEGER
         )
     ''')
     cursor.execute('''
@@ -378,18 +419,27 @@ def inicializar_banco():
             historico_jogador TEXT
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS arbitros (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            foto TEXT,
+            categoria TEXT,
+            uf TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
 # =============================================
-# CARREGAMENTO DOS DADOS (CSVs)
+# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENERICA)
 # =============================================
-@st.cache_data
-def carregar_elenco_profissional() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_PROFISSIONAL):
+def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
+    """Função auxiliar que lê o CSV de elenco no formato padrão."""
+    if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
-        df_raw = pd.read_csv(ARQUIVO_CSV_PROFISSIONAL, sep=';', encoding='utf-8-sig',
+        df_raw = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
                              header=None, on_bad_lines='skip')
         if len(df_raw) == 0:
             return pd.DataFrame()
@@ -477,88 +527,68 @@ def carregar_elenco_profissional() -> pd.DataFrame:
         df['Rating_Geral_FM26'] = df.apply(lambda row: min(100, row['habilidade_atual']/2) if pd.notna(row.get('habilidade_atual')) else 50, axis=1)
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar elenco profissional: {e}")
+        st.error(f"Erro ao carregar elenco de {caminho_arquivo}: {e}")
         return pd.DataFrame()
 
+# =============================================
+# CARREGAMENTO DOS DADOS (CSVs) – usando a função auxiliar
+# =============================================
 @st.cache_data
-def carregar_elenco_sub20() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_SUB20):
-        return pd.DataFrame()
-    try:
-        return carregar_elenco_profissional()
-    except:
-        return pd.DataFrame()
+def carregar_elenco_profissional() -> pd.DataFrame:
+    return _carregar_elenco_generico(ARQUIVO_CSV_PROFISSIONAL)
+
+@st.cache_data
+def carregar_elenco_sub15() -> pd.DataFrame:
+    return _carregar_elenco_generico(ARQUIVO_CSV_SUB15)
 
 @st.cache_data
 def carregar_elenco_sub17() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_SUB17):
-        return pd.DataFrame()
-    try:
-        return carregar_elenco_profissional()
-    except:
-        return pd.DataFrame()
+    return _carregar_elenco_generico(ARQUIVO_CSV_SUB17)
 
+# =============================================
+# COMISSÃO – mantido como estava (já com nomes corretos)
+# =============================================
 @st.cache_data
 def carregar_comissao() -> pd.DataFrame:
     if not os.path.exists(ARQUIVO_CSV_COMISSAO_PROFISSIONAL):
         return pd.DataFrame()
     try:
-        # Tenta ler em utf-8-sig/utf-8 e latin1 como fallback
-        try:
-            df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='utf-8-sig')
-        except UnicodeDecodeError:
-            df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='latin1')
-
-        # Padroniza nomes das colunas
+        df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='utf-8-sig')
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-
-        # 1. Definir o nome de exibição principal (Apelido ou Nome Completo)
-        if 'apelido' in df.columns and 'nome_completo' in df.columns:
-            df['nome'] = df['apelido'].fillna(df['nome_completo']).replace('', np.nan).fillna(df['nome_completo'])
-        elif 'apelido' in df.columns:
-            df['nome'] = df['apelido'].fillna('Sem Nome')
+        if 'apelido' in df.columns:
+            df['nome'] = df['apelido'].fillna('')
         elif 'nome_completo' in df.columns:
-            df['nome'] = df['nome_completo'].fillna('Sem Nome')
-        else:
-            df['nome'] = 'Membro'
-
-        # 2. Mapeamento do nome canônico para fotos/cartões
-        if 'apelido_norm' in df.columns:
-            df['nome_canonico'] = df['apelido_norm'].fillna(df['nome'].str.lower().str.strip())
-        else:
-            df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
-
-        # 3. Cargo e Idade
+            df['nome'] = df['nome_completo'].fillna('')
         if 'cargo' not in df.columns:
-            df['cargo'] = 'Comissão Técnica'
-
+            df['cargo'] = 'Técnico'
         if 'data_nascimento' in df.columns:
-            df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(str(x)) if pd.notna(x) else np.nan)
+            df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
         else:
             df['idade'] = np.nan
-
-        # 4. Cidade e Estado
         if 'cidade_nascimento' in df.columns:
-            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ' / ' + df.get('uf_nascimento', '').fillna('')
-            df['cidade_uf'] = df['cidade_uf'].str.strip(' /')
-            df['cidade_uf'] = df['cidade_uf'].replace('', 'N/I')
+            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df.get('uf_nascimento', '').fillna('')
+            df['cidade_uf'] = df['cidade_uf'].str.rstrip(', ')
         else:
             df['cidade_uf'] = 'N/I'
-
-        df['pais'] = df.get('pais_nascimento', 'Brasil').fillna('Brasil')
-
-        # 5. Mapeamento dos Históricos do CSV
-        df['historico_profissional'] = df.get('historico_comissao', '').fillna('')
-        df['historico_jogador'] = df.get('historico_jogador', '').fillna('')
-
+        df['pais'] = df.get('pais_nascimento', 'N/I')
+        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
         return df
     except Exception as e:
         st.error(f"Erro ao carregar comissão: {e}")
         return pd.DataFrame()
 
 @st.cache_data
-def carregar_comissao_sub20() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_COMISSAO_SUB20):
+def carregar_comissao_sub15() -> pd.DataFrame:
+    if not os.path.exists(ARQUIVO_CSV_COMISSAO_SUB15):
+        return pd.DataFrame()
+    try:
+        return carregar_comissao()
+    except:
+        return pd.DataFrame()
+
+@st.cache_data
+def carregar_comissao_sub17() -> pd.DataFrame:
+    if not os.path.exists(ARQUIVO_CSV_COMISSAO_SUB17):
         return pd.DataFrame()
     try:
         return carregar_comissao()
@@ -566,32 +596,76 @@ def carregar_comissao_sub20() -> pd.DataFrame:
         return pd.DataFrame()
 
 # =============================================
-# CRONOGRAMA VIA CSV
+# CRONOGRAMA – USANDO OS SCRIPTS
 # =============================================
-@st.cache_data
 def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
-    arquivo = ARQUIVO_CRONO_PROF if categoria == "Profissional" else ARQUIVO_CRONO_SUB20
-    if not os.path.exists(arquivo):
-        return pd.DataFrame()
-    try:
-        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
-        if 'data' not in df.columns:
+    if categoria == "Profissional" and CRONO_PROF_DISPONIVEL:
+        jogos = JOGOS_PROF
+    elif categoria == "Sub-15" and CRONO_SUB15_DISPONIVEL:
+        jogos = JOGOS_SUB15
+    elif categoria == "Sub-17" and CRONO_SUB17_DISPONIVEL:
+        jogos = JOGOS_SUB17
+    else:
+        # Fallback para CSV (caso o script não exista)
+        if categoria == "Profissional":
+            arquivo = "cronograma_profissional_2026.csv"
+        elif categoria == "Sub-15":
+            arquivo = "cronograma_sub15_2026.csv"
+        elif categoria == "Sub-17":
+            arquivo = "cronograma_sub17_2026.csv"
+        else:
             return pd.DataFrame()
-        df['data'] = pd.to_datetime(df['data'], errors='coerce')
+        if not os.path.exists(arquivo):
+            return pd.DataFrame()
+        try:
+            df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
+            if 'data' not in df.columns:
+                return pd.DataFrame()
+            df['data'] = pd.to_datetime(df['data'], errors='coerce')
+            return df
+        except Exception as e:
+            st.error(f"Erro ao carregar cronograma (fallback): {e}")
+            return pd.DataFrame()
+
+    dados = []
+    for jogo in jogos:
+        try:
+            data_obj = datetime.strptime(jogo['data_jogo'], "%d/%m/%Y")
+        except:
+            continue
+        dados.append({
+            'data': data_obj,
+            'adversario': jogo.get('adversario', ''),
+            'local': jogo.get('local_jogo', ''),
+            'competicao': jogo.get('competicao', ''),
+            'fase': jogo.get('fase', ''),
+            'rodada': jogo.get('rodada', ''),
+            'status': jogo.get('status', ''),
+            'id_jogo': jogo.get('id_jogo', ''),
+            'url_completa': jogo.get('url_completa', ''),
+        })
+    if dados:
+        df = pd.DataFrame(dados)
+        df['data'] = pd.to_datetime(df['data'])
         return df
-    except Exception as e:
-        st.error(f"Erro ao carregar cronograma: {e}")
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
-    df = carregar_cronograma(categoria)
-    if df.empty:
-        return None
-    hoje = datetime.now().date()
-    df_futuros = df[df['data'].dt.date >= hoje].sort_values('data')
-    if df_futuros.empty:
-        return None
-    return df_futuros.iloc[0].to_dict()
+    if categoria == "Profissional" and CRONO_PROF_DISPONIVEL:
+        return obter_proximo_jogo_prof()
+    elif categoria == "Sub-15" and CRONO_SUB15_DISPONIVEL:
+        return obter_proximo_jogo_sub15()
+    elif categoria == "Sub-17" and CRONO_SUB17_DISPONIVEL:
+        return obter_proximo_jogo_sub17()
+    else:
+        df = carregar_cronograma(categoria)
+        if df.empty:
+            return None
+        hoje = datetime.now().date()
+        df_futuros = df[df['data'].dt.date >= hoje].sort_values('data')
+        if df_futuros.empty:
+            return None
+        return df_futuros.iloc[0].to_dict()
 
 # =============================================
 # EXIBIR FOTO
@@ -609,9 +683,11 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         nome_clean = normalizar_texto(nome).replace(' ', '_')
         pastas = [
             "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
-            "fotos_sistema_Analise_Elenco/Jogadores/Sub20",
+            "fotos_sistema_Analise_Elenco/Jogadores/Sub15",
             "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
             "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
             "fotos"
         ]
         for ext in ['.png', '.jpg', '.jpeg']:
@@ -652,11 +728,14 @@ def formatar_data_br(data_date):
     return data_date.strftime("%d/%m/%Y") if data_date else ''
 
 def carregar_lesoes(categoria):
-    csv_path = {
-        'profissional': ARQUIVO_LESOES_PROFISSIONAL,
-        'sub20': ARQUIVO_LESOES_SUB20,
-        'sub17': ARQUIVO_LESOES_SUB17,
-    }.get(categoria)
+    if categoria == 'profissional':
+        csv_path = ARQUIVO_LESOES_PROFISSIONAL
+    elif categoria == 'sub15':
+        csv_path = ARQUIVO_LESOES_SUB15
+    elif categoria == 'sub17':
+        csv_path = ARQUIVO_LESOES_SUB17
+    else:
+        return {}, {}
     if not csv_path or not os.path.exists(csv_path):
         return {}, {}
     try:
@@ -710,11 +789,14 @@ def adicionar_coluna_lesionado(df, categoria):
     return df
 
 def obter_historico_lesoes_texto(jogador_row, categoria):
-    csv_path = {
-        'Profissional': ARQUIVO_LESOES_PROFISSIONAL,
-        'Sub-20': ARQUIVO_LESOES_SUB20,
-        'Sub-17': ARQUIVO_LESOES_SUB17,
-    }.get(categoria)
+    if categoria == 'Profissional':
+        csv_path = ARQUIVO_LESOES_PROFISSIONAL
+    elif categoria == 'Sub-15':
+        csv_path = ARQUIVO_LESOES_SUB15
+    elif categoria == 'Sub-17':
+        csv_path = ARQUIVO_LESOES_SUB17
+    else:
+        return "Categoria inválida."
     if not csv_path or not os.path.exists(csv_path):
         return "Arquivo de lesões não encontrado."
     try:
@@ -771,11 +853,14 @@ def obter_historico_lesoes_texto(jogador_row, categoria):
     return "\n".join(linhas)
 
 def obter_lesao_atual(jogador_row, categoria):
-    csv_path = {
-        'Profissional': ARQUIVO_LESOES_PROFISSIONAL,
-        'Sub-20': ARQUIVO_LESOES_SUB20,
-        'Sub-17': ARQUIVO_LESOES_SUB17,
-    }.get(categoria)
+    if categoria == 'Profissional':
+        csv_path = ARQUIVO_LESOES_PROFISSIONAL
+    elif categoria == 'Sub-15':
+        csv_path = ARQUIVO_LESOES_SUB15
+    elif categoria == 'Sub-17':
+        csv_path = ARQUIVO_LESOES_SUB17
+    else:
+        return ""
     if not csv_path or not os.path.exists(csv_path):
         return ""
     try:
@@ -811,11 +896,14 @@ def obter_lesao_atual(jogador_row, categoria):
 # BIOIMPEDÂNCIA (CSV)
 # =============================================
 def carregar_dados_bioimpedancia(categoria):
-    csv_path = {
-        'profissional': ARQUIVO_BIO_PROFISSIONAL,
-        'sub20': ARQUIVO_BIO_SUB20,
-        'sub17': ARQUIVO_BIO_SUB17,
-    }.get(categoria)
+    if categoria == 'profissional':
+        csv_path = ARQUIVO_BIO_PROFISSIONAL
+    elif categoria == 'sub15':
+        csv_path = ARQUIVO_BIO_SUB15
+    elif categoria == 'sub17':
+        csv_path = ARQUIVO_BIO_SUB17
+    else:
+        return {}
     if not csv_path or not os.path.exists(csv_path):
         return {}
     try:
@@ -849,7 +937,6 @@ def carregar_dados_bioimpedancia(categoria):
             perim_braco = para_float(row.get('perimetro_braco'))
             perim_coxa = para_float(row.get('perimetro_coxa'))
             perim_perna = para_float(row.get('perimetro_perna'))
-            # Cálculo das dobras (fallback)
             pct_f = None
             pct_p3 = None
             pct_p7 = None
@@ -975,14 +1062,20 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
 # CARTÕES (JSON)
 # =============================================
 def carregar_cartoes_json(categoria):
-    caminho = {
-        'profissional': CAMINHO_CARTOES_PROFISSIONAL,
-        'sub20': CAMINHO_CARTOES_SUB20,
-        'sub17': CAMINHO_CARTOES_SUB17,
-        'comissao_profissional': CAMINHO_CARTOES_COMISSAO_PROFISSIONAL,
-        'comissao_sub20': CAMINHO_CARTOES_COMISSAO_SUB20,
-        'comissao_sub17': CAMINHO_CARTOES_COMISSAO_SUB17,
-    }.get(categoria)
+    if categoria == 'profissional':
+        caminho = CAMINHO_CARTOES_PROFISSIONAL
+    elif categoria == 'sub15':
+        caminho = CAMINHO_CARTOES_SUB15
+    elif categoria == 'sub17':
+        caminho = CAMINHO_CARTOES_SUB17
+    elif categoria == 'comissao_profissional':
+        caminho = CAMINHO_CARTOES_COMISSAO_PROFISSIONAL
+    elif categoria == 'comissao_sub15':
+        caminho = CAMINHO_CARTOES_COMISSAO_SUB15
+    elif categoria == 'comissao_sub17':
+        caminho = CAMINHO_CARTOES_COMISSAO_SUB17
+    else:
+        return {}, []
     if not caminho or not os.path.exists(caminho):
         return {}, []
     try:
@@ -993,14 +1086,20 @@ def carregar_cartoes_json(categoria):
         return {}, []
 
 def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
-    caminho = {
-        'profissional': CAMINHO_CARTOES_PROFISSIONAL,
-        'sub20': CAMINHO_CARTOES_SUB20,
-        'sub17': CAMINHO_CARTOES_SUB17,
-        'comissao_profissional': CAMINHO_CARTOES_COMISSAO_PROFISSIONAL,
-        'comissao_sub20': CAMINHO_CARTOES_COMISSAO_SUB20,
-        'comissao_sub17': CAMINHO_CARTOES_COMISSAO_SUB17,
-    }.get(categoria)
+    if categoria == 'profissional':
+        caminho = CAMINHO_CARTOES_PROFISSIONAL
+    elif categoria == 'sub15':
+        caminho = CAMINHO_CARTOES_SUB15
+    elif categoria == 'sub17':
+        caminho = CAMINHO_CARTOES_SUB17
+    elif categoria == 'comissao_profissional':
+        caminho = CAMINHO_CARTOES_COMISSAO_PROFISSIONAL
+    elif categoria == 'comissao_sub15':
+        caminho = CAMINHO_CARTOES_COMISSAO_SUB15
+    elif categoria == 'comissao_sub17':
+        caminho = CAMINHO_CARTOES_COMISSAO_SUB17
+    else:
+        return
     if not caminho:
         return
     if datas_globais is None:
@@ -1015,11 +1114,14 @@ def jogador_suspenso(nome, cartoes):
 
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     st.info(f"🔄 Reinicializando cartões para {categoria}...")
-    pasta = {
-        'profissional': PASTA_ESTATISTICAS_PROFISSIONAL,
-        'sub20': PASTA_ESTATISTICAS_SUB20,
-        'sub17': PASTA_ESTATISTICAS_SUB17,
-    }.get(categoria)
+    if categoria == 'profissional':
+        pasta = PASTA_ESTATISTICAS_PROFISSIONAL
+    elif categoria == 'sub15':
+        pasta = PASTA_ESTATISTICAS_SUB15
+    elif categoria == 'sub17':
+        pasta = PASTA_ESTATISTICAS_SUB17
+    else:
+        return {}, []
     if not pasta or not os.path.exists(pasta):
         st.warning(f"Pasta {pasta} não encontrada.")
         return {}, []
@@ -1153,11 +1255,14 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
 # ESTATÍSTICAS DE PARTIDAS
 # =============================================
 def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
-    pasta = {
-        'Profissional': PASTA_ESTATISTICAS_PROFISSIONAL,
-        'Sub-20': PASTA_ESTATISTICAS_SUB20,
-        'Sub-17': PASTA_ESTATISTICAS_SUB17
-    }.get(categoria, PASTA_ESTATISTICAS_PROFISSIONAL)
+    if categoria == "Profissional":
+        pasta = PASTA_ESTATISTICAS_PROFISSIONAL
+    elif categoria == "Sub-15":
+        pasta = PASTA_ESTATISTICAS_SUB15
+    elif categoria == "Sub-17":
+        pasta = PASTA_ESTATISTICAS_SUB17
+    else:
+        pasta = PASTA_ESTATISTICAS_PROFISSIONAL
     if not os.path.exists(pasta):
         return []
     return [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
@@ -1392,7 +1497,6 @@ def corrigir_nome_time(nome):
 # FUNÇÕES DA FASTAPI (API-FOOTBALL PROXY)
 # =============================================
 def _chamar_api(endpoint, params=None, tentativa=1):
-    """Faz requisição para a FastAPI (backend)."""
     url = f"{BASE_URL_FASTAPI}{endpoint}"
     try:
         resp = requests.get(url, params=params, timeout=10)
@@ -1411,7 +1515,6 @@ def _chamar_api(endpoint, params=None, tentativa=1):
         return None
 
 def verificar_jogo_ao_vivo():
-    """Verifica se há um jogo ao vivo do Linhares FC."""
     dados = _chamar_api("/api/fixtures/live", {"team_id": TEAM_ID})
     if dados and dados.get('fixture_id'):
         return dados['fixture_id']
@@ -1444,7 +1547,6 @@ def buscar_jogos_por_competicao(league_id, season_id, team_id,
     })
     if not jogos:
         return []
-    # Converte para o formato esperado pelo frontend
     jogos_tratados = []
     for evento in jogos:
         fixture = evento['fixture']
@@ -1492,7 +1594,6 @@ def buscar_jogos_por_competicao(league_id, season_id, team_id,
     return jogos_tratados
 
 def gerar_relatorio_excel(fixture_id, time_casa_titulares=None, time_casa_reservas=None):
-    """Gera relatório em Excel pós-jogo usando dados da FastAPI."""
     print("\n" + "="*60)
     print("📊 GERANDO RELATÓRIO EM EXCEL PÓS-JOGO")
     print("="*60)
@@ -1791,18 +1892,6 @@ def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
         return True
     except Exception as e:
         print(f"Erro ao exportar escalação: {e}")
-        return False
-
-def exportar_escalacao_pdf(df, nome_arquivo="escalacao.pdf"):
-    """
-    Stub para exportar escalação em PDF.
-    (Substitua por lógica real com reportlab, fpdf, etc.)
-    """
-    try:
-        # Simula exportação bem-sucedida (apenas para evitar erro)
-        return True
-    except Exception as e:
-        print(f"Erro ao exportar PDF: {e}")
         return False
 
 def inicializar_cartoes_comissao(categoria, df_comissao):
