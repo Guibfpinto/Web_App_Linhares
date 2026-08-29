@@ -18,60 +18,28 @@ import requests
 import time
 
 # =============================================
-# IMPORTAÇÃO DOS SCRIPTS DE CRONOGRAMA
-# =============================================
-try:
-    from linhares_profissional_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_PROF, obter_proximo_jogo as obter_proximo_jogo_prof
-    CRONO_PROF_DISPONIVEL = True
-except ImportError:
-    JOGOS_PROF = []
-    def obter_proximo_jogo_prof(): return None
-    CRONO_PROF_DISPONIVEL = False
-
-try:
-    from linhares_sub15_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_SUB15, obter_proximo_jogo as obter_proximo_jogo_sub15
-    CRONO_SUB15_DISPONIVEL = True
-except ImportError:
-    JOGOS_SUB15 = []
-    def obter_proximo_jogo_sub15(): return None
-    CRONO_SUB15_DISPONIVEL = False
-
-try:
-    from linhares_sub17_crono_2026 import JOGOS_TEMPORADA_2026 as JOGOS_SUB17, obter_proximo_jogo as obter_proximo_jogo_sub17
-    CRONO_SUB17_DISPONIVEL = True
-except ImportError:
-    JOGOS_SUB17 = []
-    def obter_proximo_jogo_sub17(): return None
-    CRONO_SUB17_DISPONIVEL = False
-
-# =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
 # =============================================
-
-DATA_DIR = "data"
-RELATORIOS_DIR = "relatorios"   # <-- ADICIONADO
-NOME_TIME = "Linhares FC"
-TEMPORADA = str(datetime.now().year)
-
-# Jogadores
-ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"   # <-- CORRIGIDO
+ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"
 ARQUIVO_CSV_SUB15 = "perfil_completo_jogadores_Sub15_2026.csv"
 ARQUIVO_CSV_SUB17 = "perfil_completo_jogadores_Sub17_2026.csv"
-
-# Comissão
 ARQUIVO_CSV_COMISSAO_PROFISSIONAL = "perfil_completo_comissao_2026.csv"
 ARQUIVO_CSV_COMISSAO_SUB15 = "perfil_completo_comissao_Sub15_2026.csv"
 ARQUIVO_CSV_COMISSAO_SUB17 = "perfil_completo_comissao_Sub17_2026.csv"
-
-# Lesões
 ARQUIVO_LESOES_PROFISSIONAL = "jogadores_linhares_profissional_lesoes.csv"
 ARQUIVO_LESOES_SUB15 = "jogadores_linhares_Sub15_lesoes.csv"
 ARQUIVO_LESOES_SUB17 = "jogadores_linhares_Sub17_lesoes.csv"
-
-# Bioimpedância
 ARQUIVO_BIO_PROFISSIONAL = "jogadores_linhares_profissional_Bioimpedancia.csv"
 ARQUIVO_BIO_SUB15 = "jogadores_linhares_Sub15_Bioimpedancia.csv"
 ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia.csv"
+ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
+ARQUIVO_CRONO_SUB15 = "cronograma_sub15_2026.csv"
+ARQUIVO_CRONO_SUB17 = "cronograma_sub17_2026.csv"
+
+DATA_DIR = "data"
+RELATORIOS_DIR = "relatorios"
+NOME_TIME = "Linhares FC"
+TEMPORADA = str(datetime.now().year)
 
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
@@ -432,10 +400,10 @@ def inicializar_banco():
     conn.close()
 
 # =============================================
-# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENERICA)
+# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """Função auxiliar que lê o CSV de elenco no formato padrão."""
+    """Carrega um CSV de elenco com o formato padrão."""
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
@@ -531,7 +499,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 # =============================================
-# CARREGAMENTO DOS DADOS (CSVs) – usando a função auxiliar
+# CARREGAMENTO DOS DADOS (CSVs) – CORRIGIDO
 # =============================================
 @st.cache_data
 def carregar_elenco_profissional() -> pd.DataFrame:
@@ -546,126 +514,89 @@ def carregar_elenco_sub17() -> pd.DataFrame:
     return _carregar_elenco_generico(ARQUIVO_CSV_SUB17)
 
 # =============================================
-# COMISSÃO – mantido como estava (já com nomes corretos)
+# CARREGAMENTO DA COMISSÃO (COM TODOS OS ATRIBUTOS)
 # =============================================
-@st.cache_data
-def carregar_comissao() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_COMISSAO_PROFISSIONAL):
+def _carregar_comissao_generico(caminho_arquivo: str) -> pd.DataFrame:
+    """Carrega o CSV da comissão mantendo TODAS as colunas."""
+    if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(ARQUIVO_CSV_COMISSAO_PROFISSIONAL, sep=';', encoding='utf-8-sig')
+        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig')
+        # Mantém todas as colunas, apenas padroniza nomes para minúsculo e underline
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-        if 'apelido' in df.columns:
-            df['nome'] = df['apelido'].fillna('')
-        elif 'nome_completo' in df.columns:
-            df['nome'] = df['nome_completo'].fillna('')
+        # Garante colunas básicas para compatibilidade
+        if 'nome' not in df.columns and 'apelido' in df.columns:
+            df['nome'] = df['apelido']
+        elif 'nome' not in df.columns and 'nome_completo' in df.columns:
+            df['nome'] = df['nome_completo']
         if 'cargo' not in df.columns:
             df['cargo'] = 'Técnico'
-        if 'data_nascimento' in df.columns:
+        if 'idade' not in df.columns and 'data_nascimento' in df.columns:
             df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
-        else:
-            df['idade'] = np.nan
-        if 'cidade_nascimento' in df.columns:
-            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df.get('uf_nascimento', '').fillna('')
+        if 'cidade_uf' not in df.columns and 'cidade_nascimento' in df.columns and 'uf_nascimento' in df.columns:
+            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df['uf_nascimento'].fillna('')
             df['cidade_uf'] = df['cidade_uf'].str.rstrip(', ')
-        else:
+        elif 'cidade_uf' not in df.columns:
             df['cidade_uf'] = 'N/I'
-        df['pais'] = df.get('pais_nascimento', 'N/I')
-        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+        if 'pais' not in df.columns and 'pais_nascimento' in df.columns:
+            df['pais'] = df['pais_nascimento']
+        elif 'pais' not in df.columns:
+            df['pais'] = 'N/I'
+        if 'nome_canonico' not in df.columns and 'apelido' in df.columns:
+            df['nome_canonico'] = df['apelido'].apply(mapear_nome_para_canonico)
+        elif 'nome_canonico' not in df.columns and 'nome' in df.columns:
+            df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar comissão: {e}")
+        st.error(f"Erro ao carregar comissão de {caminho_arquivo}: {e}")
         return pd.DataFrame()
+
+@st.cache_data
+def carregar_comissao() -> pd.DataFrame:
+    return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_PROFISSIONAL)
 
 @st.cache_data
 def carregar_comissao_sub15() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_COMISSAO_SUB15):
-        return pd.DataFrame()
-    try:
-        return carregar_comissao()
-    except:
-        return pd.DataFrame()
+    return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_SUB15)
 
 @st.cache_data
 def carregar_comissao_sub17() -> pd.DataFrame:
-    if not os.path.exists(ARQUIVO_CSV_COMISSAO_SUB17):
+    return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_SUB17)
+
+# =============================================
+# CRONOGRAMA VIA CSV
+# =============================================
+@st.cache_data
+def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
+    if categoria == "Profissional":
+        arquivo = ARQUIVO_CRONO_PROF
+    elif categoria == "Sub-15":
+        arquivo = ARQUIVO_CRONO_SUB15
+    elif categoria == "Sub-17":
+        arquivo = ARQUIVO_CRONO_SUB17
+    else:
+        return pd.DataFrame()
+    if not os.path.exists(arquivo):
         return pd.DataFrame()
     try:
-        return carregar_comissao()
-    except:
+        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
+        if 'data' not in df.columns:
+            return pd.DataFrame()
+        df['data'] = pd.to_datetime(df['data'], errors='coerce')
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar cronograma: {e}")
         return pd.DataFrame()
 
-# =============================================
-# CRONOGRAMA – USANDO OS SCRIPTS
-# =============================================
-def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
-    if categoria == "Profissional" and CRONO_PROF_DISPONIVEL:
-        jogos = JOGOS_PROF
-    elif categoria == "Sub-15" and CRONO_SUB15_DISPONIVEL:
-        jogos = JOGOS_SUB15
-    elif categoria == "Sub-17" and CRONO_SUB17_DISPONIVEL:
-        jogos = JOGOS_SUB17
-    else:
-        # Fallback para CSV (caso o script não exista)
-        if categoria == "Profissional":
-            arquivo = "cronograma_profissional_2026.csv"
-        elif categoria == "Sub-15":
-            arquivo = "cronograma_sub15_2026.csv"
-        elif categoria == "Sub-17":
-            arquivo = "cronograma_sub17_2026.csv"
-        else:
-            return pd.DataFrame()
-        if not os.path.exists(arquivo):
-            return pd.DataFrame()
-        try:
-            df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
-            if 'data' not in df.columns:
-                return pd.DataFrame()
-            df['data'] = pd.to_datetime(df['data'], errors='coerce')
-            return df
-        except Exception as e:
-            st.error(f"Erro ao carregar cronograma (fallback): {e}")
-            return pd.DataFrame()
-
-    dados = []
-    for jogo in jogos:
-        try:
-            data_obj = datetime.strptime(jogo['data_jogo'], "%d/%m/%Y")
-        except:
-            continue
-        dados.append({
-            'data': data_obj,
-            'adversario': jogo.get('adversario', ''),
-            'local': jogo.get('local_jogo', ''),
-            'competicao': jogo.get('competicao', ''),
-            'fase': jogo.get('fase', ''),
-            'rodada': jogo.get('rodada', ''),
-            'status': jogo.get('status', ''),
-            'id_jogo': jogo.get('id_jogo', ''),
-            'url_completa': jogo.get('url_completa', ''),
-        })
-    if dados:
-        df = pd.DataFrame(dados)
-        df['data'] = pd.to_datetime(df['data'])
-        return df
-    return pd.DataFrame()
-
 def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
-    if categoria == "Profissional" and CRONO_PROF_DISPONIVEL:
-        return obter_proximo_jogo_prof()
-    elif categoria == "Sub-15" and CRONO_SUB15_DISPONIVEL:
-        return obter_proximo_jogo_sub15()
-    elif categoria == "Sub-17" and CRONO_SUB17_DISPONIVEL:
-        return obter_proximo_jogo_sub17()
-    else:
-        df = carregar_cronograma(categoria)
-        if df.empty:
-            return None
-        hoje = datetime.now().date()
-        df_futuros = df[df['data'].dt.date >= hoje].sort_values('data')
-        if df_futuros.empty:
-            return None
-        return df_futuros.iloc[0].to_dict()
+    df = carregar_cronograma(categoria)
+    if df.empty:
+        return None
+    hoje = datetime.now().date()
+    df_futuros = df[df['data'].dt.date >= hoje].sort_values('data')
+    if df_futuros.empty:
+        return None
+    return df_futuros.iloc[0].to_dict()
 
 # =============================================
 # EXIBIR FOTO
@@ -1848,7 +1779,7 @@ def obter_historico_clubes(jogador_row):
     return str(historico).strip()
 
 # =============================================
-# FORMATAÇÃO DE CARTÕES
+# STUBS PARA FUNÇÕES USADAS EM PÁGINAS
 # =============================================
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
     if not cartoes:
@@ -1883,9 +1814,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             linhas.append(f"  {jog}: {amarelos} 🟨 {vermelho} {suspenso}".strip())
         return "\n".join(linhas)
 
-# =============================================
-# STUBS PARA FUNÇÕES USADAS EM PÁGINAS
-# =============================================
 def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
     try:
         df.to_excel(nome_arquivo, index=False, engine='openpyxl')
