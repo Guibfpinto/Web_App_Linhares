@@ -89,6 +89,8 @@ MAPEAMENTO_NOMES = {
     'Gabriel Jesus': 'Gabriel Jesus',
     'Luander da Silva Denerval': 'Luander',
     'Luander': 'Luander',
+    'Thayson Lourenço dos Santos': 'Thayson',
+    'Thayson': 'Thayson',
 }
 
 # ============================================================================
@@ -121,6 +123,7 @@ IDS_CONHECIDOS = {
     'Matheus Nossa': '2541477',
     'Gabriel Jesus': '3553860',
     'Luander': '973782',
+    'Thayson': '2530125',
 }
 
 # ============================================================================
@@ -153,6 +156,7 @@ POSICOES_CSV = {
     'Matheus Nossa': 'Goleiro',
     'Gabriel Jesus': 'Ponta Esquerda',
     'Luander': 'Centroavante',
+    'Thayson': 'Atacante',
 }
 
 # Conjunto de IDs válidos para agilizar a verificação
@@ -183,6 +187,8 @@ JOGOS_TEMPORADA_2026 = [
 {"id_jogo": "12271165", "data_jogo": "14/08/2026", "adversario": "Doze FC", "time_casa": "Linhares FC", "time_fora": "Doze FC", "local_jogo": "(C)", "status": "REALIZADO", "slug": "2026-08-14-linhares-fc-doze", "url_completa": "https://www.ogol.com.br/jogo/2026-08-14-linhares-fc-doze/12271165/performance", "competicao": "Capixabão Série B", "fase": "1ª Fase"},
 {"id_jogo": "12271173", "data_jogo": "26/08/2026", "adversario": "GEL", "time_casa": "Linhares FC", "time_fora": "GEL", "local_jogo": "(C)", "status": "REALIZADO", "slug": "2026-08-26-linhares-fc-gel", "url_completa": "https://www.ogol.com.br/jogo/2026-08-26-linhares-fc-gel/12271173/performance", "competicao": "Capixabão Série B", "fase": "1ª Fase"},
 {"id_jogo": "12271178", "data_jogo": "29/08/2026", "adversario": "CTE Colatina", "time_casa": "CTE Colatina", "time_fora": "Linhares FC", "local_jogo": "(F)", "status": "REALIZADO", "slug": "2026-08-29-cte-colatina-linhares-fc", "url_completa":"https://www.ogol.com.br/jogo/2026-08-29-cte-colatina-linhares-fc/12271178/performance", "competicao": "Capixabão Série B", "fase": "1ª Fase"},
+{"id_jogo": "", "data_jogo": "05/09/2026", "adversario": "Rive", "time_casa": "Rive", "time_fora": "Linhares FC", "local_jogo": "(F)", "status": "AGENDADO", "slug": "2026-09-05-rive-linhares-fc", "url_completa":"https://www.ogol.com.br/jogo/2026-09-05-rive-linhares-fc//performance", "competicao": "Capixabão Série B", "fase": "2ª Fase"},
+{"id_jogo": "", "data_jogo": "12/09/2026", "adversario": "Rive", "time_casa": "Linhares FC", "time_fora": "Rive", "local_jogo": "(C)", "status": "AGENDADO", "slug": "2026-09-12-linhares-fc-rive", "url_completa":"https://www.ogol.com.br/jogo/2026-09-12-linhares-fc-rive//performance", "competicao": "Capixabão Série B", "fase": "2ª Fase"},
 
 ]
 

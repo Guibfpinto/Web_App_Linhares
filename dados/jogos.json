@@ -135,6 +135,40 @@
       "url_completa": "https://www.ogol.com.br/jogo/2026-08-29-cte-colatina-linhares-fc/12271178/performance",
       "competicao": "Capixabão Série B",
       "fase": "1ª Fase"
+    },
+        {
+      "id_jogo": "",
+      "data_jogo": "05/09/2026",
+      "horario": "15:00",
+      "adversario": "Rive",
+      "time_casa": "Rive",
+      "time_fora": "Linhares FC",
+      "local_jogo": "(F)",
+      "status": "AGENDADO",
+      "estadio": "",
+      "endereco": "",
+      "cidade": "",
+      "slug": "2026-09-05-rive-linhares-fc",
+      "url_completa": "https://www.ogol.com.br/jogo/2026-09-05-rive-linhares-fc//performance",
+      "competicao": "Capixabão Série B",
+      "fase": "2ª Fase"
+    },
+            {
+      "id_jogo": "",
+      "data_jogo": "12/09/2026",
+      "horario": "15:00",
+      "adversario": "Rive",
+      "time_casa": "Linhares FC",
+      "time_fora": "Rive",
+      "local_jogo": "(C)",
+      "status": "AGENDADO",
+      "estadio": "Estádio Conilon",
+      "endereco": "Jaguaré, ES, 29950-000",
+      "cidade": "Jaguaré",
+      "slug": "2026-09-12-linhares-fc-rive",
+      "url_completa": "https://www.ogol.com.br/jogo/2026-09-12-linhares-fc-rive//performance",
+      "competicao": "Capixabão Série B",
+      "fase": "2ª Fase"
     }
   ]
 }
