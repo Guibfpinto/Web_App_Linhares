@@ -7,8 +7,27 @@ import os
 from utils import carregar_cronograma, obter_proximo_jogo
 
 # ============================================================
-# FUNÇÕES PARA CARREGAR DADOS
+# FUNÇÕES DE CARREGAMENTO
 # ============================================================
+def carregar_jogos_do_json(categoria):
+    """Carrega a lista de jogos do arquivo JSON específico da categoria."""
+    nome_arquivo = {
+        "Profissional": "jogos_profissional.json",
+        "Sub-15": "jogos_sub15.json",
+        "Sub-17": "jogos_sub17.json"
+    }.get(categoria)
+    if not nome_arquivo:
+        return None
+    if not os.path.exists(nome_arquivo):
+        return None
+    try:
+        with open(nome_arquivo, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('jogos', [])
+    except Exception as e:
+        st.error(f"Erro ao carregar JSON: {e}")
+        return None
+
 def carregar_jogos_do_script(categoria):
     """Tenta importar JOGOS_TEMPORADA_2026 do script específico."""
     try:
@@ -22,41 +41,6 @@ def carregar_jogos_do_script(categoria):
             return None
         return JOGOS_TEMPORADA_2026
     except ImportError:
-        return None
-
-def obter_proximo_jogo_do_script(categoria):
-    """Tenta usar a função obter_proximo_jogo do script específico."""
-    try:
-        if categoria == "Profissional":
-            from linhares_profissional_crono_2026 import obter_proximo_jogo
-        elif categoria == "Sub-15":
-            from linhares_sub15_crono_2026 import obter_proximo_jogo
-        elif categoria == "Sub-17":
-            from linhares_sub17_crono_2026 import obter_proximo_jogo
-        else:
-            return None
-        return obter_proximo_jogo()
-    except ImportError:
-        return None
-
-def carregar_jogos_do_json(categoria):
-    """Carrega a lista de jogos do arquivo JSON específico da categoria."""
-    nome_arquivo = {
-        "Profissional": "jogos_profissional.json",
-        "Sub-15": "jogos_sub15.json",
-        "Sub-17": "jogos_sub17.json"
-    }.get(categoria)
-    if not nome_arquivo:
-        return None
-    if not os.path.exists(nome_arquivo):
-        st.warning(f"Arquivo {nome_arquivo} não encontrado.")
-        return None
-    try:
-        with open(nome_arquivo, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data.get('jogos', [])
-    except Exception as e:
-        st.error(f"Erro ao carregar JSON: {e}")
         return None
 
 def calcular_proximo_jogo(jogos):
@@ -91,49 +75,70 @@ def calcular_proximo_jogo(jogos):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    categoria = st.session_state.get("categoria_proximo_jogo", "Profissional")
-    st.title(f"📅 Próximo Jogo - {categoria}")
+    st.title("📅 Próximo Jogo")
     st.markdown("---")
+
+    # ===== SELETOR DE CATEGORIA =====
+    categoria = st.selectbox(
+        "Selecione a categoria",
+        ["Profissional", "Sub-15", "Sub-17"],
+        key="proximo_jogo_categoria"
+    )
 
     # ===== BOTÃO DE RECARREGAR =====
     col1, col2 = st.columns([1, 5])
     with col1:
-        if st.button("🔄 Recarregar dados", use_container_width=True):
+        if st.button("🔄 Recarregar Dados", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
     with col2:
-        st.caption("Clique para recarregar os dados do JSON/CSV")
+        st.caption("Clique para recarregar os dados do arquivo JSON")
 
+    # ===== CARREGAMENTO DOS DADOS =====
     jogos = None
     origem = None
     prox = None
 
-    # ===== 1. TENTA DO SCRIPT =====
-    jogos_script = carregar_jogos_do_script(categoria)
-    if jogos_script is not None:
-        jogos = jogos_script
-        origem = "script (Python)"
-        prox = obter_proximo_jogo_do_script(categoria)
-        st.success(f"✅ {len(jogos)} jogos carregados do script.")
-    else:
-        # ===== 2. TENTA DO JSON =====
-        jogos_json = carregar_jogos_do_json(categoria)
-        if jogos_json is not None:
-            jogos = jogos_json
-            origem = "JSON"
-            prox = calcular_proximo_jogo(jogos)
-            st.success(f"✅ {len(jogos)} jogos carregados do JSON.")
-        else:
-            # ===== 3. FALLBACK: CSV =====
-            st.info("⚠️ Script e JSON não encontrados. Usando CSV.")
-            df_crono = carregar_cronograma(categoria)
-            if df_crono.empty:
-                st.warning(f"Nenhum dado de cronograma para {categoria}.")
-                return
-            jogos = df_crono.to_dict('records')
-            origem = "CSV"
-            prox = obter_proximo_jogo(categoria)
-            st.success(f"✅ {len(jogos)} jogos carregados do CSV.")
+    # 1. Tenta carregar do JSON
+    jogos_json = carregar_jogos_do_json(categoria)
+    if jogos_json is not None:
+        jogos = jogos_json
+        origem = "JSON"
+        prox = calcular_proximo_jogo(jogos)
+        st.success(f"✅ {len(jogos)} jogos carregados do JSON.")
+
+    # 2. Fallback: script (se JSON não existir)
+    if jogos is None:
+        jogos_script = carregar_jogos_do_script(categoria)
+        if jogos_script is not None:
+            jogos = jogos_script
+            origem = "script (Python)"
+            # Tenta usar a função do script (se disponível)
+            try:
+                if categoria == "Profissional":
+                    from linhares_profissional_crono_2026 import obter_proximo_jogo
+                elif categoria == "Sub-15":
+                    from linhares_sub15_crono_2026 import obter_proximo_jogo
+                elif categoria == "Sub-17":
+                    from linhares_sub17_crono_2026 import obter_proximo_jogo
+                else:
+                    prox = None
+                prox = obter_proximo_jogo()
+            except:
+                prox = calcular_proximo_jogo(jogos)
+            st.success(f"✅ {len(jogos)} jogos carregados do script.")
+
+    # 3. Fallback final: CSV
+    if jogos is None:
+        st.info("⚠️ JSON e script não encontrados. Usando CSV.")
+        df_crono = carregar_cronograma(categoria)
+        if df_crono.empty:
+            st.warning(f"Nenhum dado de cronograma para {categoria}.")
+            return
+        jogos = df_crono.to_dict('records')
+        origem = "CSV"
+        prox = obter_proximo_jogo(categoria)
+        st.success(f"✅ {len(jogos)} jogos carregados do CSV.")
 
     if not jogos:
         st.warning(f"Nenhum jogo encontrado para {categoria}.")
@@ -161,14 +166,13 @@ def show():
         if prox.get('url_completa'):
             st.markdown(f"[🔗 Link do jogo]({prox['url_completa']})")
     else:
-        st.info("⚠️ Nenhum jogo futuro encontrado. Verifique se há jogos com data a partir de hoje.")
+        st.info("⚠️ Nenhum jogo futuro encontrado. Verifique se há jogos com data a partir de hoje e status AGENDADO ou AGUARDANDO.")
 
-    # ===== EXIBE TODOS OS JOGOS FUTUROS =====
+    # ===== LISTA DE TODOS OS JOGOS FUTUROS =====
     st.markdown("---")
     st.subheader("📋 Todos os jogos futuros")
     df = pd.DataFrame(jogos)
 
-    # Identifica coluna de data
     col_data = None
     for col in ['data_jogo', 'data', 'Data']:
         if col in df.columns:
@@ -184,7 +188,7 @@ def show():
 
     if df_futuros.empty:
         st.info("📭 Nenhum jogo futuro.")
-        # Expansor de depuração
+        # Expansor de depuração para ver todos os dados
         with st.expander("🔍 Ver dados carregados (depuração)"):
             st.write(f"Total de jogos: {len(df)}")
             st.dataframe(df, use_container_width=True)
