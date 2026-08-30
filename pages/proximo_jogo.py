@@ -75,6 +75,9 @@ def calcular_proximo_jogo(jogos):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
+    # ===== MENSAGEM DE DEPURAÇÃO =====
+    st.write("🔍 DEBUG: O código novo está rodando!")
+
     st.title("📅 Próximo Jogo")
     st.markdown("---")
 
