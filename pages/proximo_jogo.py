@@ -114,8 +114,14 @@ def show():
     st.title(f"📅 Próximo Jogo - {categoria}")
     st.markdown("---")
 
+    # Botão para recarregar (útil para testes)
+    if st.button("🔄 Recarregar dados"):
+        st.cache_data.clear()
+        st.rerun()
+
     jogos = None
     origem = None
+    prox = None
 
     # ===== 1. TENTA DO SCRIPT =====
     jogos_script = carregar_jogos_do_script(categoria)
@@ -123,6 +129,7 @@ def show():
         jogos = jogos_script
         origem = "script (Python)"
         prox = obter_proximo_jogo_do_script(categoria)
+        st.info(f"✅ Carregados {len(jogos)} jogos do script.")
     else:
         # ===== 2. TENTA DO JSON =====
         jogos_json = carregar_jogos_do_json(categoria)
@@ -130,9 +137,10 @@ def show():
             jogos = jogos_json
             origem = "JSON"
             prox = calcular_proximo_jogo(jogos)
+            st.info(f"✅ Carregados {len(jogos)} jogos do JSON.")
         else:
             # ===== 3. FALLBACK: CSV =====
-            st.info(f"Script e JSON não encontrados. Carregando do CSV para {categoria}.")
+            st.info(f"⚠️ Script e JSON não encontrados. Carregando do CSV para {categoria}.")
             df_crono = carregar_cronograma(categoria)
             if df_crono.empty:
                 st.warning(f"Nenhum dado de cronograma disponível para {categoria}.")
@@ -140,12 +148,11 @@ def show():
             jogos = df_crono.to_dict('records')
             origem = "CSV"
             prox = obter_proximo_jogo(categoria)
+            st.info(f"✅ Carregados {len(jogos)} jogos do CSV.")
 
     if not jogos:
         st.warning(f"Nenhum jogo encontrado para {categoria}.")
         return
-
-    st.caption(f"Fonte: {origem}")
 
     # ===== EXIBE O PRÓXIMO JOGO =====
     if prox:
@@ -167,7 +174,7 @@ def show():
         if prox.get('url_completa'):
             st.markdown(f"[🔗 Link do jogo]({prox['url_completa']})")
     else:
-        st.info("Nenhum jogo futuro encontrado. Verifique se o JSON contém jogos com data a partir de hoje.")
+        st.info("⚠️ Nenhum jogo futuro encontrado. Verifique se há jogos com data a partir de hoje e status AGENDADO ou AGUARDANDO.")
 
     # ===== EXIBE TODOS OS JOGOS FUTUROS =====
     st.markdown("---")
@@ -176,8 +183,7 @@ def show():
     # Converte a lista para DataFrame
     df = pd.DataFrame(jogos)
 
-    # Filtra apenas jogos com data futura (ou a partir de hoje)
-    hoje = datetime.now().date()
+    # Identifica a coluna de data
     coluna_data = None
     for col in ['data_jogo', 'data', 'Data']:
         if col in df.columns:
@@ -185,26 +191,29 @@ def show():
             break
 
     if coluna_data:
-        # Tenta converter a coluna para datetime
+        # Converte para datetime
         df[coluna_data] = pd.to_datetime(df[coluna_data], dayfirst=True, errors='coerce')
-        # Filtra datas futuras
+        # Filtra datas futuras (a partir de hoje)
+        hoje = datetime.now().date()
         df_futuros = df[df[coluna_data].dt.date >= hoje]
-        # Ordena
+        # Ordena por data
         df_futuros = df_futuros.sort_values(coluna_data)
     else:
         df_futuros = df
 
     if df_futuros.empty:
-        st.info("Nenhum jogo futuro.")
+        st.info("📭 Nenhum jogo futuro encontrado.")
+        # Mostra os primeiros jogos (mesmo que passados) para depuração
+        if not df.empty:
+            with st.expander("🔍 Ver todos os jogos carregados (incluindo passados)"):
+                st.dataframe(df.head(10), use_container_width=True)
     else:
         # Seleciona colunas para exibir
         colunas_exibir = ['data_jogo', 'adversario', 'local_jogo', 'competicao', 'fase', 'status', 'estadio', 'horario']
         colunas_existentes = [c for c in colunas_exibir if c in df_futuros.columns]
         if not colunas_existentes:
-            # Fallback: exibe todas as colunas
             st.dataframe(df_futuros, use_container_width=True)
         else:
-            # Renomeia para exibição amigável
             renomear = {
                 'data_jogo': 'Data',
                 'adversario': 'Adversário',
@@ -217,9 +226,3 @@ def show():
             }
             df_exibicao = df_futuros[colunas_existentes].rename(columns=renomear)
             st.dataframe(df_exibicao, use_container_width=True)
-
-    # ===== DEPURAÇÃO (opcional) =====
-    # Descomente para ver os dados brutos carregados
-    # with st.expander("🔍 Ver dados brutos (depuração)"):
-    #     st.write(f"Total de jogos carregados: {len(jogos)}")
-    #     st.dataframe(pd.DataFrame(jogos))
