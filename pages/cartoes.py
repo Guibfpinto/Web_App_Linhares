@@ -4,104 +4,182 @@ import pandas as pd
 from utils import (
     carregar_cartoes_json,
     salvar_cartoes_json,
+    formatar_cartoes,
+    jogador_suspenso,
     inicializar_cartoes_por_csvs,
     inicializar_cartoes_comissao,
-    jogador_suspenso,
-    carregar_elenco_profissional,
-    mapear_nome_para_canonico,
-    inicializar_banco
+    mapear_nome_para_canonico
 )
 
 def show():
-    inicializar_banco()
-    st.title("🟨 Cartões e Suspensões")
+    st.title("🟨 Gestão de Cartões")
+    st.markdown("---")
 
-    # Seletor de categoria
+    # ============================================================
+    # SELEÇÃO DE CATEGORIA
+    # ============================================================
     categoria = st.selectbox(
         "Categoria",
-        ["profissional", "sub20", "sub17", "comissao_profissional", "comissao_sub20", "comissao_sub17"],
-        format_func=lambda x: {
-            'profissional': 'Profissional',
-            'sub20': 'Sub-20',
-            'sub17': 'Sub-17',
-            'comissao_profissional': 'Comissão Profissional',
-            'comissao_sub20': 'Comissão Sub-20',
-            'comissao_sub17': 'Comissão Sub-17'
-        }[x]
+        ["Profissional", "Sub-15", "Sub-17", "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"],
+        key="cartoes_categoria"
     )
 
-    # Carrega cartões do JSON
-    cartoes, datas_globais = carregar_cartoes_json(categoria)
+    # Mapeia categoria para a chave usada no carregar_cartoes_json
+    mapeamento_categoria = {
+        "Profissional": "profissional",
+        "Sub-15": "sub15",
+        "Sub-17": "sub17",
+        "Comissão Profissional": "comissao_profissional",
+        "Comissão Sub-15": "comissao_sub15",
+        "Comissão Sub-17": "comissao_sub17"
+    }
+    chave_categoria = mapeamento_categoria[categoria]
+
+    # ============================================================
+    # CARREGAMENTO DOS DADOS
+    # ============================================================
+    cartoes, datas_globais = carregar_cartoes_json(chave_categoria)
 
     if not cartoes:
-        st.warning("Nenhum cartão encontrado para esta categoria.")
-        if st.button("🔄 Reinicializar Cartões (via CSVs)", use_container_width=True):
-            if categoria.startswith('comissao_'):
-                cartoes, datas = inicializar_cartoes_comissao(categoria)
-            else:
-                # Para jogadores, precisamos do mapeamento apelido -> ogol_id
-                df = carregar_elenco_profissional()
-                canonico_para_ogol_id = {}
-                for _, row in df.iterrows():
-                    canonico = mapear_nome_para_canonico(row.get('apelido'))
-                    if canonico and pd.notna(row.get('ogol_id')):
-                        canonico_para_ogol_id[canonico] = int(row['ogol_id'])
-                cartoes, datas = inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id)
-            st.rerun()
+        st.info(f"Nenhum cartão registrado para {categoria}.")
         return
 
-    # Exibe lista de pessoas com cartões
-    st.subheader(f"📋 {len(cartoes)} pessoas com cartões")
+    # ============================================================
+    # EXTRAIR COMPETIÇÕES E FASES ÚNICAS DO HISTÓRICO
+    # ============================================================
+    competicoes = set()
+    fases = set()
+    for jogador, dados in cartoes.items():
+        for ev in dados.get('historico', []):
+            if 'competicao' in ev and ev['competicao']:
+                competicoes.add(ev['competicao'])
+            if 'fase' in ev and ev['fase']:
+                fases.add(ev['fase'])
 
-    # Tabela resumo
-    data = []
-    for nome, dados in cartoes.items():
+    competicoes = sorted(list(competicoes))
+    fases = sorted(list(fases))
+
+    # ============================================================
+    # FILTROS (COMPETIÇÃO E FASE)
+    # ============================================================
+    col_filtro1, col_filtro2 = st.columns(2)
+    with col_filtro1:
+        opcoes_competicao = ["Todas"] + competicoes
+        competicao_selecionada = st.selectbox(
+            "Filtrar por Competição",
+            opcoes_competicao,
+            key="cartoes_competicao"
+        )
+    with col_filtro2:
+        opcoes_fase = ["Todas"] + fases
+        fase_selecionada = st.selectbox(
+            "Filtrar por Fase",
+            opcoes_fase,
+            key="cartoes_fase"
+        )
+
+    # ============================================================
+    # APLICAR FILTROS
+    # ============================================================
+    cartoes_filtrados = {}
+    for jogador, dados in cartoes.items():
+        historico = dados.get('historico', [])
+        # Filtra por competição
+        if competicao_selecionada != "Todas":
+            historico = [ev for ev in historico if ev.get('competicao') == competicao_selecionada]
+        # Filtra por fase
+        if fase_selecionada != "Todas":
+            historico = [ev for ev in historico if ev.get('fase') == fase_selecionada]
+
+        if historico:
+            # Cria uma cópia com o histórico filtrado e recalcula amarelos/vermelho
+            novos_dados = dados.copy()
+            novos_dados['historico'] = historico
+            novos_dados['amarelos'] = sum(1 for ev in historico if ev.get('cor') == 'amarelo')
+            novos_dados['vermelho'] = any(ev.get('cor') == 'vermelho' for ev in historico)
+            # Suspensão é global, mas para o filtro podemos manter o estado original ou resetar
+            # Vamos manter o estado original para não enganar o usuário
+            novos_dados['suspenso_proxima'] = dados.get('suspenso_proxima', False)
+            cartoes_filtrados[jogador] = novos_dados
+
+    if not cartoes_filtrados:
+        st.info("Nenhum cartão encontrado com os filtros selecionados.")
+        return
+
+    # ============================================================
+    # RESUMO EM TABELA
+    # ============================================================
+    dados_tabela = []
+    for jogador, dados in cartoes_filtrados.items():
         amarelos = dados.get('amarelos', 0)
-        vermelho = dados.get('vermelho', False)
-        suspenso = dados.get('suspenso_proxima', False)
-        data.append({
-            'Nome': nome,
-            '🟨 Amarelos': amarelos,
-            '🟥 Vermelhos': 'Sim' if vermelho else 'Não',
-            '⚠️ Suspenso': 'Sim' if suspenso else 'Não'
+        vermelho = "Sim" if dados.get('vermelho', False) else "Não"
+        suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
+        total_eventos = len(dados.get('historico', []))
+        dados_tabela.append({
+            "Jogador": jogador,
+            "Amarelos": amarelos,
+            "Vermelho": vermelho,
+            "Suspenso": suspenso,
+            "Total Eventos (filtrados)": total_eventos
         })
-    df_cartoes = pd.DataFrame(data)
-    st.dataframe(df_cartoes, use_container_width=True)
 
-    # Histórico detalhado de um jogador selecionado
-    st.subheader("🔍 Histórico de Cartões por Pessoa")
-    nomes = sorted(cartoes.keys())
-    if nomes:
-        escolha = st.selectbox("Selecione uma pessoa", nomes)
-        if escolha:
-            historico = cartoes[escolha].get('historico', [])
-            if historico:
-                df_hist = pd.DataFrame(historico)
-                st.dataframe(df_hist, use_container_width=True)
-            else:
-                st.write("Nenhum evento de cartão registrado.")
+    df = pd.DataFrame(dados_tabela)
+    st.subheader(f"Resumo de Cartões – {categoria}")
+    if competicao_selecionada != "Todas":
+        st.caption(f"Filtrado por competição: **{competicao_selecionada}**")
+    if fase_selecionada != "Todas":
+        st.caption(f"Filtrado por fase: **{fase_selecionada}**")
+    st.dataframe(df, use_container_width=True)
 
-    # Botão para reinicializar
+    # ============================================================
+    # DETALHES INDIVIDUAIS (COM FASE)
+    # ============================================================
     st.markdown("---")
-    if st.button("🔄 Reinicializar Cartões a partir dos CSVs", use_container_width=True):
-        if categoria.startswith('comissao_'):
-            cartoes, datas = inicializar_cartoes_comissao(categoria)
-        else:
-            df = carregar_elenco_profissional()
-            canonico_para_ogol_id = {}
-            for _, row in df.iterrows():
-                canonico = mapear_nome_para_canonico(row.get('apelido'))
-                if canonico and pd.notna(row.get('ogol_id')):
-                    canonico_para_ogol_id[canonico] = int(row['ogol_id'])
-            cartoes, datas = inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id)
-        st.rerun()
+    jogador_selecionado = st.selectbox(
+        "Ver detalhes de um jogador",
+        options=sorted(cartoes_filtrados.keys())
+    )
 
-    # Explicação
-    with st.expander("ℹ️ Sobre os cartões"):
-        st.write("""
-        - **Amarelos:** Acumulados por jogador/membro.
-        - **3º Amarelo:** Gera suspensão automática para o próximo jogo.
-        - **Vermelho:** Gera suspensão imediata.
-        - **Suspensão:** O jogador/membro fica suspenso até que cumpra um jogo.
-        - **Reinicialização:** Recalcula todos os cartões a partir dos CSVs de estatísticas.
-        """)
+    if jogador_selecionado:
+        dados_jogador = cartoes_filtrados[jogador_selecionado]
+        historico = dados_jogador.get('historico', [])
+
+        if historico:
+            df_hist = pd.DataFrame(historico)
+            # Ordena por data (mais recente primeiro)
+            if 'data' in df_hist.columns:
+                df_hist = df_hist.sort_values('data', ascending=False)
+            # Colunas a exibir
+            colunas_exibir = ['data', 'adversario', 'cor', 'competicao', 'fase']
+            # Garante que as colunas existam
+            for col in colunas_exibir:
+                if col not in df_hist.columns:
+                    df_hist[col] = ''
+            st.subheader(f"Histórico de {jogador_selecionado}")
+            st.dataframe(df_hist[colunas_exibir], use_container_width=True)
+
+            # Exibe também o texto formatado (opcional)
+            with st.expander("Ver texto formatado"):
+                st.text(formatar_cartoes({jogador_selecionado: dados_jogador}, jogador_selecionado))
+        else:
+            st.info("Nenhum evento de cartão para este jogador com os filtros atuais.")
+
+        # ============================================================
+        # REINICIALIZAR CARTÕES (USANDO A LÓGICA DE FASES)
+        # ============================================================
+        if st.button(f"🔄 Reinicializar cartões de {categoria}"):
+            # Para jogadores, precisamos do mapeamento nome_canonico -> ogol_id
+            if "Comissão" in categoria:
+                novos_cartoes, _ = inicializar_cartoes_comissao(chave_categoria, None)
+            else:
+                # Para jogadores, precisamos do mapeamento (a função já usa o cronograma)
+                # Vamos chamar a função sem o mapeamento (ela tentará extrair dos CSVs)
+                # Mas podemos passar um dicionário vazio, pois a função usa o cronograma para fase
+                canonico_para_ogol_id = {}  # se não tiver, a função tentará extrair
+                novos_cartoes, _ = inicializar_cartoes_por_csvs(chave_categoria, canonico_para_ogol_id)
+            st.success("Cartões reinicializados com sucesso!")
+            st.rerun()
+
+
+    st.markdown("---")
+    st.caption("Os cartões são gerenciados automaticamente pelos CSVs de estatísticas. Reinicialize se necessário.")

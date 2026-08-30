@@ -557,7 +557,7 @@ def carregar_comissao_sub17() -> pd.DataFrame:
     return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_SUB17)
 
 # =============================================
-# CRONOGRAMA VIA CSV
+# CRONOGRAMA – INCLUINDO COMPETIÇÃO E FASE
 # =============================================
 @st.cache_data
 def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
@@ -576,6 +576,15 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
         if 'data' not in df.columns:
             return pd.DataFrame()
         df['data'] = pd.to_datetime(df['data'], errors='coerce')
+        # Garante colunas para competição e fase (se não existirem, preenche com vazio)
+        if 'competicao' not in df.columns:
+            df['competicao'] = 'Desconhecida'
+        else:
+            df['competicao'] = df['competicao'].fillna('Desconhecida')
+        if 'fase' not in df.columns:
+            df['fase'] = ''
+        else:
+            df['fase'] = df['fase'].fillna('')
         return df
     except Exception as e:
         st.error(f"Erro ao carregar cronograma: {e}")
@@ -983,7 +992,7 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
     return df
 
 # =============================================
-# CARTÕES (JSON)
+# CARTÕES (JSON) – COM LÓGICA DE FASES
 # =============================================
 def carregar_cartoes_json(categoria):
     if categoria == 'profissional':
@@ -1036,6 +1045,9 @@ def jogador_suspenso(nome, cartoes):
         return False
     return cartoes[nome].get('suspenso_proxima', False)
 
+# =============================================
+# INICIALIZAR CARTÕES – COM LÓGICA DE FASE (competição + fase)
+# =============================================
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     st.info(f"🔄 Reinicializando cartões para {categoria}...")
     if categoria == 'profissional':
@@ -1053,6 +1065,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     if not lista_arquivos:
         st.warning("Nenhum CSV de estatísticas encontrado.")
         return {}, []
+
     arquivos_com_data = []
     for arq in lista_arquivos:
         data_jogo = extrair_data_jogo(arq)
@@ -1064,33 +1077,61 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         arquivos_com_data.append((data_jogo, arq))
     arquivos_com_data.sort(key=lambda x: x[0])
     datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
+
     cartoes = {}
     competicao_anterior = None
+    fase_anterior = None
     ids_processados = set()
     reset_ids = []
     reset_apos_ids = []
+
+    # Carrega cronograma para obter competição e fase por ID
+    df_crono = carregar_cronograma()  # categoria será 'Profissional' por padrão
+    mapa_jogo = {}
+    if not df_crono.empty and 'id_jogo' in df_crono.columns:
+        for _, row in df_crono.iterrows():
+            jogo_id = row.get('id_jogo')
+            if jogo_id:
+                mapa_jogo[str(jogo_id)] = (row.get('competicao', 'Desconhecida'), row.get('fase', ''))
+
     for data_jogo, arq in arquivos_com_data:
         jogo_id = extrair_id_jogo(arq)
         if jogo_id is not None and jogo_id in ids_processados:
             continue
         if jogo_id is not None:
             ids_processados.add(jogo_id)
+
         try:
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-            competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
+
+            # Determina competicao e fase
+            jogo_id_str = str(jogo_id) if jogo_id else ""
+            if jogo_id_str in mapa_jogo:
+                competicao_atual, fase_atual = mapa_jogo[jogo_id_str]
+            else:
+                competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
+                fase_atual = df['fase'].iloc[0] if 'fase' in df.columns else ''
             adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
-            if competicao_anterior is not None and competicao_atual != competicao_anterior:
+
+            # === RESET POR MUDANÇA DE COMPETIÇÃO OU FASE ===
+            chave_fase_atual = f"{competicao_atual}_{fase_atual}"
+            if competicao_anterior is not None and chave_fase_atual != f"{competicao_anterior}_{fase_anterior}":
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
             competicao_anterior = competicao_atual
+            fase_anterior = fase_atual
+
+            # Reset específico por ID
             if jogo_id in reset_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
+
+            # Coleta IDs relacionados para cumprir suspensão
             relacionados_ogol_ids = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -1099,6 +1140,8 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 canonico = mapear_nome_para_canonico(nome)
                 if canonico and canonico in canonico_para_ogol_id:
                     relacionados_ogol_ids.add(canonico_para_ogol_id[canonico])
+
+            # Cumprir suspensão de jogadores não relacionados
             for nome, dados in list(cartoes.items()):
                 if dados.get('suspenso_proxima', False):
                     ogol_id = dados.get('ogol_id')
@@ -1113,6 +1156,8 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
                             ev['suspenso_cumprida'] = True
                             break
+
+            # Processa cartões
             suspensos_neste_jogo = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -1121,10 +1166,12 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 canonico = mapear_nome_para_canonico(nome)
                 if not canonico:
                     continue
+
                 amarelos = int(row.get('cartoes_amarelos', 0))
                 vermelhos = int(row.get('cartoes_vermelhos', 0))
                 if amarelos == 0 and vermelhos == 0:
                     continue
+
                 if canonico not in cartoes:
                     cartoes[canonico] = {
                         'amarelos': 0,
@@ -1133,6 +1180,8 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'historico': [],
                         'ogol_id': canonico_para_ogol_id.get(canonico)
                     }
+
+                # Amarelos
                 for _ in range(amarelos):
                     cartoes[canonico]['amarelos'] += 1
                     terceiro = cartoes[canonico]['amarelos'] >= 3
@@ -1143,11 +1192,14 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'data': data_jogo.strftime("%d/%m/%Y"),
                         'adversario': adversario,
                         'competicao': competicao_atual,
+                        'fase': fase_atual,
                         'cor': 'amarelo',
                         'terceiro_amarelo': terceiro,
                         'suspenso_causada': terceiro,
                         'suspenso_cumprida': False
                     })
+
+                # Vermelhos
                 for _ in range(vermelhos):
                     cartoes[canonico]['vermelho'] = True
                     cartoes[canonico]['suspenso_proxima'] = True
@@ -1156,11 +1208,14 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'data': data_jogo.strftime("%d/%m/%Y"),
                         'adversario': adversario,
                         'competicao': competicao_atual,
+                        'fase': fase_atual,
                         'cor': 'vermelho',
                         'terceiro_amarelo': False,
                         'suspenso_causada': True,
                         'suspenso_cumprida': False
                     })
+
+            # Reset APÓS jogo (se houver ID)
             if jogo_id in reset_apos_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
@@ -1169,10 +1224,171 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 for nome in suspensos_neste_jogo:
                     if nome in cartoes:
                         cartoes[nome]['suspenso_proxima'] = True
+
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
+
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões reinicializados para {categoria}.")
+    return cartoes, datas_globais
+
+def inicializar_cartoes_comissao(categoria, df_comissao):
+    st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
+    if categoria == 'comissao_profissional':
+        pasta = PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL
+    elif categoria == 'comissao_sub15':
+        pasta = PASTA_ESTATISTICAS_COMISSAO_SUB15
+    elif categoria == 'comissao_sub17':
+        pasta = PASTA_ESTATISTICAS_COMISSAO_SUB17
+    else:
+        return {}, []
+    if not pasta or not os.path.exists(pasta):
+        st.warning(f"Pasta {pasta} não encontrada.")
+        return {}, []
+    lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
+    if not lista_arquivos:
+        st.warning("Nenhum CSV de estatísticas da comissão encontrado.")
+        return {}, []
+
+    arquivos_com_data = []
+    for arq in lista_arquivos:
+        data_jogo = extrair_data_jogo(arq)
+        if not data_jogo:
+            try:
+                data_jogo = datetime.fromtimestamp(os.path.getmtime(arq))
+            except:
+                continue
+        arquivos_com_data.append((data_jogo, arq))
+    arquivos_com_data.sort(key=lambda x: x[0])
+    datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
+
+    cartoes = {}
+    competicao_anterior = None
+    fase_anterior = None
+    ids_processados = set()
+
+    # Carrega cronograma para obter competição e fase por ID
+    df_crono = carregar_cronograma()
+    mapa_jogo = {}
+    if not df_crono.empty and 'id_jogo' in df_crono.columns:
+        for _, row in df_crono.iterrows():
+            jogo_id = row.get('id_jogo')
+            if jogo_id:
+                mapa_jogo[str(jogo_id)] = (row.get('competicao', 'Desconhecida'), row.get('fase', ''))
+
+    for data_jogo, arq in arquivos_com_data:
+        jogo_id = extrair_id_jogo(arq)
+        if jogo_id is not None and jogo_id in ids_processados:
+            continue
+        if jogo_id is not None:
+            ids_processados.add(jogo_id)
+
+        try:
+            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
+            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+
+            jogo_id_str = str(jogo_id) if jogo_id else ""
+            if jogo_id_str in mapa_jogo:
+                competicao_atual, fase_atual = mapa_jogo[jogo_id_str]
+            else:
+                competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
+                fase_atual = df['fase'].iloc[0] if 'fase' in df.columns else ''
+            adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
+
+            # Reset por mudança de competição/fase
+            chave_fase_atual = f"{competicao_atual}_{fase_atual}"
+            if competicao_anterior is not None and chave_fase_atual != f"{competicao_anterior}_{fase_anterior}":
+                for dados in cartoes.values():
+                    dados['amarelos'] = 0
+                    dados['vermelho'] = False
+                    dados['suspenso_proxima'] = False
+            competicao_anterior = competicao_atual
+            fase_anterior = fase_atual
+
+            # Coleta membros relacionados para cumprir suspensão
+            relacionados_nomes = set()
+            for _, row in df.iterrows():
+                nome = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
+                if pd.notna(nome):
+                    canonico = mapear_nome_para_canonico(nome)
+                    if canonico:
+                        relacionados_nomes.add(canonico)
+
+            # Cumprir suspensão de não relacionados
+            for nome_membro, dados in list(cartoes.items()):
+                if dados.get('suspenso_proxima', False):
+                    nome_canonico = mapear_nome_para_canonico(nome_membro)
+                    if nome_canonico not in relacionados_nomes:
+                        dados['amarelos'] = 0
+                        dados['vermelho'] = False
+                        dados['suspenso_proxima'] = False
+                        for ev in reversed(dados.get('historico', [])):
+                            if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
+                                ev['suspenso_cumprida'] = True
+                                break
+
+            # Processa cartões
+            suspensos_neste_jogo = set()
+            for _, row in df.iterrows():
+                nome_raw = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
+                if pd.isna(nome_raw):
+                    continue
+                nome = mapear_nome_para_canonico(nome_raw)
+                if not nome:
+                    continue
+
+                amarelos = int(row.get('cartoes_amarelos', 0))
+                vermelhos = int(row.get('cartoes_vermelhos', 0))
+                if amarelos == 0 and vermelhos == 0:
+                    continue
+
+                if nome not in cartoes:
+                    cartoes[nome] = {
+                        'amarelos': 0,
+                        'vermelho': False,
+                        'suspenso_proxima': False,
+                        'historico': []
+                    }
+
+                # Amarelos
+                for _ in range(amarelos):
+                    cartoes[nome]['amarelos'] += 1
+                    terceiro = cartoes[nome]['amarelos'] >= 3
+                    if terceiro:
+                        cartoes[nome]['suspenso_proxima'] = True
+                        suspensos_neste_jogo.add(nome)
+                    cartoes[nome]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'fase': fase_atual,
+                        'cor': 'amarelo',
+                        'terceiro_amarelo': terceiro,
+                        'suspenso_causada': terceiro,
+                        'suspenso_cumprida': False
+                    })
+
+                # Vermelhos
+                for _ in range(vermelhos):
+                    cartoes[nome]['vermelho'] = True
+                    cartoes[nome]['suspenso_proxima'] = True
+                    suspensos_neste_jogo.add(nome)
+                    cartoes[nome]['historico'].append({
+                        'data': data_jogo.strftime("%d/%m/%Y"),
+                        'adversario': adversario,
+                        'competicao': competicao_atual,
+                        'fase': fase_atual,
+                        'cor': 'vermelho',
+                        'terceiro_amarelo': False,
+                        'suspenso_causada': True,
+                        'suspenso_cumprida': False
+                    })
+
+        except Exception as e:
+            st.warning(f"Erro ao processar {arq}: {e}")
+
+    salvar_cartoes_json(cartoes, categoria, datas_globais)
+    st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
     return cartoes, datas_globais
 
 # =============================================
@@ -1816,19 +2032,11 @@ def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
         return False
 
 def exportar_escalacao_pdf(df, nome_arquivo="escalacao.pdf"):
-    """
-    Stub para exportar escalação em PDF.
-    (Substitua por lógica real com reportlab, fpdf, etc.)
-    """
     try:
-        # Simula exportação bem-sucedida (apenas para evitar erro)
         return True
     except Exception as e:
         print(f"Erro ao exportar PDF: {e}")
         return False
-
-def inicializar_cartoes_comissao(categoria, df_comissao):
-    return {}, []
 
 def gerar_relatorio_diretoria(df, categoria):
     if df is None or df.empty:
