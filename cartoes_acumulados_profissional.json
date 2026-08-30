@@ -61,9 +61,9 @@
       "ogol_id": 1542489
     },
     "João Firmino": {
-      "amarelos": 3,
+      "amarelos": 0,
       "vermelho": false,
-      "suspenso_proxima": true,
+      "suspenso_proxima": false,
       "historico": [
         {
           "data": "12/07/2026",
@@ -90,7 +90,7 @@
           "cor": "amarelo",
           "terceiro_amarelo": true,
           "suspenso_causada": true,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": true
         }
       ],
       "ogol_id": 649473
@@ -241,6 +241,7 @@
     "2026-08-05",
     "2026-08-08",
     "2026-08-14",
-    "2026-08-26"
+    "2026-08-26",
+    "2026-08-29"
   ]
 }
