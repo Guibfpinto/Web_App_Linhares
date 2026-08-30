@@ -3,14 +3,25 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import json
+from pathlib import Path
 import os
 from utils import carregar_cronograma, obter_proximo_jogo
+
+# ============================================================
+# CONFIGURAÇÃO DE CAMINHOS
+# ============================================================
+# Diretório base do projeto (sobe dois níveis a partir de pages/)
+BASE_DIR = Path(__file__).resolve().parent.parent
+DADOS_DIR = BASE_DIR / "dados"
 
 # ============================================================
 # FUNÇÕES DE CARREGAMENTO
 # ============================================================
 def carregar_jogos_do_json(categoria):
-    """Carrega a lista de jogos do arquivo JSON específico da categoria."""
+    """
+    Carrega a lista de jogos do arquivo JSON específico da categoria,
+    localizado na pasta 'dados/'.
+    """
     nome_arquivo = {
         "Profissional": "jogos_profissional.json",
         "Sub-15": "jogos_sub15.json",
@@ -18,10 +29,13 @@ def carregar_jogos_do_json(categoria):
     }.get(categoria)
     if not nome_arquivo:
         return None
-    if not os.path.exists(nome_arquivo):
+
+    caminho_arquivo = DADOS_DIR / nome_arquivo
+    if not caminho_arquivo.exists():
         return None
+
     try:
-        with open(nome_arquivo, 'r', encoding='utf-8') as f:
+        with open(caminho_arquivo, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('jogos', [])
     except Exception as e:
@@ -44,31 +58,49 @@ def carregar_jogos_do_script(categoria):
         return None
 
 def calcular_proximo_jogo(jogos):
-    """Retorna o próximo jogo a partir de uma lista de dicionários."""
+    """
+    Retorna o próximo jogo a partir de uma lista de dicionários.
+    Considera apenas jogos com data >= hoje e status 'AGENDADO' ou 'AGUARDANDO'.
+    Se nenhum com esses status, retorna o mais próximo.
+    """
     if not jogos:
         return None
+
     hoje = datetime.now().date()
     jogos_com_data = []
+
     for jogo in jogos:
         data_str = jogo.get('data_jogo') or jogo.get('data')
         if not data_str:
             continue
+
+        # Tenta parsear nos formatos dd/mm/aaaa ou aaaa-mm-dd
         try:
             data_obj = datetime.strptime(data_str, "%d/%m/%Y").date()
-        except:
+        except ValueError:
             try:
                 data_obj = datetime.strptime(data_str, "%Y-%m-%d").date()
-            except:
+            except ValueError:
                 continue
+
         if data_obj < hoje:
             continue
+
         jogos_com_data.append((data_obj, jogo))
+
     if not jogos_com_data:
         return None
+
+    # Ordena por data
     jogos_com_data.sort(key=lambda x: x[0])
+
+    # Primeiro tenta achar com status AGENDADO ou AGUARDANDO
     for _, jogo in jogos_com_data:
-        if jogo.get('status', '').upper() in ['AGENDADO', 'AGUARDANDO']:
+        status = jogo.get('status', '').upper()
+        if status in ['AGENDADO', 'AGUARDANDO']:
             return jogo
+
+    # Se não, retorna o primeiro (mais próximo)
     return jogos_com_data[0][1]
 
 # ============================================================
@@ -99,7 +131,7 @@ def show():
     origem = None
     prox = None
 
-    # 1. Tenta carregar do JSON
+    # 1. Tenta carregar do JSON (pasta dados/)
     jogos_json = carregar_jogos_do_json(categoria)
     if jogos_json is not None:
         jogos = jogos_json
@@ -107,29 +139,32 @@ def show():
         prox = calcular_proximo_jogo(jogos)
         st.success(f"✅ {len(jogos)} jogos carregados do JSON.")
 
-    # 2. Fallback: script (se JSON não existir)
-    if jogos is None:
+    # 2. Fallback: script (se JSON não existir ou estiver vazio)
+    if jogos is None or len(jogos) == 0:
         jogos_script = carregar_jogos_do_script(categoria)
-        if jogos_script is not None:
+        if jogos_script is not None and len(jogos_script) > 0:
             jogos = jogos_script
             origem = "script (Python)"
-            # Tenta usar a função do script (se disponível)
+            # Tenta usar a função obter_proximo_jogo do script se disponível
             try:
                 if categoria == "Profissional":
-                    from linhares_profissional_crono_2026 import obter_proximo_jogo
+                    from linhares_profissional_crono_2026 import obter_proximo_jogo as obter_script
                 elif categoria == "Sub-15":
-                    from linhares_sub15_crono_2026 import obter_proximo_jogo
+                    from linhares_sub15_crono_2026 import obter_proximo_jogo as obter_script
                 elif categoria == "Sub-17":
-                    from linhares_sub17_crono_2026 import obter_proximo_jogo
+                    from linhares_sub17_crono_2026 import obter_proximo_jogo as obter_script
                 else:
-                    prox = None
-                prox = obter_proximo_jogo()
+                    obter_script = None
+                if obter_script:
+                    prox = obter_script()
+                else:
+                    prox = calcular_proximo_jogo(jogos)
             except:
                 prox = calcular_proximo_jogo(jogos)
             st.success(f"✅ {len(jogos)} jogos carregados do script.")
 
-    # 3. Fallback final: CSV
-    if jogos is None:
+    # 3. Fallback final: CSV (via utils)
+    if jogos is None or len(jogos) == 0:
         st.info("⚠️ JSON e script não encontrados. Usando CSV.")
         df_crono = carregar_cronograma(categoria)
         if df_crono.empty:
