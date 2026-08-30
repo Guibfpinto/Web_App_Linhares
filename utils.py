@@ -576,7 +576,6 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
         if 'data' not in df.columns:
             return pd.DataFrame()
         df['data'] = pd.to_datetime(df['data'], errors='coerce')
-        # Garante colunas para competição e fase (se não existirem, preenche com vazio)
         if 'competicao' not in df.columns:
             df['competicao'] = 'Desconhecida'
         else:
@@ -824,6 +823,99 @@ def obter_lesao_atual(jogador_row, categoria):
             nome_lesao = col.replace('Lesao_', '').replace('_', ' ')
             return nome_lesao
     return ""
+
+# =============================================
+# GESTÃO DE LESÕES (ADICIONAR/ATUALIZAR)
+# =============================================
+def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=None):
+    """
+    Adiciona uma ocorrência de lesão para um jogador.
+    tipo_lesao: ex: 'Tornozelo', 'Joelho', 'Coxa', etc.
+    data_inicio: string 'YYYY-MM-DD'
+    data_fim: string 'YYYY-MM-DD' ou None (se ainda estiver lesionado)
+    """
+    import pandas as pd
+    if not os.path.exists(csv_path):
+        df = pd.DataFrame(columns=['ogol_id', 'nome_completo'])
+    else:
+        try:
+            df = pd.read_csv(csv_path, delimiter=';', encoding='utf-8-sig', dtype=str,
+                             on_bad_lines='skip')
+        except Exception as e:
+            print(f"Erro ao ler {csv_path}: {e}")
+            return
+
+    if 'nome_completo' not in df.columns:
+        df['nome_completo'] = ''
+    if 'ogol_id' not in df.columns:
+        df['ogol_id'] = ''
+
+    if nome_jogador in df['nome_completo'].values:
+        idx = df[df['nome_completo'] == nome_jogador].index[0]
+    else:
+        nova_linha = {'nome_completo': nome_jogador, 'ogol_id': ''}
+        for col in df.columns:
+            if col not in nova_linha:
+                nova_linha[col] = ''
+        df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
+        idx = len(df) - 1
+
+    df.at[idx, 'nome_completo'] = nome_jogador
+
+    coluna_lesao = f"Lesao_{tipo_lesao.replace(' ', '_').title()}"
+    if coluna_lesao not in df.columns:
+        df[coluna_lesao] = ''
+
+    valor_atual = df.at[idx, coluna_lesao]
+    if pd.isna(valor_atual) or valor_atual == '':
+        nova_ocorrencia = data_inicio if data_fim is None else f"{data_inicio} - {data_fim}"
+    else:
+        if data_fim is None:
+            nova_ocorrencia = f"{valor_atual}, {data_inicio}"
+        else:
+            nova_ocorrencia = f"{valor_atual}, {data_inicio} - {data_fim}"
+
+    df.at[idx, coluna_lesao] = nova_ocorrencia
+    df.to_csv(csv_path, sep=';', encoding='utf-8-sig', index=False)
+
+def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
+    """
+    Localiza a última ocorrência da lesão do tipo especificado e adiciona a data de fim.
+    Se a lesão já tiver data de fim, não faz nada.
+    """
+    import pandas as pd
+    if not os.path.exists(csv_path):
+        return
+
+    try:
+        df = pd.read_csv(csv_path, delimiter=';', encoding='utf-8-sig', dtype=str,
+                         on_bad_lines='skip')
+    except Exception as e:
+        print(f"Erro ao ler {csv_path}: {e}")
+        return
+
+    coluna_lesao = f"Lesao_{tipo_lesao.replace(' ', '_').title()}"
+    if coluna_lesao not in df.columns:
+        return
+
+    if nome_jogador in df['nome_completo'].values:
+        idx = df[df['nome_completo'] == nome_jogador].index[0]
+    else:
+        return
+
+    valor = df.at[idx, coluna_lesao]
+    if pd.isna(valor) or valor == '':
+        return
+
+    ocorrencias = str(valor).split(',')
+    for i in range(len(ocorrencias) - 1, -1, -1):
+        occ = ocorrencias[i].strip()
+        if ' - ' not in occ:
+            ocorrencias[i] = f"{occ} - {data_fim}"
+            break
+
+    df.at[idx, coluna_lesao] = ', '.join(ocorrencias)
+    df.to_csv(csv_path, sep=';', encoding='utf-8-sig', index=False)
 
 # =============================================
 # BIOIMPEDÂNCIA (CSV)
@@ -1085,8 +1177,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     reset_ids = []
     reset_apos_ids = []
 
-    # Carrega cronograma para obter competição e fase por ID
-    df_crono = carregar_cronograma()  # categoria será 'Profissional' por padrão
+    df_crono = carregar_cronograma()
     mapa_jogo = {}
     if not df_crono.empty and 'id_jogo' in df_crono.columns:
         for _, row in df_crono.iterrows():
@@ -1105,7 +1196,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
             df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
             df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-            # Determina competicao e fase
             jogo_id_str = str(jogo_id) if jogo_id else ""
             if jogo_id_str in mapa_jogo:
                 competicao_atual, fase_atual = mapa_jogo[jogo_id_str]
@@ -1114,7 +1204,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 fase_atual = df['fase'].iloc[0] if 'fase' in df.columns else ''
             adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
 
-            # === RESET POR MUDANÇA DE COMPETIÇÃO OU FASE ===
             chave_fase_atual = f"{competicao_atual}_{fase_atual}"
             if competicao_anterior is not None and chave_fase_atual != f"{competicao_anterior}_{fase_anterior}":
                 for dados in cartoes.values():
@@ -1124,14 +1213,12 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
             competicao_anterior = competicao_atual
             fase_anterior = fase_atual
 
-            # Reset específico por ID
             if jogo_id in reset_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
                     dados['vermelho'] = False
                     dados['suspenso_proxima'] = False
 
-            # Coleta IDs relacionados para cumprir suspensão
             relacionados_ogol_ids = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -1141,7 +1228,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 if canonico and canonico in canonico_para_ogol_id:
                     relacionados_ogol_ids.add(canonico_para_ogol_id[canonico])
 
-            # Cumprir suspensão de jogadores não relacionados
             for nome, dados in list(cartoes.items()):
                 if dados.get('suspenso_proxima', False):
                     ogol_id = dados.get('ogol_id')
@@ -1157,7 +1243,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                             ev['suspenso_cumprida'] = True
                             break
 
-            # Processa cartões
             suspensos_neste_jogo = set()
             for _, row in df.iterrows():
                 nome = row.get('jogador')
@@ -1181,7 +1266,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'ogol_id': canonico_para_ogol_id.get(canonico)
                     }
 
-                # Amarelos
                 for _ in range(amarelos):
                     cartoes[canonico]['amarelos'] += 1
                     terceiro = cartoes[canonico]['amarelos'] >= 3
@@ -1199,7 +1283,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'suspenso_cumprida': False
                     })
 
-                # Vermelhos
                 for _ in range(vermelhos):
                     cartoes[canonico]['vermelho'] = True
                     cartoes[canonico]['suspenso_proxima'] = True
@@ -1215,7 +1298,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'suspenso_cumprida': False
                     })
 
-            # Reset APÓS jogo (se houver ID)
             if jogo_id in reset_apos_ids:
                 for dados in cartoes.values():
                     dados['amarelos'] = 0
@@ -1267,7 +1349,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
     fase_anterior = None
     ids_processados = set()
 
-    # Carrega cronograma para obter competição e fase por ID
     df_crono = carregar_cronograma()
     mapa_jogo = {}
     if not df_crono.empty and 'id_jogo' in df_crono.columns:
@@ -1295,7 +1376,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                 fase_atual = df['fase'].iloc[0] if 'fase' in df.columns else ''
             adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
 
-            # Reset por mudança de competição/fase
             chave_fase_atual = f"{competicao_atual}_{fase_atual}"
             if competicao_anterior is not None and chave_fase_atual != f"{competicao_anterior}_{fase_anterior}":
                 for dados in cartoes.values():
@@ -1305,7 +1385,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
             competicao_anterior = competicao_atual
             fase_anterior = fase_atual
 
-            # Coleta membros relacionados para cumprir suspensão
             relacionados_nomes = set()
             for _, row in df.iterrows():
                 nome = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
@@ -1314,7 +1393,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                     if canonico:
                         relacionados_nomes.add(canonico)
 
-            # Cumprir suspensão de não relacionados
             for nome_membro, dados in list(cartoes.items()):
                 if dados.get('suspenso_proxima', False):
                     nome_canonico = mapear_nome_para_canonico(nome_membro)
@@ -1327,7 +1405,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                                 ev['suspenso_cumprida'] = True
                                 break
 
-            # Processa cartões
             suspensos_neste_jogo = set()
             for _, row in df.iterrows():
                 nome_raw = row.get('nome') or row.get('membro') or row.get('comissao') or row.get('staff')
@@ -1350,7 +1427,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                         'historico': []
                     }
 
-                # Amarelos
                 for _ in range(amarelos):
                     cartoes[nome]['amarelos'] += 1
                     terceiro = cartoes[nome]['amarelos'] >= 3
@@ -1368,7 +1444,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                         'suspenso_cumprida': False
                     })
 
-                # Vermelhos
                 for _ in range(vermelhos):
                     cartoes[nome]['vermelho'] = True
                     cartoes[nome]['suspenso_proxima'] = True
