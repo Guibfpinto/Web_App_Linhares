@@ -66,6 +66,7 @@ from utils import (
     exibir_foto,
     formatar_cartoes,
     inicializar_banco,
+    carregar_cronograma,
 )
 
 # ======================================================================
@@ -411,7 +412,48 @@ if "instrucoes_coletivas" not in st.session_state:
     st.session_state.instrucoes_coletivas = {}
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (com atributos do CSV)
+# FUNÇÕES AUXILIARES PARA OBTER DADOS POR CATEGORIA
+# ======================================================================
+def get_elenco(categoria):
+    if categoria == "Profissional":
+        return carregar_elenco_profissional()
+    elif categoria == "Sub-15":
+        return carregar_elenco_sub15()
+    elif categoria == "Sub-17":
+        return carregar_elenco_sub17()
+    return None
+
+def get_comissao(categoria):
+    if categoria == "Comissão Profissional":
+        return carregar_comissao()
+    elif categoria == "Comissão Sub-15":
+        return carregar_comissao_sub15()
+    elif categoria == "Comissão Sub-17":
+        return carregar_comissao_sub17()
+    return None
+
+def get_cartoes(categoria):
+    mapeamento = {
+        "Profissional": "profissional",
+        "Sub-15": "sub15",
+        "Sub-17": "sub17",
+        "Comissão Profissional": "comissao_profissional",
+        "Comissão Sub-15": "comissao_sub15",
+        "Comissão Sub-17": "comissao_sub17",
+    }
+    chave = mapeamento.get(categoria)
+    if chave:
+        cart, _ = carregar_cartoes_json(chave)
+        return cart
+    return {}
+
+def get_estatisticas_partidas(categoria):
+    # Usa a função existente do utils, que já aceita categoria
+    from utils import carregar_estatisticas_partidas
+    return carregar_estatisticas_partidas(categoria)
+
+# ======================================================================
+# FUNÇÃO DETALHES COMISSÃO
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
@@ -632,7 +674,7 @@ if st.sidebar.button("Sair"):
     st.rerun()
 
 # ======================================================================
-# CARREGAMENTO DE DADOS (CACHE)
+# CARREGAMENTO DE DADOS (CACHE) – TODAS AS CATEGORIAS
 # ======================================================================
 @st.cache_data
 def carregar_dfs():
@@ -651,10 +693,12 @@ def carregar_dfs():
         "cartoes_com_sub17": {},
     }
     try:
+        # Carrega elencos
         df_prof = carregar_elenco_profissional()
         df_sub15 = carregar_elenco_sub15()
         df_sub17 = carregar_elenco_sub17()
 
+        # Aplica lesões e bioimpedância
         if df_prof is not None and not df_prof.empty:
             df_prof = adicionar_coluna_lesionado(df_prof, 'profissional')
             bio_prof = carregar_dados_bioimpedancia('profissional')
@@ -672,14 +716,26 @@ def carregar_dfs():
         resultado["Sub-15"] = df_sub15
         resultado["Sub-17"] = df_sub17
 
+        # Comissão
         resultado["Comissão Profissional"] = carregar_comissao()
         resultado["Comissão Sub-15"] = carregar_comissao_sub15()
         resultado["Comissão Sub-17"] = carregar_comissao_sub17()
 
-        df_stats = carregar_estatisticas_partidas()
-        if not df_stats.empty and df_prof is not None:
-            resultado["Profissional"] = precomputar_scores_posicionais(df_prof, df_stats)
+        # Estatísticas de partidas (para cada categoria, já que podem ter CSVs separados)
+        # Usamos a função do utils que aceita categoria
+        from utils import carregar_estatisticas_partidas
+        df_stats_prof = carregar_estatisticas_partidas("Profissional")
+        df_stats_sub15 = carregar_estatisticas_partidas("Sub-15")
+        df_stats_sub17 = carregar_estatisticas_partidas("Sub-17")
 
+        if not df_stats_prof.empty and df_prof is not None:
+            resultado["Profissional"] = precomputar_scores_posicionais(df_prof, df_stats_prof)
+        if not df_stats_sub15.empty and df_sub15 is not None:
+            resultado["Sub-15"] = precomputar_scores_posicionais(df_sub15, df_stats_sub15)
+        if not df_stats_sub17.empty and df_sub17 is not None:
+            resultado["Sub-17"] = precomputar_scores_posicionais(df_sub17, df_stats_sub17)
+
+        # Cartões
         for cat, key in [
             ('profissional', 'cartoes_prof'),
             ('sub15', 'cartoes_sub15'),
@@ -709,7 +765,7 @@ def get_df_cartoes(categoria):
     return dados.get(df_key), dados.get(cart_key, {})
 
 # ======================================================================
-# ABAS PRINCIPAIS – todas com tratamento de erro
+# ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco",
@@ -725,7 +781,7 @@ tabs = st.tabs([
 ])
 
 # ======================================================================
-# ABA 1: ANÁLISE DE ELENCO
+# ABA 1: ANÁLISE DE ELENCO (com seletor de categoria)
 # ======================================================================
 with tabs[0]:
     st.header("Análise de Jogadores")
@@ -848,7 +904,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ======================================================================
-# ABA 2: COMISSÃO TÉCNICA
+# ABA 2: COMISSÃO TÉCNICA (com seletor de categoria)
 # ======================================================================
 with tabs[1]:
     st.header("Comissão Técnica")
@@ -927,79 +983,183 @@ with tabs[1]:
         st.info("Nenhum dado de comissão disponível.")
 
 # ======================================================================
-# ABA 3: MONITORAMENTO AO VIVO (com fallback)
+# ABA 3: MONITORAMENTO AO VIVO (com seletor de categoria)
 # ======================================================================
 with tabs[2]:
+    # Importa a página de monitoramento, mas ela precisa ser adaptada para aceitar categoria.
+    # Por enquanto, usamos um seletor local e chamamos a página com a categoria.
+    cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
     try:
         import pages.monitoramento as monitoramento
+        # A página de monitoramento precisa ser adaptada para receber a categoria.
+        # Vamos passar via session_state ou argumento.
+        # Como não podemos modificar a página facilmente, usamos session_state.
+        st.session_state.categoria_monitoramento = cat_monitor
         monitoramento.show()
-    except ImportError:
-        st.warning("Página de monitoramento não disponível (arquivo pages/monitoramento.py não encontrado).")
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de monitoramento: {e}")
     except Exception as e:
-        st.error(f"Erro ao carregar monitoramento: {e}")
+        st.error(f"Erro ao executar monitoramento: {e}")
 
 # ======================================================================
-# ABA 4: CARTÕES (com fallback)
+# ABA 4: CARTÕES (já adaptado em pages/cartoes.py)
 # ======================================================================
 with tabs[3]:
     try:
         import pages.cartoes as cartoes
         cartoes.show()
-    except ImportError:
-        st.warning("Página de cartões não disponível (arquivo pages/cartoes.py não encontrado).")
-    except Exception as e:
-        st.error(f"Erro ao carregar cartões: {e}")
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO (com fallback)
+# ABA 5: PRÓXIMO JOGO (com seletor de categoria)
 # ======================================================================
 with tabs[4]:
-    try:
-        import pages.proximo_jogo as proximo_jogo
-        proximo_jogo.show()
-    except ImportError:
-        st.warning("Página de próximo jogo não disponível (arquivo pages/proximo_jogo.py não encontrado).")
-    except Exception as e:
-        st.error(f"Erro ao carregar próximo jogo: {e}")
+    st.header("📅 Próximo Jogo")
+    cat_proximo = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="proximo_categoria")
+    
+    # Carrega o cronograma da categoria
+    df_crono = carregar_cronograma(cat_proximo)
+    if df_crono.empty:
+        st.info(f"Nenhum jogo futuro encontrado para {cat_proximo}.")
+    else:
+        # Obtém o próximo jogo
+        prox = obter_proximo_jogo(cat_proximo)
+        if prox:
+            st.subheader(f"Próximo jogo do {cat_proximo}")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"**Adversário:** {prox.get('adversario', 'N/I')}")
+                st.write(f"**Data:** {prox.get('data', 'N/I')}")
+                st.write(f"**Local:** {prox.get('local', 'N/I')}")
+            with col2:
+                st.write(f"**Competição:** {prox.get('competicao', 'N/I')}")
+                st.write(f"**Fase:** {prox.get('fase', 'N/I')}")
+                st.write(f"**Status:** {prox.get('status', 'N/I')}")
+            if prox.get('url_completa'):
+                st.markdown(f"[🔗 Link do jogo]({prox['url_completa']})")
+        else:
+            st.info(f"Nenhum jogo futuro encontrado para {cat_proximo}.")
+    
+    # Exibe todos os jogos futuros em uma tabela
+    if not df_crono.empty:
+        hoje = datetime.now().date()
+        df_futuros = df_crono[df_crono['data'].dt.date >= hoje].sort_values('data')
+        if not df_futuros.empty:
+            st.subheader("📋 Todos os jogos futuros")
+            st.dataframe(df_futuros[['data', 'adversario', 'local', 'competicao', 'fase', 'status']], use_container_width=True)
 
 # ======================================================================
-# ABA 6: ESCALAÇÃO TÁTICA (com fallback)
+# ABA 6: ESCALAÇÃO TÁTICA (com seletor de categoria)
 # ======================================================================
 with tabs[5]:
-    try:
-        import pages.tatica_page as tatica_page
-        tatica_page.show()
-    except ImportError:
-        st.warning("Página de escalação tática não disponível (arquivo pages/tatica_page.py não encontrado).")
-    except Exception as e:
-        st.error(f"Erro ao carregar escalação tática: {e}")
+    st.header("📐 Escalação Tática")
+    cat_tatica = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="tatica_categoria")
+    
+    # Carrega o elenco e cartões da categoria
+    df_elenco, cartoes_tatica = get_df_cartoes(cat_tatica)
+    if df_elenco is None or df_elenco.empty:
+        st.warning(f"Elenco não disponível para {cat_tatica}.")
+    else:
+        # Importa a página de tática (se existir) ou usa uma função local
+        try:
+            import pages.tatica_page as tatica_page
+            # Passa a categoria via session_state
+            st.session_state.categoria_tatica = cat_tatica
+            tatica_page.show()
+        except ImportError:
+            # Fallback: uma versão simplificada aqui mesmo
+            st.info("Página de tática não disponível. Usando versão simplificada.")
+            
+            # Formação
+            formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2")
+            if st.button("Gerar Escalação"):
+                defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
+                if posicoes is None:
+                    st.error("Formação inválida.")
+                else:
+                    # Monta time simples usando Rating
+                    titulares = []
+                    reservas = []
+                    jogadores_usados = []
+                    for pos_exibida, pos_tipo in posicoes:
+                        candidatos = obter_jogadores_para_posicao(df_elenco, pos_tipo, jogadores_usados, cartoes_tatica)
+                        if not candidatos.empty:
+                            melhor = candidatos.sort_values('Rating_Geral_FM26', ascending=False).iloc[0]
+                            titulares.append({
+                                'posicao_exibida': pos_exibida,
+                                'posicao_tipo': pos_tipo,
+                                'nome': melhor['nome_completo'],
+                                'apelido': melhor['apelido'],
+                                'row': melhor
+                            })
+                            jogadores_usados.append(melhor['nome_completo'])
+                        else:
+                            titulares.append({
+                                'posicao_exibida': pos_exibida,
+                                'posicao_tipo': pos_tipo,
+                                'nome': 'N/D',
+                                'apelido': 'N/D',
+                                'row': None
+                            })
+                    reservas_df = df_elenco[~df_elenco['nome_completo'].isin(jogadores_usados)]
+                    reservas_df = reservas_df.sort_values('Rating_Geral_FM26', ascending=False)
+                    for _, row in reservas_df.head(12).iterrows():
+                        reservas.append({
+                            'nome': row['nome_completo'],
+                            'apelido': row['apelido'],
+                            'row': row
+                        })
+                    
+                    # Exibe
+                    st.subheader("Time Titular")
+                    for j in titulares:
+                        st.write(f"**{j['posicao_exibida']}:** {j['nome']} ({j['apelido']})")
+                    st.subheader("Reservas")
+                    for j in reservas:
+                        st.write(f"• {j['nome']} ({j['apelido']})")
 
 # ======================================================================
-# ABA 7: GESTÃO (com fallback)
+# ABA 7: GESTÃO (com seletor de categoria)
 # ======================================================================
 with tabs[6]:
+    st.header("⚙️ Gestão")
+    cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
+    
+    # A página de gestão precisa ser adaptada para aceitar categoria.
+    # Por enquanto, usamos a página existente, mas passamos a categoria via session_state.
     try:
         import pages.gestao as gestao
+        st.session_state.categoria_gestao = cat_gestao
         gestao.show()
-    except ImportError:
-        st.warning("Página de gestão não disponível (arquivo pages/gestao.py não encontrado).")
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de gestão: {e}")
     except Exception as e:
-        st.error(f"Erro ao carregar gestão: {e}")
+        st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS (com fallback)
+# ABA 8: RELATÓRIOS (com seletor de categoria)
 # ======================================================================
 with tabs[7]:
-    try:
-        import pages.relatorios as relatorios
-        relatorios.show()
-    except ImportError:
-        st.warning("Página de relatórios não disponível (arquivo pages/relatorios.py não encontrado).")
-    except Exception as e:
-        st.error(f"Erro ao carregar relatórios: {e}")
+    st.header("📄 Relatórios")
+    cat_rel = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="rel_categoria")
+    df_rel, _ = get_df_cartoes(cat_rel)
+    if df_rel is not None and not df_rel.empty:
+        texto = gerar_relatorio_completo_texto(df_rel, cat_rel)
+        st.text_area("Relatório", texto, height=300)
+        
+        if st.button("Exportar Relatório (TXT)"):
+            st.download_button(
+                label="Baixar TXT",
+                data=texto,
+                file_name=f"relatorio_{cat_rel}_{datetime.now().strftime('%Y%m%d')}.txt",
+                mime="text/plain"
+            )
+    else:
+        st.warning(f"Nenhum dado disponível para {cat_rel}.")
 
 # ======================================================================
-# ABA 9: EXPORTAR
+# ABA 9: EXPORTAR (já com seletor de categoria)
 # ======================================================================
 with tabs[8]:
     st.header("📤 Exportar Dados")
@@ -1030,13 +1190,22 @@ with tabs[8]:
         st.warning("Nenhum dado disponível")
 
 # ======================================================================
-# ABA 10: VISUALIZAÇÃO TÁTICA (com fallback)
+# ABA 10: VISUALIZAÇÃO TÁTICA (com seletor de categoria)
 # ======================================================================
 with tabs[9]:
-    try:
-        import pages.visualizacao as visualizacao
-        visualizacao.show()
-    except ImportError:
-        st.warning("Página de visualização tática não disponível (arquivo pages/visualizacao.py não encontrado).")
-    except Exception as e:
-        st.error(f"Erro ao carregar visualização tática: {e}")
+    st.header("🎥 Visualização Tática")
+    cat_viz = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="viz_categoria")
+    df_viz, _ = get_df_cartoes(cat_viz)
+    if df_viz is not None and not df_viz.empty:
+        try:
+            import pages.visualizacao as visualizacao
+            st.session_state.categoria_visualizacao = cat_viz
+            visualizacao.show()
+        except ImportError:
+            st.info("Página de visualização não disponível. Usando visualização simples.")
+            # Opção simples: mostrar campo com posições dos jogadores (apenas exemplo)
+            st.write(f"Visualização tática para {cat_viz} - {len(df_viz)} jogadores")
+            # Aqui poderíamos desenhar um campo com mplsoccer, mas é complexo.
+            st.info("Para visualização avançada, instale mplsoccer e configure a página.")
+    else:
+        st.warning(f"Nenhum dado disponível para {cat_viz}.")
