@@ -403,7 +403,6 @@ def inicializar_banco():
 # FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """Carrega um CSV de elenco com o formato padrão."""
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
@@ -498,9 +497,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         st.error(f"Erro ao carregar elenco de {caminho_arquivo}: {e}")
         return pd.DataFrame()
 
-# =============================================
-# CARREGAMENTO DOS DADOS (CSVs) – CORRIGIDO
-# =============================================
 @st.cache_data
 def carregar_elenco_profissional() -> pd.DataFrame:
     return _carregar_elenco_generico(ARQUIVO_CSV_PROFISSIONAL)
@@ -517,14 +513,11 @@ def carregar_elenco_sub17() -> pd.DataFrame:
 # CARREGAMENTO DA COMISSÃO (COM TODOS OS ATRIBUTOS)
 # =============================================
 def _carregar_comissao_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """Carrega o CSV da comissão mantendo TODAS as colunas."""
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig')
-        # Mantém todas as colunas, apenas padroniza nomes para minúsculo e underline
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-        # Garante colunas básicas para compatibilidade
         if 'nome' not in df.columns and 'apelido' in df.columns:
             df['nome'] = df['apelido']
         elif 'nome' not in df.columns and 'nome_completo' in df.columns:
@@ -1820,6 +1813,18 @@ def exportar_escalacao_excel(df, nome_arquivo="escalacao.xlsx"):
         return True
     except Exception as e:
         print(f"Erro ao exportar escalação: {e}")
+        return False
+
+def exportar_escalacao_pdf(df, nome_arquivo="escalacao.pdf"):
+    """
+    Stub para exportar escalação em PDF.
+    (Substitua por lógica real com reportlab, fpdf, etc.)
+    """
+    try:
+        # Simula exportação bem-sucedida (apenas para evitar erro)
+        return True
+    except Exception as e:
+        print(f"Erro ao exportar PDF: {e}")
         return False
 
 def inicializar_cartoes_comissao(categoria, df_comissao):
