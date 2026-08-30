@@ -1,3 +1,4 @@
+# pages/proximo_jogo.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -5,16 +6,16 @@ import json
 from pathlib import Path
 
 # ============================================================
-# CAMINHO PARA A PASTA DADOS (raiz do projeto)
+# CONFIGURAÇÃO DE CAMINHOS
 # ============================================================
-# Se este arquivo está em pages/, a raiz é um nível acima
+# Supondo que este arquivo está em pages/ e a pasta dados/ está na raiz do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
 DADOS_DIR = BASE_DIR / "dados"
 
 # ============================================================
-# FUNÇÃO PARA CARREGAR JSON (com cache)
+# FUNÇÕES DE CARREGAMENTO E FILTRO
 # ============================================================
-@st.cache_data(ttl=60)  # cache de 60 segundos
+@st.cache_data(ttl=60)
 def carregar_jogos_do_json(categoria):
     """
     Carrega a lista de jogos do arquivo JSON específico da categoria.
@@ -29,37 +30,41 @@ def carregar_jogos_do_json(categoria):
         return None, "Categoria inválida", None
 
     caminho = DADOS_DIR / nome_arquivo
-    caminho_absoluto = caminho.resolve()
+    caminho_abs = caminho.resolve()
 
     if not caminho.exists():
-        return None, f"Arquivo não encontrado: {caminho_absoluto}", caminho_absoluto
+        return None, f"Arquivo não encontrado: {caminho_abs}", caminho_abs
 
     try:
         with open(caminho, 'r', encoding='utf-8') as f:
             data = json.load(f)
             jogos = data.get('jogos', [])
             if not jogos:
-                return None, "Arquivo JSON está vazio ou não contém a chave 'jogos'", caminho_absoluto
-            return jogos, f"Carregado com sucesso ({len(jogos)} jogos)", caminho_absoluto
+                return None, "Arquivo JSON carregado, mas a lista 'jogos' está vazia.", caminho_abs
+            return jogos, f"Carregado com sucesso ({len(jogos)} jogos)", caminho_abs
     except json.JSONDecodeError as e:
-        return None, f"Erro de sintaxe JSON: {e}", caminho_absoluto
+        return None, f"Erro de sintaxe JSON: {e}", caminho_abs
     except Exception as e:
-        return None, f"Erro inesperado: {e}", caminho_absoluto
+        return None, f"Erro inesperado: {e}", caminho_abs
 
-# ============================================================
-# FUNÇÃO PARA CALCULAR O PRÓXIMO JOGO
-# ============================================================
 def calcular_proximo_jogo(jogos):
-    if not jogos:
-        return None
-
+    """
+    Retorna o próximo jogo (dicionário) a partir da lista.
+    Critérios:
+      - Data >= hoje
+      - Status AGENDADO ou AGUARDANDO (prioridade)
+      - Se nenhum com esses status, retorna o mais próximo no futuro (independente do status)
+    """
     hoje = datetime.now().date()
-    jogos_futuros = []
+    futuros = []
 
     for jogo in jogos:
         data_str = jogo.get('data_jogo') or jogo.get('data')
         if not data_str:
             continue
+
+        # Remove espaços extras
+        data_str = data_str.strip()
 
         # Tenta dd/mm/aaaa
         try:
@@ -73,21 +78,23 @@ def calcular_proximo_jogo(jogos):
 
         if data_obj < hoje:
             continue
-        jogos_futuros.append((data_obj, jogo))
 
-    if not jogos_futuros:
+        futuros.append((data_obj, jogo))
+
+    if not futuros:
         return None
 
-    jogos_futuros.sort(key=lambda x: x[0])
+    # Ordena por data
+    futuros.sort(key=lambda x: x[0])
 
-    # Prioriza status AGENDADO ou AGUARDANDO
-    for _, jogo in jogos_futuros:
+    # Prioriza jogos com status AGENDADO ou AGUARDANDO
+    for _, jogo in futuros:
         status = jogo.get('status', '').upper()
         if status in ['AGENDADO', 'AGUARDANDO']:
             return jogo
 
-    # Caso contrário, retorna o mais próximo
-    return jogos_futuros[0][1]
+    # Se nenhum com status desejado, retorna o mais próximo
+    return futuros[0][1]
 
 # ============================================================
 # PÁGINA PRINCIPAL
@@ -111,16 +118,23 @@ def show():
     # ===== CARREGAR DADOS =====
     jogos, mensagem, caminho_abs = carregar_jogos_do_json(categoria)
 
-    # ===== EXIBIR STATUS =====
+    # ===== EXIBIR STATUS DE CARREGAMENTO =====
     if jogos is None:
-        st.error(f"❌ {mensagem}")
-        st.info(f"**Caminho esperado:** `{caminho_abs}`")
-        st.info("Verifique se a pasta 'dados' está na raiz do projeto e o arquivo existe.")
+        st.error(f"❌ **Erro ao carregar dados:** {mensagem}")
+        st.info(f"**Caminho procurado:** `{caminho_abs}`")
+        st.info("Verifique se a pasta 'dados' está na raiz do projeto e contém o arquivo correto.")
         return
 
     st.success(f"✅ {mensagem}")
 
-    # ===== PRÓXIMO JOGO =====
+    # ===== PAINEL DE DIAGNÓSTICO (opcional, mas útil) =====
+    with st.expander("🔍 Diagnóstico - Dados carregados"):
+        st.write(f"**Data do sistema:** `{datetime.now().date()}`")
+        st.write(f"**Total de jogos carregados:** {len(jogos)}")
+        df_all = pd.DataFrame(jogos)
+        st.dataframe(df_all)
+
+    # ===== CALCULAR PRÓXIMO JOGO =====
     prox = calcular_proximo_jogo(jogos)
 
     if prox:
@@ -144,6 +158,7 @@ def show():
     else:
         st.warning("⚠️ Nenhum jogo futuro encontrado.")
         st.info("Verifique se há jogos com data a partir de hoje e status 'AGENDADO' ou 'AGUARDANDO'.")
+        st.info("Caso existam jogos com status diferente, eles aparecerão na lista abaixo, mas não serão marcados como 'próximo'.")
 
     # ===== LISTA DE TODOS OS JOGOS FUTUROS =====
     st.markdown("---")
@@ -151,6 +166,7 @@ def show():
 
     df = pd.DataFrame(jogos)
 
+    # Identifica a coluna de data
     col_data = None
     for col in ['data_jogo', 'data', 'Data']:
         if col in df.columns:
@@ -166,11 +182,11 @@ def show():
 
     if df_futuros.empty:
         st.info("📭 Nenhum jogo futuro para exibir.")
-        with st.expander("🔍 Ver todos os dados carregados (depuração)"):
-            st.dataframe(df, use_container_width=True)
     else:
+        # Seleciona colunas amigáveis para exibição
         colunas_exibir = ['data_jogo', 'adversario', 'local_jogo', 'competicao', 'fase', 'status', 'estadio', 'horario']
         colunas_existentes = [c for c in colunas_exibir if c in df_futuros.columns]
+
         if not colunas_existentes:
             st.dataframe(df_futuros, use_container_width=True)
         else:
@@ -187,8 +203,8 @@ def show():
             df_exibicao = df_futuros[colunas_existentes].rename(columns=renomear)
             st.dataframe(df_exibicao, use_container_width=True)
 
-    # ===== INFORMAÇÃO DO CAMINHO (opcional) =====
-    with st.expander("📁 Informações do arquivo carregado"):
-        st.write(f"**Arquivo:** {caminho_abs}")
-        st.write(f"**Total de jogos:** {len(jogos)}")
-        st.write(f"**Categoria:** {categoria}")
+    # ===== INFORMAÇÕES ADICIONAIS =====
+    with st.expander("📁 Detalhes do arquivo carregado"):
+        st.write(f"**Caminho absoluto:** `{caminho_abs}`")
+        st.write(f"**Total de jogos no JSON:** {len(jogos)}")
+        st.write(f"**Categoria selecionada:** {categoria}")
