@@ -54,8 +54,57 @@ def carregar_jogos_do_json(categoria):
         with open(nome_arquivo, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('jogos', [])
-    except Exception:
+    except Exception as e:
+        st.error(f"Erro ao carregar JSON: {e}")
         return None
+
+def calcular_proximo_jogo(jogos):
+    """
+    Recebe uma lista de dicionários de jogos e retorna o próximo jogo
+    (data >= hoje, com status AGENDADO/AGUARDANDO, ou o mais próximo se nenhum).
+    """
+    if not jogos:
+        return None
+
+    hoje = datetime.now().date()
+    jogos_com_data = []
+
+    for jogo in jogos:
+        data_str = jogo.get('data_jogo') or jogo.get('data')
+        if not data_str:
+            continue
+
+        # Tenta parsear a data com diferentes formatos
+        data_obj = None
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                data_obj = datetime.strptime(data_str, fmt).date()
+                break
+            except ValueError:
+                continue
+        if data_obj is None:
+            continue
+
+        # Filtra apenas jogos a partir de hoje
+        if data_obj < hoje:
+            continue
+
+        jogos_com_data.append((data_obj, jogo))
+
+    if not jogos_com_data:
+        return None
+
+    # Ordena por data
+    jogos_com_data.sort(key=lambda x: x[0])
+
+    # Prioriza jogos com status AGENDADO ou AGUARDANDO
+    for data, jogo in jogos_com_data:
+        status = jogo.get('status', '').upper()
+        if status in ['AGENDADO', 'AGUARDANDO']:
+            return jogo
+
+    # Se nenhum agendado, retorna o primeiro (mais próximo)
+    return jogos_com_data[0][1]
 
 # ============================================================
 # PÁGINA PRINCIPAL
@@ -73,7 +122,6 @@ def show():
     if jogos_script is not None:
         jogos = jogos_script
         origem = "script (Python)"
-        # Tenta obter o próximo jogo pela função do script
         prox = obter_proximo_jogo_do_script(categoria)
     else:
         # ===== 2. TENTA DO JSON =====
@@ -81,7 +129,6 @@ def show():
         if jogos_json is not None:
             jogos = jogos_json
             origem = "JSON"
-            # Calcula o próximo jogo manualmente a partir da lista JSON
             prox = calcular_proximo_jogo(jogos)
         else:
             # ===== 3. FALLBACK: CSV =====
@@ -90,10 +137,8 @@ def show():
             if df_crono.empty:
                 st.warning(f"Nenhum dado de cronograma disponível para {categoria}.")
                 return
-            # Converte DataFrame para lista de dicionários (mesmo formato)
             jogos = df_crono.to_dict('records')
             origem = "CSV"
-            # Usa a função do utils para obter o próximo jogo
             prox = obter_proximo_jogo(categoria)
 
     if not jogos:
@@ -122,7 +167,7 @@ def show():
         if prox.get('url_completa'):
             st.markdown(f"[🔗 Link do jogo]({prox['url_completa']})")
     else:
-        st.info("Nenhum jogo futuro encontrado.")
+        st.info("Nenhum jogo futuro encontrado. Verifique se o JSON contém jogos com data a partir de hoje.")
 
     # ===== EXIBE TODOS OS JOGOS FUTUROS =====
     st.markdown("---")
@@ -138,12 +183,14 @@ def show():
         if col in df.columns:
             coluna_data = col
             break
+
     if coluna_data:
-        try:
-            df[coluna_data] = pd.to_datetime(df[coluna_data], dayfirst=True, errors='coerce')
-            df_futuros = df[df[coluna_data].dt.date >= hoje].sort_values(coluna_data)
-        except:
-            df_futuros = df
+        # Tenta converter a coluna para datetime
+        df[coluna_data] = pd.to_datetime(df[coluna_data], dayfirst=True, errors='coerce')
+        # Filtra datas futuras
+        df_futuros = df[df[coluna_data].dt.date >= hoje]
+        # Ordena
+        df_futuros = df_futuros.sort_values(coluna_data)
     else:
         df_futuros = df
 
@@ -171,52 +218,8 @@ def show():
             df_exibicao = df_futuros[colunas_existentes].rename(columns=renomear)
             st.dataframe(df_exibicao, use_container_width=True)
 
-# ============================================================
-# FUNÇÃO AUXILIAR PARA CALCULAR PRÓXIMO JOGO A PARTIR DA LISTA
-# ============================================================
-def calcular_proximo_jogo(jogos):
-    """
-    Recebe uma lista de dicionários de jogos e retorna o próximo jogo
-    (data >= hoje, com status AGENDADO/AGUARDANDO, ou o mais próximo se nenhum).
-    """
-    if not jogos:
-        return None
-
-    hoje = datetime.now().date()
-
-    # Converte data para datetime
-    jogos_com_data = []
-    for jogo in jogos:
-        data_str = jogo.get('data_jogo') or jogo.get('data')
-        if not data_str:
-            continue
-        try:
-            # Tenta parsear no formato DD/MM/YYYY
-            data_obj = datetime.strptime(data_str, "%d/%m/%Y").date()
-        except:
-            try:
-                # Tenta outros formatos comuns
-                data_obj = pd.to_datetime(data_str, errors='coerce').date()
-                if pd.isna(data_obj):
-                    continue
-            except:
-                continue
-        # Filtra apenas jogos a partir de hoje
-        if data_obj < hoje:
-            continue
-        jogos_com_data.append((data_obj, jogo))
-
-    if not jogos_com_data:
-        return None
-
-    # Ordena por data
-    jogos_com_data.sort(key=lambda x: x[0])
-
-    # Prioriza jogos com status AGENDADO ou AGUARDANDO
-    for data, jogo in jogos_com_data:
-        status = jogo.get('status', '').upper()
-        if status in ['AGENDADO', 'AGUARDANDO']:
-            return jogo
-
-    # Se nenhum agendado, retorna o primeiro (mais próximo)
-    return jogos_com_data[0][1]
+    # ===== DEPURAÇÃO (opcional) =====
+    # Descomente para ver os dados brutos carregados
+    # with st.expander("🔍 Ver dados brutos (depuração)"):
+    #     st.write(f"Total de jogos carregados: {len(jogos)}")
+    #     st.dataframe(pd.DataFrame(jogos))
