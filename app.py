@@ -709,7 +709,7 @@ def get_df_cartoes(categoria):
     return dados.get(df_key), dados.get(cart_key, {})
 
 # ======================================================================
-# ABAS PRINCIPAIS
+# ABAS PRINCIPAIS – todas com tratamento de erro
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco",
@@ -927,64 +927,76 @@ with tabs[1]:
         st.info("Nenhum dado de comissão disponível.")
 
 # ======================================================================
-# ABA 3: MONITORAMENTO AO VIVO
+# ABA 3: MONITORAMENTO AO VIVO (com fallback)
 # ======================================================================
 with tabs[2]:
     try:
         import pages.monitoramento as monitoramento
         monitoramento.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de monitoramento: {e}")
+    except ImportError:
+        st.warning("Página de monitoramento não disponível (arquivo pages/monitoramento.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar monitoramento: {e}")
 
 # ======================================================================
-# ABA 4: CARTÕES
+# ABA 4: CARTÕES (com fallback)
 # ======================================================================
 with tabs[3]:
     try:
         import pages.cartoes as cartoes
         cartoes.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de cartões: {e}")
+    except ImportError:
+        st.warning("Página de cartões não disponível (arquivo pages/cartoes.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO
+# ABA 5: PRÓXIMO JOGO (com fallback)
 # ======================================================================
 with tabs[4]:
     try:
         import pages.proximo_jogo as proximo_jogo
         proximo_jogo.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de próximo jogo: {e}")
+    except ImportError:
+        st.warning("Página de próximo jogo não disponível (arquivo pages/proximo_jogo.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar próximo jogo: {e}")
 
 # ======================================================================
-# ABA 6: ESCALAÇÃO TÁTICA
+# ABA 6: ESCALAÇÃO TÁTICA (com fallback)
 # ======================================================================
 with tabs[5]:
     try:
         import pages.tatica_page as tatica_page
         tatica_page.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de tática: {e}")
+    except ImportError:
+        st.warning("Página de escalação tática não disponível (arquivo pages/tatica_page.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar escalação tática: {e}")
 
 # ======================================================================
-# ABA 7: GESTÃO
+# ABA 7: GESTÃO (com fallback)
 # ======================================================================
 with tabs[6]:
     try:
         import pages.gestao as gestao
         gestao.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de gestão: {e}")
+    except ImportError:
+        st.warning("Página de gestão não disponível (arquivo pages/gestao.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS
+# ABA 8: RELATÓRIOS (com fallback)
 # ======================================================================
 with tabs[7]:
     try:
         import pages.relatorios as relatorios
         relatorios.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de relatórios: {e}")
+    except ImportError:
+        st.warning("Página de relatórios não disponível (arquivo pages/relatorios.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar relatórios: {e}")
 
 # ======================================================================
 # ABA 9: EXPORTAR
@@ -1018,11 +1030,13 @@ with tabs[8]:
         st.warning("Nenhum dado disponível")
 
 # ======================================================================
-# ABA 10: VISUALIZAÇÃO TÁTICA
+# ABA 10: VISUALIZAÇÃO TÁTICA (com fallback)
 # ======================================================================
 with tabs[9]:
     try:
         import pages.visualizacao as visualizacao
         visualizacao.show()
-    except ImportError as e:
-        st.error(f"Erro ao carregar página de visualização: {e}")
+    except ImportError:
+        st.warning("Página de visualização tática não disponível (arquivo pages/visualizacao.py não encontrado).")
+    except Exception as e:
+        st.error(f"Erro ao carregar visualização tática: {e}")
