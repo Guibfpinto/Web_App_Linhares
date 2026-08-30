@@ -272,7 +272,8 @@ st.markdown("""
     }
     .stSelectbox div[data-baseweb="select"] > div:hover,
     .stTextInput input:hover, .stNumberInput input:hover,
-    .stDateInput input:hover, .stTextArea textarea:hover {
+    .stDateInput input:hover, .stDateInput input:hover,
+    .stTextArea textarea:hover {
         border-color: #666 !important;
     }
     .stSelectbox div[data-baseweb="select"] > div:focus-within,
@@ -448,7 +449,6 @@ def get_cartoes(categoria):
     return {}
 
 def get_estatisticas_partidas(categoria):
-    # Usa a função existente do utils, que já aceita categoria
     from utils import carregar_estatisticas_partidas
     return carregar_estatisticas_partidas(categoria)
 
@@ -721,8 +721,7 @@ def carregar_dfs():
         resultado["Comissão Sub-15"] = carregar_comissao_sub15()
         resultado["Comissão Sub-17"] = carregar_comissao_sub17()
 
-        # Estatísticas de partidas (para cada categoria, já que podem ter CSVs separados)
-        # Usamos a função do utils que aceita categoria
+        # Estatísticas de partidas (para cada categoria)
         from utils import carregar_estatisticas_partidas
         df_stats_prof = carregar_estatisticas_partidas("Profissional")
         df_stats_sub15 = carregar_estatisticas_partidas("Sub-15")
@@ -986,14 +985,9 @@ with tabs[1]:
 # ABA 3: MONITORAMENTO AO VIVO (com seletor de categoria)
 # ======================================================================
 with tabs[2]:
-    # Importa a página de monitoramento, mas ela precisa ser adaptada para aceitar categoria.
-    # Por enquanto, usamos um seletor local e chamamos a página com a categoria.
     cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
     try:
         import pages.monitoramento as monitoramento
-        # A página de monitoramento precisa ser adaptada para receber a categoria.
-        # Vamos passar via session_state ou argumento.
-        # Como não podemos modificar a página facilmente, usamos session_state.
         st.session_state.categoria_monitoramento = cat_monitor
         monitoramento.show()
     except ImportError as e:
@@ -1012,42 +1006,16 @@ with tabs[3]:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO (com seletor de categoria)
+# ABA 5: PRÓXIMO JOGO (USANDO A NOVA PÁGINA COM JSON)
 # ======================================================================
 with tabs[4]:
-    st.header("📅 Próximo Jogo")
-    cat_proximo = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="proximo_categoria")
-    
-    # Carrega o cronograma da categoria
-    df_crono = carregar_cronograma(cat_proximo)
-    if df_crono.empty:
-        st.info(f"Nenhum jogo futuro encontrado para {cat_proximo}.")
-    else:
-        # Obtém o próximo jogo
-        prox = obter_proximo_jogo(cat_proximo)
-        if prox:
-            st.subheader(f"Próximo jogo do {cat_proximo}")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(f"**Adversário:** {prox.get('adversario', 'N/I')}")
-                st.write(f"**Data:** {prox.get('data', 'N/I')}")
-                st.write(f"**Local:** {prox.get('local', 'N/I')}")
-            with col2:
-                st.write(f"**Competição:** {prox.get('competicao', 'N/I')}")
-                st.write(f"**Fase:** {prox.get('fase', 'N/I')}")
-                st.write(f"**Status:** {prox.get('status', 'N/I')}")
-            if prox.get('url_completa'):
-                st.markdown(f"[🔗 Link do jogo]({prox['url_completa']})")
-        else:
-            st.info(f"Nenhum jogo futuro encontrado para {cat_proximo}.")
-    
-    # Exibe todos os jogos futuros em uma tabela
-    if not df_crono.empty:
-        hoje = datetime.now().date()
-        df_futuros = df_crono[df_crono['data'].dt.date >= hoje].sort_values('data')
-        if not df_futuros.empty:
-            st.subheader("📋 Todos os jogos futuros")
-            st.dataframe(df_futuros[['data', 'adversario', 'local', 'competicao', 'fase', 'status']], use_container_width=True)
+    try:
+        import pages.proximo_jogo as proximo_jogo
+        proximo_jogo.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de próximo jogo: {e}")
+    except Exception as e:
+        st.error(f"Erro ao executar próximo jogo: {e}")
 
 # ======================================================================
 # ABA 6: ESCALAÇÃO TÁTICA (com seletor de categoria)
@@ -1056,29 +1024,23 @@ with tabs[5]:
     st.header("📐 Escalação Tática")
     cat_tatica = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="tatica_categoria")
     
-    # Carrega o elenco e cartões da categoria
     df_elenco, cartoes_tatica = get_df_cartoes(cat_tatica)
     if df_elenco is None or df_elenco.empty:
         st.warning(f"Elenco não disponível para {cat_tatica}.")
     else:
-        # Importa a página de tática (se existir) ou usa uma função local
         try:
             import pages.tatica_page as tatica_page
-            # Passa a categoria via session_state
             st.session_state.categoria_tatica = cat_tatica
             tatica_page.show()
         except ImportError:
-            # Fallback: uma versão simplificada aqui mesmo
             st.info("Página de tática não disponível. Usando versão simplificada.")
             
-            # Formação
             formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2")
             if st.button("Gerar Escalação"):
                 defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
                 if posicoes is None:
                     st.error("Formação inválida.")
                 else:
-                    # Monta time simples usando Rating
                     titulares = []
                     reservas = []
                     jogadores_usados = []
@@ -1111,7 +1073,6 @@ with tabs[5]:
                             'row': row
                         })
                     
-                    # Exibe
                     st.subheader("Time Titular")
                     for j in titulares:
                         st.write(f"**{j['posicao_exibida']}:** {j['nome']} ({j['apelido']})")
@@ -1125,9 +1086,6 @@ with tabs[5]:
 with tabs[6]:
     st.header("⚙️ Gestão")
     cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
-    
-    # A página de gestão precisa ser adaptada para aceitar categoria.
-    # Por enquanto, usamos a página existente, mas passamos a categoria via session_state.
     try:
         import pages.gestao as gestao
         st.session_state.categoria_gestao = cat_gestao
@@ -1203,9 +1161,7 @@ with tabs[9]:
             visualizacao.show()
         except ImportError:
             st.info("Página de visualização não disponível. Usando visualização simples.")
-            # Opção simples: mostrar campo com posições dos jogadores (apenas exemplo)
             st.write(f"Visualização tática para {cat_viz} - {len(df_viz)} jogadores")
-            # Aqui poderíamos desenhar um campo com mplsoccer, mas é complexo.
             st.info("Para visualização avançada, instale mplsoccer e configure a página.")
     else:
         st.warning(f"Nenhum dado disponível para {cat_viz}.")
