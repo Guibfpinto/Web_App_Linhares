@@ -75,9 +75,6 @@ def calcular_proximo_jogo(jogos):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # ===== MENSAGEM DE DEPURAÇÃO =====
-    st.write("🔍 DEBUG: O código novo está rodando!")
-
     st.title("📅 Próximo Jogo")
     st.markdown("---")
 
@@ -191,7 +188,6 @@ def show():
 
     if df_futuros.empty:
         st.info("📭 Nenhum jogo futuro.")
-        # Expansor de depuração para ver todos os dados
         with st.expander("🔍 Ver dados carregados (depuração)"):
             st.write(f"Total de jogos: {len(df)}")
             st.dataframe(df, use_container_width=True)
