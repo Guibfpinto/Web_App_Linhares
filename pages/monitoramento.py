@@ -100,7 +100,7 @@ DB_PATH = "meu_futebol.db"
 
 def conectar_banco():
     conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row  # ESSENCIAL para dict(row) funcionar
+    conn.row_factory = sqlite3.Row  # ESSENCIAL: permite dict(row)
     return conn
 
 def verificar_jogo_ao_vivo_sql(team_id):
@@ -266,7 +266,12 @@ def obter_tecnicos_por_time(time_id, competicao_id=None):
     cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    tecnicos = []
+    for r in rows:
+        d = dict(r)
+        d['cargo'] = 'Técnico'  # Adiciona campo cargo para evitar KeyError
+        tecnicos.append(d)
+    return tecnicos
 
 def obter_arbitro_por_id(arbitro_id):
     if not arbitro_id:
@@ -285,8 +290,10 @@ def obter_staff_completo(time_id, competicao_id=None):
     comissao = obter_comissao_por_time(time_id, competicao_id)
     for t in tecnicos:
         t['tipo'] = 'Técnico'
+        t.setdefault('cargo', 'Técnico')
     for c in comissao:
         c['tipo'] = 'Comissão'
+        c.setdefault('cargo', 'Membro')
     return tecnicos + comissao
 
 # ============================================================
@@ -713,7 +720,9 @@ def show():
 
     st.markdown("---")
 
+    # ===== STAFF TÉCNICO (COMISSÃO + TÉCNICOS) =====
     st.subheader("👔 Staff Técnico")
+
     staff_casa = obter_staff_completo(jogo['time_casa_id'], jogo.get('competicao_id'))
     staff_fora = obter_staff_completo(jogo['time_fora_id'], jogo.get('competicao_id'))
 
@@ -730,7 +739,8 @@ def show():
                     else:
                         st.write("📌")
                 with col_texto:
-                    st.write(f"{membro['nome']} ({membro['cargo']})")
+                    cargo = membro.get('cargo', 'Técnico')  # Garante que 'cargo' existe
+                    st.write(f"{membro['nome']} ({cargo})")
         else:
             st.write("*Nenhum staff cadastrado.*")
 
@@ -746,7 +756,8 @@ def show():
                     else:
                         st.write("📌")
                 with col_texto:
-                    st.write(f"{membro['nome']} ({membro['cargo']})")
+                    cargo = membro.get('cargo', 'Técnico')
+                    st.write(f"{membro['nome']} ({cargo})")
         else:
             st.write("*Nenhum staff cadastrado.*")
 
