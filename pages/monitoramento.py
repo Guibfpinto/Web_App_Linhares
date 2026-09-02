@@ -2,9 +2,11 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import os
+import random
+import base64
 from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
-import requests
 from utils import (
     carregar_elenco_profissional,
     carregar_elenco_sub15,
@@ -18,12 +20,63 @@ from utils import (
 )
 
 # ============================================================
-# MAPEAMENTO DE CATEGORIAS PARA IDs
+# CONFIGURAÇÕES DE ÁUDIO (usando apenas os arquivos disponíveis)
+# ============================================================
+SOUNDS_DIR = "assets/sounds/"
+SOUND_FILES = {
+    "gol_casa": "gol_linhares.wav",      # gol do Linhares
+    "gol_fora": "gol_adversario.wav",    # gol do adversário
+    "cartao": "falta.wav",               # cartão (amarelo/vermelho)
+    "inicio": "inicio_tempo.wav",        # início do monitoramento
+    "fim": "fim_jogo.wav",               # fim de jogo
+    "notificacao": "notificacao.wav",    # eventos genéricos (substituições, VAR, etc.)
+}
+
+def play_sound(sound_key):
+    """
+    Toca um som usando HTML5 audio com autoplay.
+    Se o arquivo não existir, tenta gerar um beep via Web Audio API.
+    """
+    filename = SOUND_FILES.get(sound_key)
+    sound_path = os.path.join(SOUNDS_DIR, filename) if filename else None
+    if sound_path and os.path.exists(sound_path):
+        with open(sound_path, "rb") as f:
+            data = f.read()
+        b64 = base64.b64encode(data).decode()
+        audio_html = f"""
+            <audio id="player_{random.randint(1,1000000)}" autoplay>
+                <source src="data:audio/wav;base64,{b64}" type="audio/wav">
+            </audio>
+        """
+        st.components.v1.html(audio_html, height=0)
+    else:
+        # Fallback: beep via Web Audio API
+        js_beep = """
+        <script>
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                gainNode.gain.value = 0.1;
+                oscillator.start();
+                setTimeout(() => { oscillator.stop(); }, 300);
+            } catch(e) {
+                console.warn('Beep falhou:', e);
+            }
+        </script>
+        """
+        st.components.v1.html(js_beep, height=0)
+
+# ============================================================
+# CONFIGURAÇÕES DA CATEGORIA
 # ============================================================
 CATEGORIA_CONFIG = {
     "Profissional": {
         "team_id": 12928,
-        "competicao_id": 2,          # Capixaba Série B
         "nome_time": "Linhares FC",
         "elenco_func": carregar_elenco_profissional,
         "cartoes_key": "profissional",
@@ -31,7 +84,6 @@ CATEGORIA_CONFIG = {
     },
     "Sub-15": {
         "team_id": 27831,
-        "competicao_id": 11,         # Copa Espírito Santo Sub-15
         "nome_time": "Linhares FC Sub-15",
         "elenco_func": carregar_elenco_sub15,
         "cartoes_key": "sub15",
@@ -39,7 +91,6 @@ CATEGORIA_CONFIG = {
     },
     "Sub-17": {
         "team_id": 27832,
-        "competicao_id": 10,         # Copa Espírito Santo Sub-17
         "nome_time": "Linhares FC Sub-17",
         "elenco_func": carregar_elenco_sub17,
         "cartoes_key": "sub17",
@@ -48,82 +99,243 @@ CATEGORIA_CONFIG = {
 }
 
 # ============================================================
-# FUNÇÕES DE ACESSO À API FASTAPI (dinâmicas)
+# FUNÇÕES DE ACESSO AO BANCO SQLITE
 # ============================================================
-BASE_URL_FASTAPI = "http://localhost:8000"
+DB_PATH = "meu_futebol.db"
 
-def chamar_api(endpoint, params=None):
-    try:
-        url = f"{BASE_URL_FASTAPI}{endpoint}"
-        resp = requests.get(url, params=params, timeout=5)
-        if resp.status_code == 200:
-            return resp.json()
-        return None
-    except:
-        return None
+def conectar_banco():
+    return sqlite3.connect(DB_PATH, timeout=10)
 
-def verificar_jogo_ao_vivo(team_id):
-    """Verifica se há um jogo ao vivo do time especificado."""
-    dados = chamar_api("/api/fixtures/live", params={"team_id": team_id})
-    if dados and dados.get('fixture_id'):
-        return dados['fixture_id']
+def verificar_jogo_ao_vivo_sql(team_id):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id FROM jogos
+        WHERE (time_casa_id = ? OR time_fora_id = ?)
+        AND status IN ('1H', '2H', 'HT', 'ET', 'P')
+        LIMIT 1
+    """, (team_id, team_id))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def obter_detalhes_jogo_sql(fixture_id):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT j.*,
+               tc.nome AS time_casa_nome,
+               tf.nome AS time_fora_nome,
+               v.nome AS estadio
+        FROM jogos j
+        LEFT JOIN times tc ON j.time_casa_id = tc.id
+        LEFT JOIN times tf ON j.time_fora_id = tf.id
+        LEFT JOIN venues v ON j.venue_id = v.id
+        WHERE j.id = ?
+    """, (fixture_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    colunas = [desc[0] for desc in cursor.description]
+    dados = dict(zip(colunas, row))
+    return {
+        "fixture": {
+            "id": dados["id"],
+            "date": dados.get("data_hora", ""),
+            "status": {"short": dados.get("status", "NS")},
+            "venue": {"name": dados.get("estadio", "Estádio")},
+            "referee": dados.get("arbitro", "Não informado")
+        },
+        "teams": {
+            "home": {"id": dados["time_casa_id"], "name": dados.get("time_casa_nome", "Casa")},
+            "away": {"id": dados["time_fora_id"], "name": dados.get("time_fora_nome", "Fora")}
+        },
+        "goals": {
+            "home": dados.get("gols_casa", 0),
+            "away": dados.get("gols_fora", 0)
+        },
+        "score": {"penalty": None}
+    }
+
+def obter_eventos_jogo_sql(fixture_id):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, el.nome AS jogador_nome, t.nome AS time_nome
+        FROM eventos e
+        LEFT JOIN elenco el ON e.jogador_id = el.id
+        LEFT JOIN times t ON e.time_id = t.id
+        WHERE e.jogo_id = ?
+        ORDER BY e.tempo ASC
+    """, (fixture_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    eventos = []
+    for r in rows:
+        eventos.append({
+            "time": {"elapsed": r[2], "extra": None},
+            "type": r[3],
+            "detail": r[4],
+            "player": {"name": r[5] if r[5] else "Desconhecido"},
+            "team": {"name": r[6] if r[6] else "Time"}
+        })
+    return eventos
+
+def obter_estatisticas_jogo_sql(fixture_id):
+    # Mock – substitua por consulta real se tiver tabela de estatísticas
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("SELECT time_casa_id, time_fora_id FROM jogos WHERE id = ?", (fixture_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    time_casa, time_fora = row
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_casa,))
+    nome_casa = cursor.fetchone()[0] if cursor.fetchone() else "Casa"
+    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_fora,))
+    nome_fora = cursor.fetchone()[0] if cursor.fetchone() else "Fora"
+    conn.close()
+    return [
+        {
+            "team": {"name": nome_casa},
+            "statistics": [
+                {"type": "Ball Possession", "value": "50%"},
+                {"type": "Total Shots", "value": "10"},
+                {"type": "Shots on Goal", "value": "4"},
+                {"type": "Passes", "value": "300"},
+                {"type": "Passes %", "value": "75%"},
+                {"type": "Fouls", "value": "12"},
+                {"type": "Yellow Cards", "value": "2"},
+                {"type": "Red Cards", "value": "0"}
+            ]
+        },
+        {
+            "team": {"name": nome_fora},
+            "statistics": [
+                {"type": "Ball Possession", "value": "50%"},
+                {"type": "Total Shots", "value": "8"},
+                {"type": "Shots on Goal", "value": "2"},
+                {"type": "Passes", "value": "250"},
+                {"type": "Passes %", "value": "70%"},
+                {"type": "Fouls", "value": "15"},
+                {"type": "Yellow Cards", "value": "3"},
+                {"type": "Red Cards", "value": "0"}
+            ]
+        }
+    ]
+
+# ============================================================
+# FUNÇÕES PARA COMISSÃO, TÉCNICOS E ARBITROS
+# ============================================================
+def obter_comissao_por_time(time_id, competicao_id=None):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    query = """
+        SELECT id, nome, cargo, foto, data_nascimento, cidade, uf, pais,
+               historico_profissional, historico_jogador, apelido, idade
+        FROM comissao
+        WHERE time_id = ?
+    """
+    params = [time_id]
+    if competicao_id:
+        query += " AND competicao_id = ?"
+        params.append(competicao_id)
+    query += " ORDER BY nome"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def obter_tecnicos_por_time(time_id, competicao_id=None):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    query = """
+        SELECT id, nome, idade, nacionalidade, foto, time_id,
+               historico_jogador, historico_profissional,
+               data_nascimento, cidade, uf, pais, competicao_id, apelido
+        FROM tecnicos
+        WHERE time_id = ?
+    """
+    params = [time_id]
+    if competicao_id:
+        query += " AND competicao_id = ?"
+        params.append(competicao_id)
+    query += " ORDER BY nome"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def obter_arbitro_por_id(arbitro_id):
+    if not arbitro_id:
+        return None
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nome, foto, categoria, uf, genero FROM arbitros WHERE id = ?", (arbitro_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
     return None
 
-def obter_detalhes_jogo(fixture_id):
-    return chamar_api(f"/api/fixtures/{fixture_id}")
-
-def obter_eventos_jogo(fixture_id):
-    return chamar_api(f"/api/fixtures/{fixture_id}/events")
-
-def obter_estatisticas_jogo(fixture_id):
-    return chamar_api(f"/api/fixtures/{fixture_id}/statistics")
-
-def obter_lineups_jogo(fixture_id):
-    return chamar_api(f"/api/fixtures/{fixture_id}/lineups")
-
-def obter_players_stats(fixture_id):
-    return chamar_api(f"/api/fixtures/{fixture_id}/players")
-
-def buscar_jogos_competicao(team_id, competicao_id, season=2026):
-    """Busca jogos do time em uma competição específica."""
-    params = {
-        "league": competicao_id,
-        "season": season,
-        "team": team_id,
-        "from": "2026-07-12",
-        "to": "2026-08-29"
-    }
-    jogos = chamar_api("/api/fixtures", params=params)
-    if not jogos:
-        return []
-    jogos_resumidos = []
-    for jogo in jogos:
-        if jogo['teams']['home']['id'] == team_id:
-            adversario = jogo['teams']['away']['name']
-            local = "Casa"
-        else:
-            adversario = jogo['teams']['home']['name']
-            local = "Fora"
-        status = jogo['fixture']['status']['short']
-        data = jogo['fixture']['date'][:10]
-        gols_casa = jogo['goals']['home']
-        gols_fora = jogo['goals']['away']
-        jogos_resumidos.append({
-            'id': jogo['fixture']['id'],
-            'data': data,
-            'adversario': adversario,
-            'local': local,
-            'status': status,
-            'gols_casa': gols_casa,
-            'gols_fora': gols_fora
-        })
-    return jogos_resumidos
+def obter_staff_completo(time_id, competicao_id=None):
+    tecnicos = obter_tecnicos_por_time(time_id, competicao_id)
+    comissao = obter_comissao_por_time(time_id, competicao_id)
+    for t in tecnicos:
+        t['tipo'] = 'Técnico'
+    for c in comissao:
+        c['tipo'] = 'Comissão'
+    return tecnicos + comissao
 
 # ============================================================
-# FUNÇÕES DE ATUALIZAÇÃO DO BANCO (SQLite)
+# FUNÇÕES DE EXIBIÇÃO DE FOTOS (com caminhos relativos)
+# ============================================================
+PASTA_FOTOS_COMISSAO = "assets/fotos_comissao/"
+PASTA_FOTOS_TECNICOS = "assets/fotos_tecnicos/"
+PASTA_FOTOS_ARBITROS = "assets/fotos_arbitros/"
+
+def caminho_foto_membro(membro):
+    foto = membro.get('foto', '')
+    if not foto:
+        return None
+    if foto.startswith('C:') or '\\' in foto:
+        nome_arquivo = os.path.basename(foto)
+    else:
+        nome_arquivo = foto
+    for pasta in [PASTA_FOTOS_COMISSAO, PASTA_FOTOS_TECNICOS]:
+        caminho = os.path.join(pasta, nome_arquivo)
+        if os.path.exists(caminho):
+            return caminho
+    for pasta in [PASTA_FOTOS_COMISSAO, PASTA_FOTOS_TECNICOS]:
+        for root, dirs, files in os.walk(pasta):
+            if nome_arquivo in files:
+                return os.path.join(root, nome_arquivo)
+    return None
+
+def caminho_foto_arbitro(foto):
+    if not foto:
+        return None
+    if foto.startswith('C:') or '\\' in foto:
+        nome_arquivo = os.path.basename(foto)
+    else:
+        nome_arquivo = foto
+    caminho = os.path.join(PASTA_FOTOS_ARBITROS, nome_arquivo)
+    if os.path.exists(caminho):
+        return caminho
+    for root, dirs, files in os.walk(PASTA_FOTOS_ARBITROS):
+        if nome_arquivo in files:
+            return os.path.join(root, nome_arquivo)
+    return None
+
+# ============================================================
+# FUNÇÕES DE ESCRITA (ATUALIZAÇÃO DO BANCO)
 # ============================================================
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes)
@@ -133,21 +345,21 @@ def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes):
     conn.close()
 
 def atualizar_placar_sqlite(jogo_id, gols_casa, gols_fora):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET gols_casa = ?, gols_fora = ? WHERE id = ?", (gols_casa, gols_fora, jogo_id))
     conn.commit()
     conn.close()
 
 def atualizar_status_sqlite(jogo_id, status):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET status = ? WHERE id = ?", (status, jogo_id))
     conn.commit()
     conn.close()
 
 def atualizar_arbitro_jogo(jogo_id, arbitro_id):
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET arbitro_id = ? WHERE id = ?", (arbitro_id, jogo_id))
     conn.commit()
@@ -209,7 +421,7 @@ def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # ===== OBTÉM A CATEGORIA DO SESSION_STATE =====
+    # ===== OBTÉM A CATEGORIA =====
     categoria = st.session_state.get("categoria_monitoramento", "Profissional")
     config = CATEGORIA_CONFIG.get(categoria)
     if not config:
@@ -217,13 +429,12 @@ def show():
         return
 
     team_id = config["team_id"]
-    competicao_id = config["competicao_id"]
     nome_time = config["nome_time"]
     elenco_func = config["elenco_func"]
     cartoes_key = config["cartoes_key"]
 
     st.title(f"📊 Monitoramento ao Vivo - {categoria}")
-    st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {config['liga_nome']} (ID: {competicao_id})")
+    st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {config['liga_nome']}")
     st.markdown("---")
 
     # ===== CARREGA DADOS DA CATEGORIA =====
@@ -235,20 +446,20 @@ def show():
 
     inicializar_banco()
 
-    # ===== SIDEBAR: SELEÇÃO DE JOGO (apenas jogos do time escolhido e futuros) =====
+    # ===== SIDEBAR: SELEÇÃO DE JOGO (futuros e em andamento) =====
     st.sidebar.header("Selecionar Partida")
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
 
     try:
         df_jogos = pd.read_sql_query(f"""
-            SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora, 
+            SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora,
                    j.status, j.data_hora, j.formacao_casa, j.formacao_fora,
                    j.arbitro_id,
                    v.nome AS estadio
             FROM jogos j
             LEFT JOIN venues v ON j.venue_id = v.id
             WHERE (j.time_casa_id = {team_id} OR j.time_fora_id = {team_id})
-              AND substr(j.data_hora, 1, 10) >= date('now')
+              AND (substr(j.data_hora, 1, 10) >= date('now') OR j.status IN ('1H','2H','HT','ET','P'))
             ORDER BY j.data_hora ASC
         """, conn)
     except Exception as e:
@@ -258,7 +469,7 @@ def show():
 
     try:
         times_df = pd.read_sql_query("SELECT id, nome FROM times", conn)
-        arbitros_df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
+        arbitros_df = pd.read_sql_query("SELECT id, nome, categoria, foto FROM arbitros ORDER BY nome", conn)
     except Exception as e:
         st.error(f"Erro ao carregar times ou árbitros: {e}")
         conn.close()
@@ -270,31 +481,7 @@ def show():
     arbitros_dict = dict(zip(arbitros_df['id'], arbitros_df['nome']))
 
     if df_jogos.empty:
-        st.sidebar.warning(f"Nenhum jogo futuro do {nome_time} cadastrado.")
-        if st.sidebar.button("📥 Buscar jogos da competição"):
-            jogos_api = buscar_jogos_competicao(team_id, competicao_id)
-            if jogos_api:
-                conn = sqlite3.connect('meu_futebol.db', timeout=10)
-                cursor = conn.cursor()
-                for jogo in jogos_api:
-                    cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo['id'],))
-                    if not cursor.fetchone():
-                        if jogo['local'] == 'Casa':
-                            time_casa = team_id
-                            time_fora = 0
-                        else:
-                            time_casa = 0
-                            time_fora = team_id
-                        cursor.execute('''
-                            INSERT INTO jogos (id, time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (jogo['id'], time_casa, time_fora, jogo['gols_casa'], jogo['gols_fora'], jogo['status'], jogo['data']))
-                conn.commit()
-                conn.close()
-                st.success(f"{len(jogos_api)} jogos importados!")
-                st.rerun()
-            else:
-                st.error("Erro ao buscar jogos. Verifique o backend FastAPI.")
+        st.sidebar.warning(f"Nenhum jogo futuro ou em andamento do {nome_time}.")
         st.stop()
 
     opcoes = []
@@ -304,10 +491,6 @@ def show():
         label = f"{time_casa} x {time_fora} ({row['data_hora'][:10]}) - {row['status']}"
         opcoes.append((row['id'], label))
 
-    if not opcoes:
-        st.sidebar.warning("Nenhum jogo disponível.")
-        st.stop()
-
     jogo_selecionado_id = st.sidebar.selectbox(
         "Escolha a partida",
         options=[op[0] for op in opcoes],
@@ -315,8 +498,8 @@ def show():
         index=0
     )
 
-    # ===== CORPO PRINCIPAL =====
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    # ===== CARREGA DADOS DO JOGO SELECIONADO =====
+    conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM jogos WHERE id = ?", (jogo_selecionado_id,))
     colunas = [desc[0] for desc in cursor.description]
@@ -349,8 +532,14 @@ def show():
         if jogo.get('estadio'):
             st.write(f"**Local:** {jogo['estadio']}")
     with col_arb:
-        nome_arbitro = arbitros_dict.get(arbitro_id_atual, 'Não definido')
-        st.write(f"**🟨 Árbitro:** {nome_arbitro}")
+        arbitro = obter_arbitro_por_id(arbitro_id_atual)
+        if arbitro:
+            foto_arb = caminho_foto_arbitro(arbitro.get('foto'))
+            if foto_arb:
+                st.image(foto_arb, width=30)
+            st.write(f"**🟨 Árbitro:** {arbitro['nome']} ({arbitro.get('categoria', 'N/I')})")
+        else:
+            st.write("**🟨 Árbitro:** Não definido")
 
     # ===== SELETOR DE ÁRBITRO =====
     if not arbitros_df.empty:
@@ -376,9 +565,9 @@ def show():
     st.markdown("---")
 
     # ===== EVENTOS RECENTES =====
-    conn = sqlite3.connect('meu_futebol.db', timeout=10)
+    conn = conectar_banco()
     df_eventos = pd.read_sql_query(f"""
-        SELECT e.*, el.nome AS jogador_nome 
+        SELECT e.*, el.nome AS jogador_nome
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
         WHERE e.jogo_id = {jogo_selecionado_id}
@@ -402,15 +591,18 @@ def show():
         st.write("**Controle de Status**")
         if status == 'NS' and st.button("▶️ Iniciar 1º Tempo", width='stretch'):
             atualizar_status_sqlite(jogo_selecionado_id, '1H')
+            play_sound('inicio')
             st.rerun()
         elif status == '1H' and st.button("⏸️ Intervalo", width='stretch'):
             atualizar_status_sqlite(jogo_selecionado_id, 'HT')
             st.rerun()
         elif status == 'HT' and st.button("▶️ Iniciar 2º Tempo", width='stretch'):
             atualizar_status_sqlite(jogo_selecionado_id, '2H')
+            play_sound('inicio')
             st.rerun()
         elif status == '2H' and st.button("⏹️ Encerrar", width='stretch'):
             atualizar_status_sqlite(jogo_selecionado_id, 'FT')
+            play_sound('fim')
             st.success("Partida encerrada!")
             st.rerun()
         else:
@@ -422,10 +614,12 @@ def show():
             if st.button(f"⚽ {time_casa}", width='stretch'):
                 atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
                 salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_casa}")
+                play_sound('gol_casa')
                 st.rerun()
             if st.button(f"⚽ {time_fora}", width='stretch'):
                 atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
                 salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_fora}")
+                play_sound('gol_fora')
                 st.rerun()
         else:
             st.info("Partida não em andamento.")
@@ -436,9 +630,9 @@ def show():
             with st.form("evento_form"):
                 tempo = st.number_input("Minuto", 0, 120, 0, step=1)
                 tipo = st.selectbox("Tipo", ['Goal', 'Card', 'subst', 'Var'])
-                conn = sqlite3.connect('meu_futebol.db', timeout=10)
+                conn = conectar_banco()
                 jogadores_df = pd.read_sql_query(f"""
-                    SELECT id, nome FROM elenco 
+                    SELECT id, nome FROM elenco
                     WHERE time_id IN ({jogo['time_casa_id']}, {jogo['time_fora_id']})
                     ORDER BY nome
                 """, conn)
@@ -450,8 +644,17 @@ def show():
                 else:
                     jogador_id = 0
                 detalhes = st.text_input("Detalhes")
-                if st.form_submit_button("Adicionar Evento", width='stretch'):
+                submitted = st.form_submit_button("Adicionar Evento", width='stretch')
+                if submitted:
                     salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, jogador_id, detalhes)
+                    # Toca o som apropriado
+                    if tipo == 'Goal':
+                        # Se não souber o time, toca notificação (mas já temos gol manual com som)
+                        play_sound('notificacao')
+                    elif tipo == 'Card':
+                        play_sound('cartao')
+                    else:
+                        play_sound('notificacao')
                     st.success("Evento adicionado!")
                     st.rerun()
         else:
@@ -469,7 +672,7 @@ def show():
             nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
             nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
             if st.form_submit_button("Salvar Formações", width='stretch'):
-                conn = sqlite3.connect('meu_futebol.db')
+                conn = conectar_banco()
                 cursor = conn.cursor()
                 cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
                 conn.commit()
@@ -477,10 +680,10 @@ def show():
                 st.success("Formações atualizadas!")
                 st.rerun()
 
-    # Escalação
-    conn = sqlite3.connect('meu_futebol.db')
+    # Escalação (eventos do tipo 'Lineup')
+    conn = conectar_banco()
     df_lineup = pd.read_sql_query(f"""
-        SELECT e.*, el.nome 
+        SELECT e.*, el.nome
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
         WHERE e.jogo_id = {jogo_selecionado_id} AND e.tipo = 'Lineup'
@@ -511,7 +714,7 @@ def show():
             if st.button("⚽ Montar Time Automaticamente", width='stretch'):
                 titulares, reservas = montar_time(df_elenco, formacao_manual, cartoes)
                 if titulares:
-                    conn = sqlite3.connect('meu_futebol.db')
+                    conn = conectar_banco()
                     cursor = conn.cursor()
                     for jog in titulares:
                         if jog['row'] is not None:
@@ -528,6 +731,47 @@ def show():
 
     st.markdown("---")
 
+    # ===== STAFF TÉCNICO (COMISSÃO + TÉCNICOS) =====
+    st.subheader("👔 Staff Técnico")
+
+    staff_casa = obter_staff_completo(jogo['time_casa_id'], jogo.get('competicao_id'))
+    staff_fora = obter_staff_completo(jogo['time_fora_id'], jogo.get('competicao_id'))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**{time_casa}**")
+        if staff_casa:
+            for membro in staff_casa:
+                foto_path = caminho_foto_membro(membro)
+                col_foto, col_texto = st.columns([1, 4])
+                with col_foto:
+                    if foto_path:
+                        st.image(foto_path, width=30)
+                    else:
+                        st.write("📌")
+                with col_texto:
+                    st.write(f"{membro['nome']} ({membro['cargo']})")
+        else:
+            st.write("*Nenhum staff cadastrado.*")
+
+    with col2:
+        st.markdown(f"**{time_fora}**")
+        if staff_fora:
+            for membro in staff_fora:
+                foto_path = caminho_foto_membro(membro)
+                col_foto, col_texto = st.columns([1, 4])
+                with col_foto:
+                    if foto_path:
+                        st.image(foto_path, width=30)
+                    else:
+                        st.write("📌")
+                with col_texto:
+                    st.write(f"{membro['nome']} ({membro['cargo']})")
+        else:
+            st.write("*Nenhum staff cadastrado.*")
+
+    st.markdown("---")
+
     # ===== MONITORAMENTO AUTOMÁTICO =====
     st.subheader("🔄 Monitoramento Automático")
 
@@ -539,10 +783,11 @@ def show():
 
     if monitor_habilitado:
         if st.button("🔍 Verificar Jogo ao Vivo", width='stretch'):
-            fixture_id = verificar_jogo_ao_vivo(team_id)
+            fixture_id = verificar_jogo_ao_vivo_sql(team_id)
             if fixture_id:
                 st.session_state.fixture_id = fixture_id
                 st.session_state.monitoramento_ativo = True
+                play_sound('inicio')
                 st.success(f"Jogo ao vivo encontrado! ID: {fixture_id}")
                 st.rerun()
             else:
@@ -556,7 +801,7 @@ def show():
         fixture_id = st.session_state.fixture_id
         st.info(f"Monitorando partida {fixture_id}...")
 
-        detalhes = obter_detalhes_jogo(fixture_id)
+        detalhes = obter_detalhes_jogo_sql(fixture_id)
         if detalhes:
             gols_casa_api = detalhes['goals']['home'] or 0
             gols_fora_api = detalhes['goals']['away'] or 0
@@ -567,13 +812,15 @@ def show():
             status_api = detalhes['fixture']['status']['short']
             if status_api != status:
                 atualizar_status_sqlite(jogo_selecionado_id, status_api)
+                if status_api in ['FT', 'AET', 'PEN']:
+                    play_sound('fim')
                 st.rerun()
 
             st.write(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
-        eventos_api = obter_eventos_jogo(fixture_id)
+        eventos_api = obter_eventos_jogo_sql(fixture_id)
         if eventos_api:
-            conn = sqlite3.connect('meu_futebol.db')
+            conn = conectar_banco()
             cursor = conn.cursor()
             for ev in eventos_api:
                 jogador_nome = ev.get('player', {}).get('name', '')
@@ -590,6 +837,18 @@ def show():
                         INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes)
                         VALUES (?, ?, ?, ?, ?)
                     ''', (jogo_selecionado_id, ev['time']['elapsed'], ev['type'], jogador_id, ev.get('detail', '')))
+                    # Toca som para novos eventos
+                    tipo = ev['type'].lower()
+                    if tipo == 'goal':
+                        time_nome = ev.get('team', {}).get('name', '')
+                        if time_nome == config['nome_time']:  # Linhares
+                            play_sound('gol_casa')
+                        else:
+                            play_sound('gol_fora')
+                    elif tipo == 'card':
+                        play_sound('cartao')
+                    else:
+                        play_sound('notificacao')
             conn.commit()
             conn.close()
             st.rerun()
