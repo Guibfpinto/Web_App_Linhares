@@ -1222,26 +1222,30 @@ def jogador_suspenso(nome, cartoes):
 # =============================================
 def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
     """
-    Versão que recebe um DataFrame já carregado, evitando problemas de caminho.
-    Usa a mesma lógica de reset.
-    Agora prioriza o apelido (coluna 'jogador') como chave.
+    Versão que recebe um DataFrame já carregado, com lógica de reset.
+    Prioriza o apelido (coluna 'jogador') como chave.
+    Se não houver cronograma, usa fallback de 7 dias.
     """
     if df.empty:
         return {}, {}
 
     df = df.sort_values('data_jogo', ascending=True)
 
+    # Carrega cronograma
     df_crono = carregar_cronograma(categoria.capitalize())
     datas_cronograma = []
     if not df_crono.empty and 'data' in df_crono.columns:
         datas_cronograma = sorted(df_crono['data'].dt.strftime('%d/%m/%Y').tolist())
+    else:
+        # Se não houver cronograma, cria uma lista vazia (fallback será usado)
+        pass
 
     cartoes = {}
     datas_globais = {}
     jogador_datas = {}
 
     for _, row in df.iterrows():
-        # === CORREÇÃO: prioriza 'jogador' (apelido) ===
+        # === PRIORIZA O APELIDO (coluna 'jogador') ===
         nome = row.get('jogador')
         if pd.isna(nome) or str(nome).strip() == '':
             nome = row.get('nome_completo')
@@ -1293,17 +1297,21 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # --- Processamento ---
+        # --- Processamento de suspensão prévia (reaparecimento) ---
         if cartoes[nome]['suspenso_proxima']:
             data_susp = cartoes[nome].get('data_suspensao')
-            if data_susp and data_susp in datas_cronograma:
-                try:
-                    idx = datas_cronograma.index(data_susp)
-                    if idx + 1 < len(datas_cronograma):
-                        data_cumprimento = datas_cronograma[idx + 1]
-                    else:
-                        data_cumprimento = data
-                except:
+            if data_susp:
+                # Tenta encontrar a próxima data no cronograma
+                data_cumprimento = None
+                if datas_cronograma and data_susp in datas_cronograma:
+                    try:
+                        idx = datas_cronograma.index(data_susp)
+                        if idx + 1 < len(datas_cronograma):
+                            data_cumprimento = datas_cronograma[idx + 1]
+                    except:
+                        pass
+                # Se não encontrou, usa a data atual (reaparecimento) como fallback
+                if data_cumprimento is None:
                     data_cumprimento = data
 
                 cartoes[nome]['historico'].append({
@@ -1323,6 +1331,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
 
+        # --- Amarelos ---
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1345,6 +1354,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
+        # --- Vermelhos ---
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
@@ -1367,7 +1377,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
 
-        # Atualiza datas globais (apenas se id_ogol for válido)
+        # --- Datas globais ---
         id_ogol = cartoes[nome]['id_ogol']
         if id_ogol:
             if id_ogol not in datas_globais:
@@ -1375,24 +1385,37 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             if data not in datas_globais[id_ogol]:
                 datas_globais[id_ogol].append(data)
 
-    # Verificação final: suspensões não cumpridas
+    # ============================================================
+    # VERIFICAÇÃO FINAL (suspensões não cumpridas)
+    # ============================================================
     hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     for nome, dados in cartoes.items():
         if dados.get('suspenso_proxima', False):
             data_susp = dados.get('data_suspensao')
-            if data_susp and data_susp in datas_cronograma:
-                try:
-                    idx = datas_cronograma.index(data_susp)
-                    if idx + 1 < len(datas_cronograma):
-                        data_proximo_jogo = datetime.strptime(datas_cronograma[idx + 1], "%d/%m/%Y").date()
-                    else:
+            if data_susp:
+                # Tenta encontrar a próxima data no cronograma
+                data_proximo_jogo = None
+                if datas_cronograma and data_susp in datas_cronograma:
+                    try:
+                        idx = datas_cronograma.index(data_susp)
+                        if idx + 1 < len(datas_cronograma):
+                            data_proximo_jogo = datetime.strptime(datas_cronograma[idx + 1], "%d/%m/%Y").date()
+                    except:
+                        pass
+                # Fallback: se não houver cronograma, considera 7 dias após a suspensão
+                if data_proximo_jogo is None:
+                    try:
+                        dt_susp = datetime.strptime(data_susp, "%d/%m/%Y").date()
+                        data_proximo_jogo = dt_susp + timedelta(days=7)
+                    except:
                         continue
-                except:
-                    continue
 
+                # Se a data do próximo jogo já passou e o jogador NÃO jogou nela
                 if data_proximo_jogo < hoje:
-                    data_str_prox = datas_cronograma[idx + 1]
+                    # Converte a data para string para verificar ausência
+                    data_str_prox = data_proximo_jogo.strftime("%d/%m/%Y")
                     if data_str_prox not in jogador_datas.get(nome, set()):
+                        # Suspensão cumprida
                         cartoes[nome]['historico'].append({
                             'data': data_str_prox,
                             'adversario': 'Suspensão cumprida (não jogou)',
