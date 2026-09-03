@@ -1,162 +1,26 @@
 {
   "cartoes": {
-    "Rayner": {
-      "amarelos": 2,
-      "vermelho": false,
-      "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "05/08/2026",
-          "adversario": "CTE Colatina",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        }
-      ],
-      "ogol_id": 1175696
-    },
-    "Junior Espeto": {
-      "amarelos": 1,
-      "vermelho": false,
-      "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        }
-      ],
-      "ogol_id": null
-    },
-    "Gabriel Amorim": {
-      "amarelos": 1,
-      "vermelho": false,
-      "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        }
-      ],
-      "ogol_id": 1542489
-    },
-    "João Firmino": {
+    "Matheus Toribes Ferreira Souza": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "14/08/2026",
-          "adversario": "Doze FC",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "26/08/2026",
-          "adversario": "GEL",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": true,
-          "suspenso_causada": true,
-          "suspenso_cumprida": true
-        }
-      ],
-      "ogol_id": 649473
+      "historico": [],
+      "id_ogol": "733867",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     },
-    "Wendy": {
+    "Ruan Amaral Rios": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "08/08/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "vermelho",
-          "terceiro_amarelo": false,
-          "suspenso_causada": true,
-          "suspenso_cumprida": true
-        }
-      ],
-      "ogol_id": 391833
+      "historico": [],
+      "id_ogol": "737841",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     },
-    "Borjão": {
-      "amarelos": 1,
-      "vermelho": false,
-      "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "19/07/2026",
-          "adversario": "Doze FC",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "08/08/2026",
-          "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "vermelho",
-          "terceiro_amarelo": false,
-          "suspenso_causada": true,
-          "suspenso_cumprida": true
-        },
-        {
-          "data": "26/08/2026",
-          "adversario": "GEL",
-          "competicao": "Capixabão Série B - 1ª Fase",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        }
-      ],
-      "ogol_id": 481421
-    },
-    "Yuri Ribeiro": {
+    "Yuri Ribeiro Giovanelli": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -164,16 +28,20 @@
         {
           "data": "28/07/2026",
           "adversario": "GEL",
-          "competicao": "Capixabão Série B - 1ª Fase",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
         }
       ],
-      "ogol_id": 1461714
+      "id_ogol": "1461714",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     },
-    "Kaká": {
+    "Karlos Henrique dos Reis Calavort": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -181,16 +49,20 @@
         {
           "data": "05/08/2026",
           "adversario": "CTE Colatina",
-          "competicao": "Capixabão Série B - 1ª Fase",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
         }
       ],
-      "ogol_id": 807983
+      "id_ogol": "807983",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     },
-    "Lucas Titol": {
+    "Rayner Silva Gomes": {
       "amarelos": 2,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -198,25 +70,325 @@
         {
           "data": "05/08/2026",
           "adversario": "CTE Colatina",
-          "competicao": "Capixabão Série B - 1ª Fase",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "1175696",
+      "contador_amarelos_desde_reset": 2,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Junior Espeto": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "391818",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Gabriel Amorim de Aguiar": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "1542489",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Francisco de Assis Rapozo Neto": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "840156",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Lucas Titol Lopes": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "05/08/2026",
+          "adversario": "CTE Colatina",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
         },
         {
           "data": "08/08/2026",
           "adversario": "Audax São Mateus",
-          "competicao": "Capixabão Série B - 1ª Fase",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
         }
       ],
-      "ogol_id": 973784
+      "id_ogol": "973784",
+      "contador_amarelos_desde_reset": 2,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     },
-    "Jeferson Palacios": {
+    "Virgílio Santos Borges": {
+      "amarelos": 2,
+      "vermelho": true,
+      "suspenso_proxima": true,
+      "historico": [
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "19/07/2026",
+          "adversario": "Doze FC",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "26/08/2026",
+          "adversario": "GEL",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "481421",
+      "contador_amarelos_desde_reset": 2,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": "08/08/2026"
+    },
+    "João Pedro Firmino Oliveira": {
+      "amarelos": 3,
+      "vermelho": false,
+      "suspenso_proxima": true,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "14/08/2026",
+          "adversario": "Doze FC",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "26/08/2026",
+          "adversario": "GEL",
+          "cor": "amarelo",
+          "terceiro_amarelo": true,
+          "suspenso_causada": true,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "649473",
+      "contador_amarelos_desde_reset": 3,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": "26/08/2026"
+    },
+    "Wenderson Silva Neves": {
+      "amarelos": 1,
+      "vermelho": true,
+      "suspenso_proxima": true,
+      "historico": [
+        {
+          "data": "08/08/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        },
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "391833",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": "08/08/2026"
+    },
+    "Clavis Severo Leão": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "1724371",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Davi Fornaciari Lima": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2522494",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Kayque Santos da Cunha": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3547000",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Francisco Wesley da Silva Sousa": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "552238",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Luander da Silva Denerval": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "973782",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "João Marcos Santos Ferraz Luz": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "1533876",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Daniel Olmo Morais Gonçalves": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2530126",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Gabriel de Jesus Rodrigues": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3553860",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Marcus Paulo Sousa Oliveira": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "855737",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Stuart Asafe Ferreira Alves": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "619320",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Matheus Sarmento Mesquita": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2541477",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Jeferson David Palacios Cantillo": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -224,24 +396,286 @@
         {
           "data": "26/08/2026",
           "adversario": "GEL",
-          "competicao": "Capixabão Série B - 1ª Fase",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
         }
       ],
-      "ogol_id": 787886
+      "id_ogol": "787886",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Júnior Espeto": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Arthur Luiz Darros": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2530122",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Júlio César Fontana Leite": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3562873",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Thayson Lourenço dos Santos": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2530125",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     }
   },
-  "datas_globais": [
-    "2026-07-12",
-    "2026-07-19",
-    "2026-07-28",
-    "2026-08-05",
-    "2026-08-08",
-    "2026-08-14",
-    "2026-08-26",
-    "2026-08-29"
-  ]
+  "datas_globais": {
+    "733867": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026"
+    ],
+    "737841": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "1461714": [
+      "05/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "807983": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "1175696": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "391818": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "1542489": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "840156": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "973784": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "481421": [
+      "05/08/2026",
+      "08/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "649473": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026"
+    ],
+    "391833": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "1724371": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "2522494": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "3547000": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "552238": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "973782": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "1533876": [
+      "05/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "2530126": [
+      "05/08/2026",
+      "08/08/2026",
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "3553860": [
+      "05/08/2026",
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "855737": [
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "619320": [
+      "08/08/2026",
+      "14/08/2026",
+      "26/08/2026"
+    ],
+    "2541477": [
+      "12/07/2026",
+      "29/08/2026"
+    ],
+    "787886": [
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "26/08/2026",
+      "28/07/2026",
+      "29/08/2026"
+    ],
+    "2530122": [
+      "12/07/2026",
+      "14/08/2026",
+      "19/07/2026",
+      "29/08/2026"
+    ],
+    "3562873": [
+      "12/07/2026",
+      "19/07/2026"
+    ],
+    "2530125": [
+      "26/08/2026",
+      "29/08/2026"
+    ]
+  }
 }
