@@ -1111,6 +1111,22 @@ def carregar_cartoes_json(categoria):
         return {}, []
 
 def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
+    # Garantir que datas_globais seja uma lista de strings
+    if datas_globais is None:
+        _, datas_globais = carregar_cartoes_json(categoria)
+    # Converter para lista de strings, removendo duplicatas e ordenando
+    if isinstance(datas_globais, list):
+        datas_globais = sorted(set(str(d) for d in datas_globais))
+    else:
+        datas_globais = []
+
+    # Garantir que cartoes seja um dicionário serializável
+    # (já deve ser, mas faremos uma conversão segura)
+    dados = {
+        'cartoes': cartoes,
+        'datas_globais': datas_globais
+    }
+
     if categoria == 'profissional':
         caminho = CAMINHO_CARTOES_PROFISSIONAL
     elif categoria == 'sub15':
@@ -1125,12 +1141,9 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
         caminho = CAMINHO_CARTOES_COMISSAO_SUB17
     else:
         return
-    if not caminho:
-        return
-    if datas_globais is None:
-        _, datas_globais = carregar_cartoes_json(categoria)
+
     with open(caminho, 'w', encoding='utf-8') as f:
-        json.dump({'cartoes': cartoes, 'datas_globais': datas_globais}, f, ensure_ascii=False, indent=2)
+        json.dump(dados, f, ensure_ascii=False, indent=2)
 
 def jogador_suspenso(nome, cartoes):
     if nome not in cartoes:
@@ -1310,6 +1323,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
 
+    # CORREÇÃO: garantir que datas_globais seja uma lista de strings
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões reinicializados para {categoria}.")
     return cartoes, datas_globais
@@ -1462,6 +1476,7 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
 
+    # CORREÇÃO: garantir que datas_globais seja uma lista de strings
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
     return cartoes, datas_globais
