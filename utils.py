@@ -1164,9 +1164,10 @@ def jogador_suspenso(nome, cartoes):
 # =============================================
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     """
-    Reinicializa os cartões a partir dos CSVs de estatísticas, usando os IDs do oGol.
-    Retorna (cartoes, datas_globais) onde datas_globais é um dicionário serializável
-    com chave = id_ogol e valor = lista de strings de datas (dd/mm/aaaa).
+    Reinicializa os cartões a partir do CSV de estatísticas por partida.
+    Para cada linha com cartao_amarelo > 0 ou cartao_vermelho > 0,
+    adiciona um evento ao histórico do jogador.
+    Retorna (cartoes, datas_globais) onde datas_globais é um dicionário com datas por jogador.
     """
     from utils import carregar_estatisticas_partidas
     df = carregar_estatisticas_partidas(categoria)
@@ -1174,15 +1175,22 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         return {}, {}
 
     cartoes = {}
-    datas_globais = {}  # chave: id_ogol (int ou str), valor: lista de datas (strings)
+    datas_globais = {}
+
+    # Mapeia nome_completo -> id_ogol_jogador (se disponível)
+    # Usaremos o nome_completo como chave principal, mas também guardamos o id_ogol
 
     for _, row in df.iterrows():
-        nome = row.get('nome_canonico')
+        # Identificar jogador: usar nome_completo se existir, senão jogador (apelido)
+        nome = row.get('nome_completo') or row.get('jogador')
         if not nome:
             continue
-        id_ogol = canonico_para_ogol_id.get(nome)
-        if not id_ogol:
-            continue
+
+        # Se houver id_ogol_jogador, guardar
+        id_ogol = row.get('id_ogol_jogador')
+        if not id_ogol and canonico_para_ogol_id:
+            # Tenta mapear via dicionário (caso não tenha no CSV)
+            id_ogol = canonico_para_ogol_id.get(nome)
 
         # Inicializa estrutura do jogador se não existir
         if nome not in cartoes:
@@ -1191,42 +1199,78 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 'vermelho': False,
                 'suspenso_proxima': False,
                 'historico': [],
-                'id_ogol': id_ogol
+                'id_ogol': id_ogol or ''
             }
 
-        # Pega a data do jogo (coluna 'data')
-        data_raw = row.get('data')
-        if not data_raw:
+        # Lê os cartões da linha
+        amarelos = int(row.get('cartoes_amarelos', 0))
+        vermelhos = int(row.get('cartoes_vermelhos', 0))
+
+        if amarelos == 0 and vermelhos == 0:
             continue
 
-        # Normaliza para string dd/mm/aaaa
+        # Data e adversário
+        data_str = row.get('data_jogo') or row.get('data')
+        if not data_str:
+            continue
+        # Converte para dd/mm/aaaa se necessário
         try:
-            if isinstance(data_raw, str):
-                if '/' in data_raw:
-                    data_str = data_raw.strip()
-                else:
-                    # Tenta converter de aaaa-mm-dd
-                    dt = datetime.strptime(data_raw.strip(), "%Y-%m-%d")
-                    data_str = dt.strftime("%d/%m/%Y")
-            elif hasattr(data_raw, 'strftime'):  # é um datetime/date
-                data_str = data_raw.strftime("%d/%m/%Y")
+            if '/' in data_str:
+                data = data_str.strip()
             else:
-                # Fallback: converte para string
-                data_str = str(data_raw)
-        except Exception:
-            data_str = str(data_raw)
+                dt = datetime.strptime(data_str.strip(), "%Y-%m-%d")
+                data = dt.strftime("%d/%m/%Y")
+        except:
+            data = data_str.strip()
 
-        # Adiciona ao histórico de datas globais (por jogador)
-        if id_ogol not in datas_globais:
-            datas_globais[id_ogol] = []
-        if data_str not in datas_globais[id_ogol]:
-            datas_globais[id_ogol].append(data_str)
+        adversario = row.get('adversario', 'N/I')
+        competicao = row.get('Competicao', '')
+        fase = row.get('Fase', '')
 
-    # Ordena as datas para cada jogador
+        # Adiciona cartões amarelos
+        for _ in range(amarelos):
+            cartoes[nome]['amarelos'] += 1
+            cartoes[nome]['historico'].append({
+                'data': data,
+                'adversario': adversario,
+                'cor': 'amarelo',
+                'terceiro_amarelo': cartoes[nome]['amarelos'] >= 3,
+                'suspenso_causada': cartoes[nome]['amarelos'] >= 3,
+                'suspenso_cumprida': False,
+                'competicao': competicao,
+                'fase': fase
+            })
+            # Se atingiu 3 amarelos, marca suspenso
+            if cartoes[nome]['amarelos'] >= 3:
+                cartoes[nome]['suspenso_proxima'] = True
+
+        # Adiciona cartões vermelhos
+        for _ in range(vermelhos):
+            cartoes[nome]['vermelho'] = True
+            cartoes[nome]['suspenso_proxima'] = True
+            cartoes[nome]['historico'].append({
+                'data': data,
+                'adversario': adversario,
+                'cor': 'vermelho',
+                'terceiro_amarelo': False,
+                'suspenso_causada': True,
+                'suspenso_cumprida': False,
+                'competicao': competicao,
+                'fase': fase
+            })
+
+        # Registra data do jogo para este jogador (para controle global)
+        if id_ogol:
+            if id_ogol not in datas_globais:
+                datas_globais[id_ogol] = []
+            if data not in datas_globais[id_ogol]:
+                datas_globais[id_ogol].append(data)
+
+    # Ordena as datas em datas_globais
     for jogador in datas_globais:
         datas_globais[jogador].sort()
 
-    # Salva no JSON (chamando a função corrigida)
+    # Salva no JSON usando a função já corrigida
     salvar_cartoes_json(cartoes, categoria, datas_globais)
 
     return cartoes, datas_globais
