@@ -416,21 +416,28 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         st.warning(f"Arquivo não encontrado: {caminho_arquivo}")
         return pd.DataFrame()
     try:
-        # Lê o CSV com cabeçalho
+        # Lê o CSV com cabeçalho (primeira linha contém os nomes das colunas)
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-        # Limpa nomes das colunas
+        # Limpa nomes das colunas (remove espaços, substitui por _, minúsculo)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
         # ============================================================
-        # GARANTE QUE 'nome_completo' EXISTA
+        # GARANTE QUE A COLUNA DE NOMES EXISTA
         # ============================================================
-        if 'nome_completo' not in df.columns:
-            for col in df.columns:
-                if col in ['nome', 'jogador', 'atleta', 'player', 'name']:
-                    df.rename(columns={col: 'nome_completo'}, inplace=True)
-                    break
-            else:
-                df['nome_completo'] = ''
+        # Tenta identificar a coluna de nomes
+        col_nome = None
+        for possivel in ['nome_completo', 'nome', 'jogador', 'atleta', 'player', 'name']:
+            if possivel in df.columns:
+                col_nome = possivel
+                break
+        
+        if col_nome is None:
+            # Se não encontrar, cria coluna vazia (fallback)
+            df['nome_completo'] = ''
+            col_nome = 'nome_completo'
+        elif col_nome != 'nome_completo':
+            # Renomeia para padronizar
+            df.rename(columns={col_nome: 'nome_completo'}, inplace=True)
 
         # ============================================================
         # GARANTE OUTRAS COLUNAS OBRIGATÓRIAS
@@ -554,7 +561,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
-        # Remove a coluna 'foto' se existir
+        # Remove a coluna 'foto' se existir (já que você não a tem)
         if 'foto' in df.columns:
             df.drop(columns=['foto'], inplace=True)
 
@@ -1276,7 +1283,17 @@ def jogador_suspenso(nome, cartoes):
 def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
     """
     Reinicializa os cartões a partir de um DataFrame de estatísticas por partida.
-    Usa as datas do próprio CSV para determinar a próxima partida após a suspensão.
+    Lógica:
+      - Amarelos acumulam até 3. Ao atingir 3, jogador fica suspenso (suspenso_proxima=True)
+        e data_suspensao = data do 3º amarelo.
+      - Vermelho direto também suspende e zera o contador de amarelos,
+        mas o vermelho é registrado e não impede novas contagens.
+      - Na verificação final, para cada jogador suspenso:
+        * Se a data de suspensão for anterior a hoje, procura a próxima partida no cronograma
+          após essa data. Se a próxima partida já passou e o jogador não jogou nela,
+          a suspensão é cumprida.
+        * Se não houver cronograma, usa fallback de 7 dias.
+      - Agora também conta vermelhos (armazena no campo 'total_vermelhos').
     """
     if df.empty:
         return {}, {}
@@ -1296,6 +1313,9 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
     jogador_datas = {}  # datas em que o jogador jogou (YYYY-MM-DD)
 
     for _, row in df.iterrows():
+        # ============================================================
+        # IDENTIFICA O JOGADOR (prioriza 'jogador' = apelido)
+        # ============================================================
         nome = row.get('jogador')
         if pd.isna(nome) or str(nome).strip() == '':
             nome = row.get('nome_completo')
@@ -1308,10 +1328,12 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             continue
         data = data_dt.strftime('%Y-%m-%d')
 
+        # Registra que o jogador jogou nesta data
         if nome not in jogador_datas:
             jogador_datas[nome] = set()
         jogador_datas[nome].add(data)
 
+        # Inicializa estrutura do jogador
         if nome not in cartoes:
             id_ogol = row.get('id_ogol_jogador')
             if pd.isna(id_ogol):
@@ -1324,6 +1346,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             cartoes[nome] = {
                 'amarelos': 0,
                 'vermelho': False,
+                'total_vermelhos': 0,          # <-- NOVO: contador de vermelhos
                 'suspenso_proxima': False,
                 'historico': [],
                 'id_ogol': id_ogol,
@@ -1338,7 +1361,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # --- Amarelos ---
+        # --- PROCESSAR AMARELOS ---
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1361,10 +1384,11 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # --- Vermelhos ---
+        # --- PROCESSAR VERMELHOS ---
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
+                cartoes[nome]['total_vermelhos'] += 1  # <-- INCREMENTA CONTADOR DE VERMELHOS
                 cartoes[nome]['historico'].append({
                     'data': data,
                     'adversario': adversario,
@@ -1380,6 +1404,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 cartoes[nome]['data_suspensao'] = data
                 cartoes[nome]['suspensoes_cumpridas'] = 0
 
+        # Atualiza amarelos atuais
         cartoes[nome]['amarelos'] = cartoes[nome]['contador_amarelos_desde_reset']
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
@@ -1438,11 +1463,9 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     'fase': '',
                     'observacao': f"Suspensão cumprida em {data_str_prox}"
                 })
-                # Reseta estado
-                # Reseta estado (incluindo vermelho)
+                # Reseta estado (mantém total_vermelhos)
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
-                cartoes[nome]['vermelho'] = False   # <--- adiciona esta linha para zerar o vermelho também
                 cartoes[nome]['suspenso_proxima'] = False
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
