@@ -558,15 +558,30 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
 
 @st.cache_data
 def carregar_elenco_profissional() -> pd.DataFrame:
-    return _carregar_elenco_generico(ARQUIVO_CSV_PROFISSIONAL)
+    # Tenta carregar da raiz primeiro
+    caminho = ARQUIVO_CSV_PROFISSIONAL
+    if not os.path.exists(caminho):
+        # Fallback: tenta na pasta data/
+        caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_PROFISSIONAL)
+    # Debug: imprime o caminho (pode ser visto no terminal)
+    print(f"📂 Carregando profissional: {caminho}")
+    return _carregar_elenco_generico(caminho)
 
 @st.cache_data
 def carregar_elenco_sub15() -> pd.DataFrame:
-    return _carregar_elenco_generico(ARQUIVO_CSV_SUB15)
+    caminho = ARQUIVO_CSV_SUB15
+    if not os.path.exists(caminho):
+        caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_SUB15)
+    print(f"📂 Carregando sub15: {caminho}")
+    return _carregar_elenco_generico(caminho)
 
 @st.cache_data
 def carregar_elenco_sub17() -> pd.DataFrame:
-    return _carregar_elenco_generico(ARQUIVO_CSV_SUB17)
+    caminho = ARQUIVO_CSV_SUB17
+    if not os.path.exists(caminho):
+        caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_SUB17)
+    print(f"📂 Carregando sub17: {caminho}")
+    return _carregar_elenco_generico(caminho)
 
 # =============================================
 # CARREGAMENTO DA COMISSÃO (COM TODOS OS ATRIBUTOS)
@@ -1585,40 +1600,71 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
+    """
+    Precomputa scores posicionais com base no merge de dados do elenco e estatísticas agregadas.
+    Agrega as estatísticas por jogador antes de fazer o merge para evitar duplicação de linhas.
+    """
     if df_stats_partidas.empty:
-        max_starts = 1
-        max_90min = 1
-        max_minutos_partidas = 1
-    else:
-        max_starts = df_stats_partidas['starts'].max() if 'starts' in df_stats_partidas.columns else 1
-        max_90min = df_stats_partidas['jogos_90min'].max() if 'jogos_90min' in df_stats_partidas.columns else 1
-        max_minutos_partidas = df_stats_partidas['minutos_totais'].max() if 'minutos_totais' in df_stats_partidas.columns else 1
+        # Se não houver estatísticas, apenas adiciona colunas vazias
+        for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
+            df[col] = 0
+        return df
 
+    # Cria coluna 'nome_canonico' no df a partir do apelido, se existir
     if 'apelido' in df.columns:
         df['nome_canonico'] = df['apelido'].apply(mapear_nome_para_canonico)
     else:
         df['nome_canonico'] = None
 
+    # Agrupa df_stats_partidas por jogador (canônico) e agrega
+    # Como df_stats_partidas tem várias linhas por jogador, agrupar por 'jogador_canonico'
+    # e calcular soma de minutos, contagem de starts (minutos >= 90?), etc.
+    # Primeiro, tenta criar a coluna 'jogador_canonico' em df_stats_partidas
     df_stats = df_stats_partidas.copy()
-    df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
-
     if 'jogador_canonico' not in df_stats.columns:
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
         elif 'nome_completo' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['nome_completo'].apply(mapear_nome_para_canonico)
         else:
+            # Se não houver nenhuma coluna de nome, não faz merge
             for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-                if col not in df.columns:
-                    df[col] = 0
+                df[col] = 0
             return df
 
-    df = df.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
+    # Agrupa: para cada jogador, soma minutos, conta quantas partidas com minutos >= 90 (jogos_90min),
+    # e conta quantas vezes apareceu como titular (starts) – assumindo que 'titular' é uma coluna
+    # ou que se minutos >= 90 considera titular. Vamos usar uma lógica mais simples:
+    # starts = número de partidas onde minutos > 0 (ou minutos >= 90, depende da competição)
+    # Vamos definir starts como número de partidas com minutos > 0 (ou >= 90 se tiver dados)
+    # E jogos_90min = número de partidas com minutos >= 90.
+    # Se não houver coluna de minutos, podemos pular.
+    if 'minutos' in df_stats.columns:
+        df_stats['minutos'] = pd.to_numeric(df_stats['minutos'], errors='coerce').fillna(0)
+        # Agrupa
+        grouped = df_stats.groupby('jogador_canonico').agg(
+            starts=('minutos', lambda x: (x > 0).sum()),
+            jogos_90min=('minutos', lambda x: (x >= 90).sum()),
+            minutos_totais=('minutos', 'sum')
+        ).reset_index()
+        # Renomeia colunas
+        grouped.rename(columns={'minutos_totais': 'minutos_totais_partidas'}, inplace=True)
+    else:
+        # Se não tiver minutos, cria zeros
+        grouped = df_stats.groupby('jogador_canonico').size().reset_index(name='starts')
+        grouped['jogos_90min'] = 0
+        grouped['minutos_totais_partidas'] = 0
+
+    # Agora faz o merge com df usando 'nome_canonico' e 'jogador_canonico'
+    df = df.merge(grouped, left_on='nome_canonico', right_on='jogador_canonico', how='left')
+    # Preenche NaN com 0
     for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
         if col in df.columns:
             df[col] = df[col].fillna(0).astype(int)
         else:
             df[col] = 0
+
+    # Remove colunas auxiliares
     df = df.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore')
     return df
 
