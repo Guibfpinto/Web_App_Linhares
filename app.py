@@ -526,6 +526,9 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
+
+        caminho = obter_caminho_foto(row, categoria)
+        st.write(f"🔍 Caminho da foto para {row.get('apelido')}: {caminho}")
         col1, col2 = st.columns([1, 2])
         with col1:
             # Verifica se a coluna 'foto' existe e tenta exibir
