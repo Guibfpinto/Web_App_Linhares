@@ -401,127 +401,69 @@ def inicializar_banco():
     conn.close()
 
 # =============================================
-# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
+# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA) - CORRIGIDA
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """
-    Carrega o CSV de elenco, seja com cabeçalho ou sem.
-    Se tiver cabeçalho, usa as colunas diretamente.
-    Se não tiver, aplica renomeação manual.
-    """
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
-
     try:
-        # Primeiro, tenta ler com cabeçalho (modo normal)
+        # Lê o CSV com cabeçalho
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-        
-        # Verifica se as colunas esperadas existem
-        colunas_esperadas = ['nome_completo', 'apelido', 'data_nascimento', 'posicao']
-        tem_cabecalho = all(col in df.columns for col in colunas_esperadas)
-        
-        if tem_cabecalho:
-            # Já tem cabeçalho, faz apenas os ajustes necessários
-            df.columns = df.columns.str.strip()
-            # Se a primeira coluna for sem nome (Unnamed), renomeia
-            if df.columns[0] == 'Unnamed: 0':
-                df = df.drop(columns=[df.columns[0]])
-        else:
-            # Se não tiver cabeçalho, usa a lógica antiga (header=None)
-            df_raw = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
-                                 header=None, on_bad_lines='skip')
-            if len(df_raw) == 0:
-                return pd.DataFrame()
-            
-            cabecalhos = df_raw.iloc[0].tolist()
-            df = df_raw.iloc[1:].reset_index(drop=True)
-            
-            nomes_fixos = [
-                'nome_completo', 'apelido', 'data_nascimento', 'posicao', 'pe_pref',
-                'altura_cm', 'peso_kg', 'salario', 'cidade_nascimento', 'uf_nascimento',
-                'pais_nascimento', 'historico', 'foto'
-            ]
-            for i, nome in enumerate(nomes_fixos):
-                if i < df.shape[1]:
-                    df.rename(columns={i: nome}, inplace=True)
-            
-            colunas_restantes = {}
-            for i in range(13, df.shape[1]):
-                nome_original = cabecalhos[i] if i < len(cabecalhos) else f'col_{i}'
-                nome_normalizado = str(nome_original).strip().replace('\ufeff', '').replace(' ', '_').lower()
-                colunas_restantes[i] = nome_normalizado
-            df.rename(columns=colunas_restantes, inplace=True)
-        
-        # --- AJUSTES COMUNS PARA AMBOS OS CASOS ---
-        
-        # Garante que colunas essenciais existam
+        # Limpa nomes das colunas: remove espaços, substitui por _
+        df.columns = df.columns.str.strip().str.replace(' ', '_').str.lower()
+
+        # Verifica se a coluna 'nome_completo' existe; se não, tenta encontrar uma coluna de nome
         if 'nome_completo' not in df.columns:
-            # Tenta encontrar uma coluna que possa ser o nome
             for col in df.columns:
-                if col.lower() in ['nome', 'jogador', 'atleta', 'player', 'name', 'nome_completo']:
+                if col in ['nome', 'jogador', 'atleta', 'player', 'name']:
                     df.rename(columns={col: 'nome_completo'}, inplace=True)
                     break
             else:
                 # Se não encontrar, cria uma coluna vazia (fallback)
                 df['nome_completo'] = ''
-        
-        if 'apelido' not in df.columns:
-            # Tenta usar 'nome_completo' como apelido se não houver
-            df['apelido'] = df['nome_completo']
-        
-        if 'data_nascimento' not in df.columns:
-            df['data_nascimento'] = None
-            
-        if 'posicao' not in df.columns:
-            df['posicao'] = ''
-        
-        if 'pe_pref' not in df.columns:
-            df['pe_pref'] = np.nan
-        else:
-            df['pe_pref'] = df['pe_pref'].replace(['', 'nan', 'NaN', 'None'], np.nan)
-        
-        for col in ['cidade_nascimento', 'uf_nascimento', 'pais_nascimento']:
+
+        # Assegura que as colunas obrigatórias existam
+        for col in ['apelido', 'data_nascimento', 'posicao']:
             if col not in df.columns:
                 df[col] = None
-        
-        # --- PROCESSAMENTO DE ATRIBUTOS NUMÉRICOS ---
+
+        # Converte colunas numéricas
         cols_num = ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']
         for col in cols_num:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-        
+            else:
+                df[col] = np.nan
+
         # Atributos FM26
         for attr in ATRIBUTOS_FM26:
             if attr in df.columns:
                 df[attr] = pd.to_numeric(df[attr], errors='coerce')
-        
-        # Calcular IMC, Idade, etc.
+            else:
+                df[attr] = np.nan
+
+        # IMC, Idade, Gordura, etc.
         df['IMC'] = df.apply(lambda x: x['peso_kg'] / ((x['altura_cm']/100)**2)
                              if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
                              else np.nan, axis=1).round(1)
-        
         df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
         df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
-        
         df['Gordura_Corporal_%'] = df.apply(lambda row: round((1.20*row['IMC']) + (0.23*row['Idade']) - 16.2, 1)
                                             if pd.notna(row['IMC']) and pd.notna(row['Idade']) else np.nan, axis=1)
-        
         df['Massa_Magra_kg'] = df.apply(
             lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%']/100), 1)
             if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%']) else np.nan,
             axis=1
         )
-        
         df['Massa_Muscular_Estimada_kg'] = df.apply(
             lambda row: round(row['Massa_Magra_kg'] * 0.55, 1)
             if pd.notna(row['Massa_Magra_kg']) else np.nan,
             axis=1
         )
-        
         df['Classificacao_Gordura'] = df.apply(lambda x: classif_gordura(x['Gordura_Corporal_%'], x['Idade']), axis=1)
         df['Estado_Fisico'] = df.apply(lambda row: estado_fisico(row['Classificacao_IMC'], row['Classificacao_Gordura']), axis=1)
-        
-        # Classificação de posição
+
+        # Posição Principal
         def cat_pos(pos_str):
             if pd.isna(pos_str): return 'Outros', []
             pos = str(pos_str).upper().strip()
@@ -548,17 +490,16 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             cats = [c for c in cats if c != 'Outros']
             cats = list(dict.fromkeys(cats))
             return cats[0] if cats else 'Outros', cats
-        
         res = df['posicao'].apply(cat_pos)
         df['Posicao_Principal'] = res.apply(lambda x: x[0])
         df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
-        
-        # Rating Geral
-        df['Rating_Geral_FM26'] = df.apply(lambda row: min(100, row['habilidade_atual']/2) 
-                                            if pd.notna(row.get('habilidade_atual')) else 50, axis=1)
-        
+        df['Rating_Geral_FM26'] = df.apply(lambda row: min(100, row['habilidade_atual']/2) if pd.notna(row.get('habilidade_atual')) else 50, axis=1)
+
+        # Remove a coluna 'foto' se existir (já que você não a tem)
+        if 'foto' in df.columns:
+            df.drop(columns=['foto'], inplace=True)
+
         return df
-        
     except Exception as e:
         st.error(f"Erro ao carregar elenco de {caminho_arquivo}: {e}")
         return pd.DataFrame()
@@ -666,9 +607,12 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     return df_futuros.iloc[0].to_dict()
 
 # =============================================
-# EXIBIR FOTO
+# EXIBIR FOTO (CORRIGIDO PARA NÃO DAR ERRO SE NÃO HOUVER COLUNA 'foto')
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
+    # Verifica se a coluna 'foto' existe no dicionário
+    if 'foto' not in pessoa_row.index:
+        return None
     foto = pessoa_row.get('foto')
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
@@ -894,12 +838,6 @@ def obter_lesao_atual(jogador_row, categoria):
 # GESTÃO DE LESÕES (ADICIONAR/ATUALIZAR)
 # =============================================
 def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=None):
-    """
-    Adiciona uma ocorrência de lesão para um jogador.
-    tipo_lesao: ex: 'Tornozelo', 'Joelho', 'Coxa', etc.
-    data_inicio: string 'YYYY-MM-DD'
-    data_fim: string 'YYYY-MM-DD' ou None (se ainda estiver lesionado)
-    """
     import pandas as pd
     if not os.path.exists(csv_path):
         df = pd.DataFrame(columns=['ogol_id', 'nome_completo'])
@@ -945,10 +883,6 @@ def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=No
     df.to_csv(csv_path, sep=';', encoding='utf-8-sig', index=False)
 
 def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
-    """
-    Localiza a última ocorrência da lesão do tipo especificado e adiciona a data de fim.
-    Se a lesão já tiver data de fim, não faz nada.
-    """
     import pandas as pd
     if not os.path.exists(csv_path):
         return
@@ -1163,7 +1097,6 @@ def carregar_cartoes_json(categoria):
     }.get(categoria)
 
     if not caminho or not os.path.exists(caminho):
-        # Se não existe, tenta inicializar do CSV
         from utils import inicializar_cartoes_por_csvs
         cartoes, datas = inicializar_cartoes_por_csvs(categoria, {})
         return cartoes, datas
@@ -1179,11 +1112,6 @@ def carregar_cartoes_json(categoria):
         return {}, {}
 
 def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
-    """
-    Salva cartões e datas globais em um arquivo JSON, garantindo que todos os objetos
-    sejam serializáveis (strings, números, listas, dicionários).
-    """
-    # Define o caminho do arquivo com base na categoria
     if categoria == 'profissional':
         caminho = CAMINHO_CARTOES_PROFISSIONAL
     elif categoria == 'sub15':
@@ -1199,14 +1127,10 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
     else:
         caminho = os.path.join(DATA_DIR, f"cartoes_{categoria}.json")
 
-    # Prepara o dicionário a ser salvo
     dados = {'cartoes': cartoes}
-
-    # Converte datas_globais para um formato serializável
     if datas_globais:
         dados_serializaveis = {}
         for id_jogador, lista_datas in datas_globais.items():
-            # Garante que cada elemento seja string
             if isinstance(lista_datas, (list, tuple)):
                 dados_serializaveis[id_jogador] = [
                     d.strftime("%d/%m/%Y") if hasattr(d, 'strftime') else str(d)
@@ -1218,7 +1142,6 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
     else:
         dados['datas_globais'] = {}
 
-    # Salva o arquivo JSON
     with open(caminho, 'w', encoding='utf-8') as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
 
@@ -1228,29 +1151,15 @@ def jogador_suspenso(nome, cartoes):
     return cartoes[nome].get('suspenso_proxima', False)
 
 # =============================================
-# INICIALIZAR CARTÕES – COM RESET DE AMARELOS (versão com cumprimento automático)
+# INICIALIZAR CARTÕES – COM RESET DE AMARELOS E C UMPRIMENTO AUTOMÁTICO
 # =============================================
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
-    """
-    Reinicializa os cartões a partir do CSV de estatísticas por partida.
-    Lógica:
-      - Amarelos acumulam até 3.
-      - Ao atingir 3, jogador fica suspenso (suspenso_proxima = True).
-      - Quando o jogador não aparece na partida seguinte (detectado pelo
-        reaparicionamento em uma partida posterior), a suspensão é cumprida:
-        - Adiciona evento 'suspensao_cumprida' na data da partida que ele não jogou.
-        - Reseta contador de amarelos para 0.
-        - Marca suspenso_proxima = False.
-      - Ao final, para jogadores que ainda estão suspensos e a data atual já ultrapassou
-        a data da próxima partida do cronograma, considera a suspensão cumprida automaticamente.
-    """
     df = carregar_estatisticas_partidas(categoria)
     if df.empty:
         return {}, {}
 
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Carrega cronograma para obter as datas dos jogos
     df_crono = carregar_cronograma(categoria.capitalize())
     datas_cronograma = []
     if not df_crono.empty and 'data' in df_crono.columns:
@@ -1258,7 +1167,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
 
     cartoes = {}
     datas_globais = {}
-    jogadores_que_jogaram = set()  # para saber quem apareceu em alguma partida
+    jogadores_que_jogaram = set()
 
     for _, row in df.iterrows():
         nome = row.get('nome_completo') or row.get('jogador')
@@ -1279,7 +1188,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 'data_suspensao': None
             }
 
-        # Processa data
         data_raw = row.get('data_jogo') or row.get('data')
         if not data_raw:
             continue
@@ -1301,24 +1209,19 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # ============================================================
-        # 1. SE O JOGADOR ESTAVA SUSPENSO E APARECEU NESTA PARTIDA
-        #    -> ELE CUMPRIU A SUSPENSÃO (porque ficou de fora na anterior)
-        # ============================================================
+        # 1. SE JÁ ESTAVA SUSPENSO E APARECEU -> CUMPRIU
         if cartoes[nome]['suspenso_proxima']:
             data_susp = cartoes[nome].get('data_suspensao')
             if data_susp and data_susp in datas_cronograma:
-                # Encontra a próxima data no cronograma após a data de suspensão
                 try:
                     idx = datas_cronograma.index(data_susp)
                     if idx + 1 < len(datas_cronograma):
                         data_cumprimento = datas_cronograma[idx + 1]
                     else:
-                        data_cumprimento = data  # fallback
+                        data_cumprimento = data
                 except:
                     data_cumprimento = data
 
-                # Adiciona evento de cumprimento na data da partida em que ele não jogou
                 cartoes[nome]['historico'].append({
                     'data': data_cumprimento,
                     'adversario': 'Suspensão cumprida (não jogou)',
@@ -1330,16 +1233,13 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                     'fase': fase,
                     'observacao': f"Suspensão cumprida (ficou de fora em {data_cumprimento})"
                 })
-                # Reseta contador e marca como não suspenso
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
                 cartoes[nome]['suspenso_proxima'] = False
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
 
-        # ============================================================
         # 2. PROCESSAR AMARELOS
-        # ============================================================
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1353,7 +1253,6 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                     'fase': fase
                 })
                 cartoes[nome]['contador_amarelos_desde_reset'] += 1
-
                 if cartoes[nome]['contador_amarelos_desde_reset'] >= 3:
                     if cartoes[nome]['historico']:
                         ultimo = cartoes[nome]['historico'][-1]
@@ -1363,9 +1262,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                     cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # ============================================================
         # 3. PROCESSAR VERMELHOS
-        # ============================================================
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
@@ -1384,16 +1281,10 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 cartoes[nome]['data_suspensao'] = data
                 cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # ============================================================
-        # 4. ATUALIZA AMARELOS ATUAIS E SUSPENSO_PROXIMA
-        # ============================================================
         cartoes[nome]['amarelos'] = cartoes[nome]['contador_amarelos_desde_reset']
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
 
-        # ============================================================
-        # 5. DATAS GLOBAIS
-        # ============================================================
         id_ogol = row.get('id_ogol_jogador')
         if id_ogol:
             if id_ogol not in datas_globais:
@@ -1401,11 +1292,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
             if data not in datas_globais[id_ogol]:
                 datas_globais[id_ogol].append(data)
 
-    # ============================================================
-    # 6. VERIFICAÇÃO FINAL PARA SUSPENSÕES NÃO CUMPRIDAS
-    #    Se a data atual já ultrapassou a data da próxima partida,
-    #    considera a suspensão cumprida automaticamente.
-    # ============================================================
+    # 4. VERIFICAÇÃO FINAL: suspensão cumprida automaticamente se data passou
     hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     for nome, dados in cartoes.items():
         if dados.get('suspenso_proxima', False):
@@ -1416,14 +1303,11 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                     if idx + 1 < len(datas_cronograma):
                         data_proximo_jogo = datetime.strptime(datas_cronograma[idx + 1], "%d/%m/%Y").date()
                     else:
-                        # Se não houver próxima partida, não faz nada
                         continue
                 except:
                     continue
 
-                # Se a data do próximo jogo já passou e o jogador não jogou (não está no CSV)
                 if data_proximo_jogo < hoje and nome not in jogadores_que_jogaram:
-                    # Considera que a suspensão foi cumprida (não jogou)
                     cartoes[nome]['historico'].append({
                         'data': datas_cronograma[idx + 1],
                         'adversario': 'Suspensão cumprida (automática)',
@@ -1435,20 +1319,21 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                         'fase': '',
                         'observacao': f"Suspensão cumprida automaticamente em {datas_cronograma[idx + 1]}"
                     })
-                    # Reseta
                     cartoes[nome]['contador_amarelos_desde_reset'] = 0
                     cartoes[nome]['amarelos'] = 0
                     cartoes[nome]['suspenso_proxima'] = False
                     cartoes[nome]['suspensoes_cumpridas'] = 0
                     cartoes[nome]['data_suspensao'] = None
 
-    # Ordena datas globais
     for jogador in datas_globais:
         datas_globais[jogador].sort()
 
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     return cartoes, datas_globais
 
+# =============================================
+# INICIALIZAR CARTÕES COMISSÃO
+# =============================================
 def inicializar_cartoes_comissao(categoria, df_comissao):
     st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
     if categoria == 'comissao_profissional':
@@ -1597,13 +1482,12 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
 
-    # CORREÇÃO: garantir que datas_globais seja uma lista de strings
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
     return cartoes, datas_globais
 
 # =============================================
-# ESTATÍSTICAS DE PARTIDAS (CORRIGIDO PARA EVITAR ERRO 'jogador_canonico')
+# ESTATÍSTICAS DE PARTIDAS
 # =============================================
 def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
     if categoria == "Profissional":
@@ -1619,12 +1503,6 @@ def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
     return [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
 
 def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
-    """
-    Carrega o CSV consolidado de estatísticas por partida para a categoria.
-    Espera colunas: nome_completo, jogador, data_jogo, adversario,
-    cartoes_amarelos, cartoes_vermelhos, etc.
-    Retorna o DataFrame sem colunas extras.
-    """
     arquivo = {
         "Profissional": "estatisticas_jogadores_profissional_2026.csv",
         "Sub-15": "estatisticas_jogadores_sub15_2026.csv",
@@ -1633,7 +1511,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
     if not arquivo:
         return pd.DataFrame()
 
-    # Tenta na pasta específica
     caminho = os.path.join(
         PASTA_ESTATISTICAS_PROFISSIONAL if categoria == "Profissional" else
         PASTA_ESTATISTICAS_SUB15 if categoria == "Sub-15" else
@@ -1651,17 +1528,12 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
         if 'data_jogo' in df.columns:
             df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
-        # Não adicionamos colunas extras aqui
         return df
     except Exception as e:
         print(f"Erro ao carregar {caminho}: {e}")
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
-    """
-    Precomputa scores posicionais com base no merge de dados do elenco e estatísticas.
-    Corrigido para não depender de 'jogador_canonico' se não existir.
-    """
     if df_stats_partidas.empty:
         max_starts = 1
         max_90min = 1
@@ -1671,41 +1543,31 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
         max_90min = df_stats_partidas['jogos_90min'].max() if 'jogos_90min' in df_stats_partidas.columns else 1
         max_minutos_partidas = df_stats_partidas['minutos_totais'].max() if 'minutos_totais' in df_stats_partidas.columns else 1
 
-    # Cria coluna 'nome_canonico' no df a partir do apelido, se existir
     if 'apelido' in df.columns:
         df['nome_canonico'] = df['apelido'].apply(mapear_nome_para_canonico)
     else:
         df['nome_canonico'] = None
 
-    # Renomeia coluna de minutos para merge
     df_stats = df_stats_partidas.copy()
     df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
 
-    # Verifica se df_stats tem coluna 'jogador_canonico'; se não, tenta criar
     if 'jogador_canonico' not in df_stats.columns:
-        # Tenta usar a coluna 'jogador' ou 'nome' para criar o canônico
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
         elif 'nome_completo' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['nome_completo'].apply(mapear_nome_para_canonico)
         else:
-            # Se não houver nenhuma coluna de nome, não faz merge
             for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
                 if col not in df.columns:
                     df[col] = 0
             return df
 
-    # Agora faz o merge usando 'nome_canonico' (do lado esquerdo) e 'jogador_canonico' (lado direito)
     df = df.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
-
-    # Preenche valores nulos
     for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
         if col in df.columns:
             df[col] = df[col].fillna(0).astype(int)
         else:
             df[col] = 0
-
-    # Remove colunas auxiliares
     df = df.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore')
     return df
 
@@ -2210,11 +2072,6 @@ def obter_historico_clubes(jogador_row):
 # FORMATAR CARTÕES PARA EXIBIÇÃO (COM RESET)
 # =============================================
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
-    """
-    Retorna um texto formatado com o resumo de cartões.
-    Mostra: amarelos atuais, vermelho direto, suspenso para o próximo jogo,
-    e "Suspensão cumprida?" baseado na existência de evento 'suspensao_cumprida' no histórico.
-    """
     if not cartoes:
         return "Nenhum dado de cartões disponível."
 
@@ -2234,7 +2091,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
         historico = dados.get('historico', [])
-        # Verifica se existe algum evento de cumprimento
         ja_cumpriu = any(ev.get('cor') == 'suspensao_cumprida' for ev in historico)
         cumprida = "Sim" if ja_cumpriu else "Não"
 
@@ -2253,7 +2109,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 adv = ev.get('adversario', 'adversário')
                 cor = ev.get('cor', '')
                 cumprida_evento = "Sim" if ev.get('suspenso_cumprida', False) else "Não"
-
                 if cor == 'amarelo':
                     emoji = "🟨"
                     extra = " (3º amarelo!)" if ev.get('terceiro_amarelo', False) else ""
@@ -2266,7 +2121,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 else:
                     emoji = "ℹ️"
                     extra = ""
-
                 linha = f"    {emoji} {data} vs {adv} - {cor}{extra} [Cumprida: {cumprida_evento}]"
                 if ev.get('competicao'):
                     linha += f" [{ev.get('competicao')}"
@@ -2279,7 +2133,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
         return "\n".join(linhas)
 
     else:
-        # Resumo de todos os jogadores
         linhas = ["📊 **RESUMO DE CARTÕES DE TODOS OS JOGADORES**", ""]
         linhas.append(f"{'Jogador':<25} {'Atuais':<10} {'Vermelho':<10} {'Suspenso':<10} {'Cumprida':<15}")
         linhas.append("-" * 70)
@@ -2299,12 +2152,10 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
 ARQUIVO_CONTROLE_REINICIALIZACAO = os.path.join(DATA_DIR, "ultima_reinicializacao.json")
 
 def _obter_data_brt_atual() -> str:
-    """Retorna a data atual no fuso horário de Brasília (YYYY-MM-DD)."""
     agora = datetime.now(ZoneInfo("America/Sao_Paulo"))
     return agora.strftime("%Y-%m-%d")
 
 def _carregar_ultima_reinicializacao() -> Optional[str]:
-    """Carrega a data da última reinicialização do arquivo de controle."""
     if not os.path.exists(ARQUIVO_CONTROLE_REINICIALIZACAO):
         return None
     try:
@@ -2315,30 +2166,20 @@ def _carregar_ultima_reinicializacao() -> Optional[str]:
         return None
 
 def _salvar_ultima_reinicializacao(data: str):
-    """Salva a data da última reinicialização."""
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(ARQUIVO_CONTROLE_REINICIALIZACAO, 'w', encoding='utf-8') as f:
         json.dump({'data': data}, f, ensure_ascii=False, indent=2)
 
 def verificar_e_reinicializar_cartoes(categoria: str) -> bool:
-    """
-    Verifica se a data atual (BRT) é diferente da última reinicialização registrada.
-    Se for, executa a reinicialização dos cartões para a categoria e atualiza o controle.
-    Retorna True se a reinicialização foi executada, False caso contrário.
-    """
     data_atual = _obter_data_brt_atual()
     ultima_data = _carregar_ultima_reinicializacao()
-
     if ultima_data is None or ultima_data != data_atual:
-        # Mapeia categoria para chave
         chave_categoria = {
             "Profissional": "profissional",
             "Sub-15": "sub15",
             "Sub-17": "sub17",
         }.get(categoria, categoria.lower())
-        # Chama a função de inicialização
         novos_cartoes, _ = inicializar_cartoes_por_csvs(chave_categoria, {})
-        # Salva nova data
         _salvar_ultima_reinicializacao(data_atual)
         return True
     return False

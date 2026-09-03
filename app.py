@@ -453,15 +453,19 @@ def get_estatisticas_partidas(categoria):
     return carregar_estatisticas_partidas(categoria)
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO
+# FUNÇÃO DETALHES COMISSÃO (CORRIGIDA PARA 'foto')
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
-            caminho_foto = obter_caminho_foto(row, categoria)
-            if caminho_foto:
-                st.image(caminho_foto, width=150)
+            # Verifica se a coluna 'foto' existe e tenta exibir
+            if 'foto' in row and pd.notna(row.get('foto')):
+                caminho_foto = obter_caminho_foto(row, categoria)
+                if caminho_foto:
+                    st.image(caminho_foto, width=150)
+                else:
+                    st.write("📷 Sem foto")
             else:
                 st.write("📷 Sem foto")
         with col2:
@@ -518,15 +522,19 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.info("Nenhum atributo detalhado disponível para este membro.")
 
 # ======================================================================
-# FUNÇÃO DETALHES JOGADOR
+# FUNÇÃO DETALHES JOGADOR (CORRIGIDA PARA 'foto')
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
-            caminho_foto = obter_caminho_foto(row, categoria)
-            if caminho_foto:
-                st.image(caminho_foto, width=150)
+            # Verifica se a coluna 'foto' existe e tenta exibir
+            if 'foto' in row and pd.notna(row.get('foto')):
+                caminho_foto = obter_caminho_foto(row, categoria)
+                if caminho_foto:
+                    st.image(caminho_foto, width=150)
+                else:
+                    st.write("📷 Sem foto")
             else:
                 st.write("📷 Sem foto")
         with col2:
@@ -819,9 +827,18 @@ with tabs[0]:
             st.dataframe(df_analise[[c for c in cols if c in df_analise.columns]])
 
         elif opcao_analise == "Detalhes do jogador":
-            jogador_sel = st.selectbox("Selecione", df_analise['nome_completo'].tolist())
-            row = df_analise[df_analise['nome_completo'] == jogador_sel].iloc[0]
-            exibir_detalhes_jogador(row, cat_analise, cartoes_analise)
+            # Detecção automática da coluna de nomes
+            col_nome = None
+            for possivel in ['nome_completo', 'Nome', 'nome', 'jogador', 'Jogador', 'apelido']:
+                if possivel in df_analise.columns:
+                    col_nome = possivel
+                    break
+            if col_nome is None:
+                st.error("Não foi possível identificar a coluna de nomes no elenco. Colunas disponíveis: " + ", ".join(df_analise.columns))
+            else:
+                jogador_sel = st.selectbox("Selecione", df_analise[col_nome].tolist())
+                row = df_analise[df_analise[col_nome] == jogador_sel].iloc[0]
+                exibir_detalhes_jogador(row, cat_analise, cartoes_analise)
 
         elif opcao_analise == "Relatório completo":
             texto = gerar_relatorio_completo_texto(df_analise, cat_analise)
