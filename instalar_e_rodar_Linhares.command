@@ -1,0 +1,191 @@
+#!/bin/bash
+
+# ============================================================
+# 🚀 INSTALADOR AUTOMÁTICO - Linhares FC Web App
+#    Para macOS com Python 3.12
+# ============================================================
+
+# Cores para mensagens
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # Sem cor
+
+echo -e "${BLUE}============================================================${NC}"
+echo -e "${GREEN}⚽ Linhares FC - Web App (Instalação Automática)${NC}"
+echo -e "${BLUE}============================================================${NC}"
+
+# ============================================================
+# 1. VERIFICAR / INSTALAR HOMEBREW
+# ============================================================
+echo -e "${YELLOW}🔍 Verificando Homebrew...${NC}"
+if ! command -v brew &>/dev/null; then
+    echo -e "${YELLOW}📦 Instalando Homebrew (gerenciador de pacotes do Mac)...${NC}"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    
+    # Adiciona Homebrew ao PATH (necessário para Apple Silicon)
+    if [[ $(uname -m) == "arm64" ]]; then
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    else
+        echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+    echo -e "${GREEN}✅ Homebrew instalado!${NC}"
+else
+    echo -e "${GREEN}✅ Homebrew já instalado.${NC}"
+fi
+
+# ============================================================
+# 2. VERIFICAR / INSTALAR GIT
+# ============================================================
+echo -e "${YELLOW}🔍 Verificando Git...${NC}"
+if ! command -v git &>/dev/null; then
+    echo -e "${YELLOW}📦 Instalando Git...${NC}"
+    brew install git
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Git instalado!${NC}"
+    else
+        echo -e "${RED}❌ Falha ao instalar Git. Tente manualmente.${NC}"
+        read -p "Pressione ENTER para sair..."
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✅ Git já instalado.${NC}"
+fi
+
+# ============================================================
+# 3. VERIFICAR / INSTALAR PYTHON 3.12
+# ============================================================
+echo -e "${YELLOW}🔍 Verificando Python 3.12...${NC}"
+
+# Verifica se o Python 3.12 está instalado
+if command -v python3.12 &>/dev/null; then
+    PYTHON_CMD="python3.12"
+    echo -e "${GREEN}✅ Python 3.12 encontrado.${NC}"
+else
+    echo -e "${YELLOW}⚠️ Python 3.12 não encontrado. Instalando via Homebrew...${NC}"
+    brew install python@3.12
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Python 3.12 instalado com sucesso!${NC}"
+        PYTHON_CMD="python3.12"
+        # Garante que o comando python3.12 esteja disponível
+        export PATH="/opt/homebrew/bin:$PATH"
+    else
+        echo -e "${RED}❌ Falha ao instalar Python 3.12 via Homebrew.${NC}"
+        echo -e "${YELLOW}👉 Baixe manualmente em https://www.python.org/downloads/${NC}"
+        read -p "Pressione ENTER para sair..."
+        exit 1
+    fi
+fi
+
+# ============================================================
+# 4. CLONAR O REPOSITÓRIO
+# ============================================================
+echo -e "${YELLOW}📥 Clonando repositório...${NC}"
+
+# Define a pasta onde o projeto será baixado (Documentos, se existir)
+if [ -d "$HOME/Documents" ]; then
+    PROJETO_DIR="$HOME/Documents/Web_App_Linhares"
+else
+    PROJETO_DIR="$HOME/Web_App_Linhares"
+fi
+
+# Remove pasta antiga se existir (para forçar clone atualizado)
+if [ -d "$PROJETO_DIR" ]; then
+    echo -e "${YELLOW}⚠️ Pasta $PROJETO_DIR já existe. Removendo para atualizar...${NC}"
+    rm -rf "$PROJETO_DIR"
+fi
+
+git clone https://github.com/Guibfpinto/Web_App_Linhares.git "$PROJETO_DIR"
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Repositório clonado com sucesso em: $PROJETO_DIR${NC}"
+    cd "$PROJETO_DIR"
+else
+    echo -e "${RED}❌ Falha ao clonar o repositório.${NC}"
+    read -p "Pressione ENTER para sair..."
+    exit 1
+fi
+
+# ============================================================
+# 5. VERIFICAR O ARQUIVO requirements.txt
+# ============================================================
+if [ ! -f "$PROJETO_DIR/requirements.txt" ]; then
+    echo -e "${YELLOW}⚠️ requirements.txt não encontrado. Criando...${NC}"
+    cat > requirements.txt << EOF
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+mplsoccer>=1.2.0
+openpyxl>=3.1.0
+reportlab>=4.0.0
+requests>=2.31.0
+bcrypt>=4.0.0
+scipy>=1.10.0
+streamlit-autorefresh>=1.0.0
+EOF
+    echo -e "${GREEN}✅ requirements.txt criado.${NC}"
+fi
+
+# ============================================================
+# 6. AMBIENTE VIRTUAL E DEPENDÊNCIAS
+# ============================================================
+echo -e "${YELLOW}📦 Criando ambiente virtual...${NC}"
+$PYTHON_CMD -m venv venv
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Ambiente virtual criado.${NC}"
+else
+    echo -e "${RED}❌ Falha ao criar ambiente virtual.${NC}"
+    read -p "Pressione ENTER para sair..."
+    exit 1
+fi
+
+source venv/bin/activate
+echo -e "${GREEN}✅ Ambiente virtual ativado.${NC}"
+
+echo -e "${YELLOW}📥 Instalando dependências...${NC}"
+pip install --upgrade pip --quiet
+pip install -r requirements.txt --quiet
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Dependências instaladas!${NC}"
+else
+    echo -e "${RED}❌ Erro ao instalar dependências.${NC}"
+    read -p "Pressione ENTER para sair..."
+    exit 1
+fi
+
+# ============================================================
+# 7. VERIFICAR PASTA 'dados'
+# ============================================================
+if [ ! -d "$PROJETO_DIR/dados" ]; then
+    echo -e "${YELLOW}⚠️ Pasta 'dados' não encontrada. Criando...${NC}"
+    mkdir -p "$PROJETO_DIR/dados"
+    echo -e "${YELLOW}👉 Coloque os arquivos JSON dentro de 'dados'.${NC}"
+fi
+
+# ============================================================
+# 8. EXECUTAR O APLICATIVO
+# ============================================================
+PORT=8501
+if lsof -Pi :$PORT -sTCP:LISTEN -t &>/dev/null; then
+    echo -e "${YELLOW}⚠️ Porta $PORT ocupada. Usando porta 8502.${NC}"
+    PORT=8502
+fi
+
+echo -e "${GREEN}🚀 Iniciando o aplicativo...${NC}"
+echo -e "   Acesse: http://localhost:$PORT"
+echo -e "${BLUE}============================================================${NC}"
+echo -e "${YELLOW}🔄 Não feche esta janela. Pressione Ctrl+C para parar.${NC}"
+echo -e "${BLUE}============================================================${NC}"
+
+streamlit run app.py --server.port $PORT
+
+# Ao encerrar
+deactivate
+echo -e "${GREEN}👋 Aplicativo encerrado.${NC}"
+read -p "Pressione ENTER para fechar..."
