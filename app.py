@@ -540,7 +540,8 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             else:
                 st.write("📷 Sem foto")
         with col2:
-            st.write(f"**Nome:** {row.get('nome_completo', 'N/I')}")
+            nome_exibicao = row.get('nome_completo') or row.get('apelido') or 'N/I'
+            st.write(f"**Nome:** {nome_exibicao}")
             st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
             data_nasc = row.get('data_nascimento', '')
             idade = row.get('Idade', 'N/I')
