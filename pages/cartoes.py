@@ -8,7 +8,8 @@ from utils import (
     jogador_suspenso,
     inicializar_cartoes_por_csvs,
     inicializar_cartoes_comissao,
-    mapear_nome_para_canonico
+    mapear_nome_para_canonico,
+    verificar_e_reinicializar_cartoes
 )
 
 def show():
@@ -20,6 +21,15 @@ def show():
         ["Profissional", "Sub-15", "Sub-17", "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"],
         key="cartoes_categoria"
     )
+
+    # ============================================================
+    # REINICIALIZAÇÃO AUTOMÁTICA DIÁRIA (apenas para jogadores)
+    # ============================================================
+    if categoria in ["Profissional", "Sub-15", "Sub-17"]:
+        reiniciou = verificar_e_reinicializar_cartoes(categoria)
+        if reiniciou:
+            st.success(f"✅ Cartões reinicializados automaticamente para {categoria} (novo dia).")
+            st.cache_data.clear()  # limpa cache para recarregar os dados frescos
 
     mapeamento_categoria = {
         "Profissional": "profissional",
@@ -82,7 +92,7 @@ def show():
             novos_dados['amarelos'] = sum(1 for ev in historico if ev.get('cor') == 'amarelo')
             novos_dados['vermelho'] = any(ev.get('cor') == 'vermelho' for ev in historico)
             novos_dados['suspenso_proxima'] = dados.get('suspenso_proxima', False)
-            novos_dados['suspensoes_cumpridas'] = 0  # sempre 0, mantido
+            novos_dados['suspensoes_cumpridas'] = 0  # sempre 0
             cartoes_filtrados[jogador] = novos_dados
 
     if not cartoes_filtrados:
@@ -143,7 +153,7 @@ def show():
         else:
             st.info("Nenhum evento de cartão para este jogador com os filtros atuais.")
 
-        # Botão reinicializar
+        # Botão reinicializar manual
         if st.button(f"🔄 Reinicializar cartões de {categoria}"):
             if "Comissão" in categoria:
                 novos_cartoes, _ = inicializar_cartoes_comissao(chave_categoria, None)
