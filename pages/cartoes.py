@@ -29,7 +29,7 @@ def show():
         reiniciou = verificar_e_reinicializar_cartoes(categoria)
         if reiniciou:
             st.success(f"✅ Cartões reinicializados automaticamente para {categoria} (novo dia).")
-            st.cache_data.clear()  # limpa cache para recarregar os dados frescos
+            st.cache_data.clear()
 
     mapeamento_categoria = {
         "Profissional": "profissional",
@@ -89,24 +89,27 @@ def show():
         if historico:
             novos_dados = dados.copy()
             novos_dados['historico'] = historico
-            novos_dados['amarelos'] = sum(1 for ev in historico if ev.get('cor') == 'amarelo')
-            novos_dados['vermelho'] = any(ev.get('cor') == 'vermelho' for ev in historico)
+            # === CORREÇÃO: usa o campo 'amarelos' do JSON, não recalcula do histórico ===
+            novos_dados['amarelos'] = dados.get('amarelos', 0)
+            novos_dados['vermelho'] = dados.get('vermelho', False)
             novos_dados['suspenso_proxima'] = dados.get('suspenso_proxima', False)
-            novos_dados['suspensoes_cumpridas'] = 0  # sempre 0
+            novos_dados['suspensoes_cumpridas'] = dados.get('suspensoes_cumpridas', 0)
             cartoes_filtrados[jogador] = novos_dados
 
     if not cartoes_filtrados:
         st.info("Nenhum cartão encontrado com os filtros selecionados.")
         return
 
-    # Tabela resumo
+    # ============================================================
+    # TABELA DE RESUMO (com colunas: Jogador, Amarelos, Vermelho, Suspenso, Cumprida)
+    # ============================================================
     dados_tabela = []
     for jogador, dados in cartoes_filtrados.items():
+        # Usa o campo 'amarelos' do JSON
         amarelos = dados.get('amarelos', 0)
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
         historico = dados.get('historico', [])
-        # Verifica se já cumpriu alguma suspensão (evento de cumprimento)
         ja_cumpriu = any(ev.get('cor') == 'suspensao_cumprida' for ev in historico)
         cumprida = "Sim" if ja_cumpriu else "Não"
 
@@ -126,7 +129,9 @@ def show():
         st.caption(f"Filtrado por fase: **{fase_selecionada}**")
     st.dataframe(df, use_container_width=True)
 
-    # Detalhes individuais
+    # ============================================================
+    # DETALHES INDIVIDUAIS
+    # ============================================================
     st.markdown("---")
     jogador_selecionado = st.selectbox(
         "Ver detalhes de um jogador",
