@@ -18,6 +18,7 @@ from io import BytesIO
 import requests
 import time
 from pathlib import Path
+import importlib.util
 
 # =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
@@ -632,37 +633,79 @@ def carregar_comissao_sub17() -> pd.DataFrame:
     return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_SUB17)
 
 # =============================================
-# CRONOGRAMA – INCLUINDO COMPETIÇÃO E FASE
+# CRONOGRAMA – CARREGA DE CSV OU DO SCRIPT PYTHON
 # =============================================
 @st.cache_data
 def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
+    """
+    Carrega o cronograma. Primeiro tenta o CSV; se não existir, tenta importar
+    do script específico (ex: linhares_profissional_crono_2026.py).
+    """
+    # Mapeia categoria para arquivo CSV
     if categoria == "Profissional":
-        arquivo = ARQUIVO_CRONO_PROF
+        arquivo_csv = ARQUIVO_CRONO_PROF
+        nome_script = "linhares_profissional_crono_2026"
     elif categoria == "Sub-15":
-        arquivo = ARQUIVO_CRONO_SUB15
+        arquivo_csv = ARQUIVO_CRONO_SUB15
+        nome_script = "linhares_sub15_crono_2026"
     elif categoria == "Sub-17":
-        arquivo = ARQUIVO_CRONO_SUB17
+        arquivo_csv = ARQUIVO_CRONO_SUB17
+        nome_script = "linhares_sub17_crono_2026"
     else:
         return pd.DataFrame()
-    if not os.path.exists(arquivo):
-        return pd.DataFrame()
+
+    # Tenta carregar do CSV
+    if os.path.exists(arquivo_csv):
+        try:
+            df = pd.read_csv(arquivo_csv, sep=';', encoding='utf-8-sig')
+            if 'data' in df.columns:
+                df['data'] = pd.to_datetime(df['data'], errors='coerce')
+            if 'competicao' not in df.columns:
+                df['competicao'] = 'Desconhecida'
+            if 'fase' not in df.columns:
+                df['fase'] = ''
+            return df
+        except Exception as e:
+            st.warning(f"Erro ao ler CSV de cronograma: {e}")
+
+    # Se não há CSV, tenta importar do script
     try:
-        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
-        if 'data' not in df.columns:
-            return pd.DataFrame()
-        df['data'] = pd.to_datetime(df['data'], errors='coerce')
-        if 'competicao' not in df.columns:
-            df['competicao'] = 'Desconhecida'
-        else:
-            df['competicao'] = df['competicao'].fillna('Desconhecida')
-        if 'fase' not in df.columns:
-            df['fase'] = ''
-        else:
-            df['fase'] = df['fase'].fillna('')
-        return df
+        # Tenta importar o módulo
+        spec = importlib.util.find_spec(nome_script)
+        if spec is None:
+            # Tenta com caminho relativo
+            script_path = Path(__file__).resolve().parent / f"{nome_script}.py"
+            if not script_path.exists():
+                script_path = Path(__file__).resolve().parent / ".." / f"{nome_script}.py"
+            if not script_path.exists():
+                return pd.DataFrame()
+            spec = importlib.util.spec_from_file_location(nome_script, script_path)
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            if hasattr(module, 'JOGOS_TEMPORADA_2026'):
+                jogos = module.JOGOS_TEMPORADA_2026
+                df = pd.DataFrame(jogos)
+                # Renomeia colunas para padronizar
+                if 'data_jogo' in df.columns:
+                    df.rename(columns={'data_jogo': 'data'}, inplace=True)
+                if 'id_jogo' in df.columns:
+                    df.rename(columns={'id_jogo': 'id'}, inplace=True)
+                if 'url_completa' in df.columns:
+                    df.rename(columns={'url_completa': 'url'}, inplace=True)
+                # Converte data
+                if 'data' in df.columns:
+                    df['data'] = pd.to_datetime(df['data'], errors='coerce')
+                # Garante colunas obrigatórias
+                if 'competicao' not in df.columns:
+                    df['competicao'] = 'Desconhecida'
+                if 'fase' not in df.columns:
+                    df['fase'] = ''
+                return df
     except Exception as e:
-        st.error(f"Erro ao carregar cronograma: {e}")
-        return pd.DataFrame()
+        st.warning(f"Erro ao carregar cronograma do script {nome_script}: {e}")
+
+    return pd.DataFrame()
 
 def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     df = carregar_cronograma(categoria)
@@ -1224,21 +1267,18 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
     """
     Versão que recebe um DataFrame já carregado, com lógica de reset.
     Prioriza o apelido (coluna 'jogador') como chave.
-    Se não houver cronograma, usa fallback de 7 dias.
+    Usa o cronograma (de CSV ou script) para identificar a próxima partida.
     """
     if df.empty:
         return {}, {}
 
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Carrega cronograma
+    # Carrega cronograma (agora pode vir do script)
     df_crono = carregar_cronograma(categoria.capitalize())
     datas_cronograma = []
     if not df_crono.empty and 'data' in df_crono.columns:
         datas_cronograma = sorted(df_crono['data'].dt.strftime('%d/%m/%Y').tolist())
-    else:
-        # Se não houver cronograma, cria uma lista vazia (fallback será usado)
-        pass
 
     cartoes = {}
     datas_globais = {}
@@ -1301,7 +1341,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if cartoes[nome]['suspenso_proxima']:
             data_susp = cartoes[nome].get('data_suspensao')
             if data_susp:
-                # Tenta encontrar a próxima data no cronograma
                 data_cumprimento = None
                 if datas_cronograma and data_susp in datas_cronograma:
                     try:
@@ -1310,7 +1349,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                             data_cumprimento = datas_cronograma[idx + 1]
                     except:
                         pass
-                # Se não encontrou, usa a data atual (reaparecimento) como fallback
                 if data_cumprimento is None:
                     data_cumprimento = data
 
@@ -1393,7 +1431,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if dados.get('suspenso_proxima', False):
             data_susp = dados.get('data_suspensao')
             if data_susp:
-                # Tenta encontrar a próxima data no cronograma
                 data_proximo_jogo = None
                 if datas_cronograma and data_susp in datas_cronograma:
                     try:
@@ -1402,7 +1439,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                             data_proximo_jogo = datetime.strptime(datas_cronograma[idx + 1], "%d/%m/%Y").date()
                     except:
                         pass
-                # Fallback: se não houver cronograma, considera 7 dias após a suspensão
+                # Fallback: 7 dias após a data de suspensão
                 if data_proximo_jogo is None:
                     try:
                         dt_susp = datetime.strptime(data_susp, "%d/%m/%Y").date()
@@ -1410,12 +1447,9 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     except:
                         continue
 
-                # Se a data do próximo jogo já passou e o jogador NÃO jogou nela
                 if data_proximo_jogo < hoje:
-                    # Converte a data para string para verificar ausência
                     data_str_prox = data_proximo_jogo.strftime("%d/%m/%Y")
                     if data_str_prox not in jogador_datas.get(nome, set()):
-                        # Suspensão cumprida
                         cartoes[nome]['historico'].append({
                             'data': data_str_prox,
                             'adversario': 'Suspensão cumprida (não jogou)',
