@@ -1439,8 +1439,10 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     'observacao': f"Suspensão cumprida em {data_str_prox}"
                 })
                 # Reseta estado
+                # Reseta estado (incluindo vermelho)
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
+                cartoes[nome]['vermelho'] = False   # <--- adiciona esta linha para zerar o vermelho também
                 cartoes[nome]['suspenso_proxima'] = False
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
