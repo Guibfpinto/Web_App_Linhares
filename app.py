@@ -526,10 +526,18 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
 # FUNÇÃO DETALHES JOGADOR (CORRIGIDA PARA 'foto')
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
-    with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
+    """
+    Exibe os detalhes completos de um jogador em um expander.
+    Usa nome_completo ou apelido como fallback.
+    """
+    # Determina o nome para exibição
+    nome_exibicao = row.get('nome_completo') or row.get('apelido') or 'Jogador'
+
+    with st.expander(f"📋 DETALHES COMPLETOS - {nome_exibicao}", expanded=True):
         col1, col2 = st.columns([1, 2])
+
+        # ===== COLUNA 1: FOTO =====
         with col1:
-            # Busca a foto pelo apelido (ou nome completo)
             caminho_foto = obter_caminho_foto(row, categoria)
             if caminho_foto and os.path.exists(caminho_foto):
                 try:
@@ -539,53 +547,74 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                     st.error(f"Erro: {e}")
             else:
                 st.write("📷 Sem foto")
+
+        # ===== COLUNA 2: DADOS BÁSICOS =====
         with col2:
-            nome_exibicao = row.get('nome_completo') or row.get('apelido') or 'N/I'
-            st.write(f"**Nome:** {nome_exibicao}")
+            # Nome (usa nome_completo ou apelido)
+            st.write(f"**Nome:** {row.get('nome_completo', row.get('apelido', 'N/I'))}")
             st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
+
             data_nasc = row.get('data_nascimento', '')
             idade = row.get('Idade', 'N/I')
             st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
+
             cidade = row.get('cidade_nascimento', '')
             uf = row.get('uf_nascimento', '')
             pais = row.get('pais_nascimento', '')
             st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
             st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
+
             st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
+
             pos_sec = row.get('Posicoes_Secundarias', [])
             if isinstance(pos_sec, list):
                 pos_sec_str = ", ".join(pos_sec) if pos_sec else "Nenhuma"
             else:
                 pos_sec_str = str(pos_sec) if pd.notna(pos_sec) else "Nenhuma"
             st.write(f"**Pos. Secundárias:** {pos_sec_str}")
+
             pe = row.get('pe_pref', '')
             pe_map = {np.nan: 'N/I', 'D': 'Destro', 'C': 'Canhoto', 'A': 'Ambidestro'}
             pe_str = pe_map.get(pe, str(pe)) if pd.notna(pe) else 'N/I'
             st.write(f"**Pé Preferencial:** {pe_str}")
+
             rating = row.get('Rating_Geral_FM26', 0)
             st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
+
             st.write(f"**Estado Físico:** {row.get('Estado_Fisico', 'N/I')}")
             st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
+
             lesao = obter_lesao_atual(row, categoria)
             st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
+
             imc = row.get('IMC')
             if pd.notna(imc):
                 st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
+
             gordura = row.get('Gordura_Corporal_%')
             if pd.notna(gordura):
                 st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
+
             massa_magra = row.get('Massa_Magra_kg')
             if pd.notna(massa_magra):
                 st.write(f"**Massa Magra:** {massa_magra:.1f} kg")
+
             massa_muscular = row.get('Massa_Muscular_Estimada_kg')
             if pd.notna(massa_muscular):
                 st.write(f"**Massa Muscular Estimada:** {massa_muscular:.1f} kg")
+
         st.divider()
+
+        # ===== HISTÓRICO DE CLUBES =====
         st.subheader("📜 Histórico de Clubes")
         st.text(obter_historico_clubes(row))
+
+        # ===== HISTÓRICO DE LESÕES =====
         st.subheader("🩺 Histórico de Lesões")
         texto_lesoes = obter_historico_lesoes_texto(row, categoria)
         st.text(texto_lesoes)
+
+        # ===== ESTATÍSTICAS DA TEMPORADA =====
         st.subheader("📊 Estatísticas da Temporada (oGol)")
         estatisticas_ogol = {
             'jogos_temporada': 'Jogos na temporada',
@@ -605,6 +634,8 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                 if valor_str.endswith('.0'):
                     valor_str = valor_str[:-2]
             st.write(f"**{label}:** {valor_str}")
+
+        # ===== ATRIBUTOS FM26 =====
         st.subheader("🎮 Atributos FM26 (todos os 60)")
         cols_atributos = st.columns(2)
         for i, attr in enumerate(ATRIBUTOS_FM26):
@@ -613,6 +644,8 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
             with cols_atributos[i % 2]:
                 st.write(f"**{nome_attr}:** {valor_str}")
+
+        # ===== HISTÓRICO DE CARTÕES =====
         st.subheader("🟨 Histórico de Cartões")
         nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
         if nome_canonico and nome_canonico in cartoes:

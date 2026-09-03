@@ -412,63 +412,76 @@ def inicializar_banco():
 # FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA) - CORRIGIDA
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
+    """
+    Carrega o CSV de perfil completo dos jogadores.
+    - Rejeita arquivos de estatísticas (com 'id_jogo').
+    - Identifica coluna de nome (prioridade: nome_completo, apelido, jogador, nome).
+    - Preenche nome_completo com apelido se vazio.
+    - Remove duplicatas baseadas em ogol_id (ou nome_completo).
+    - Garante colunas obrigatórias e cálculos.
+    """
     if not os.path.exists(caminho_arquivo):
-        st.warning(f"Arquivo não encontrado: {caminho_arquivo}")
+        st.warning(f"⚠️ Arquivo não encontrado: {caminho_arquivo}")
         return pd.DataFrame()
+
     try:
-        # Lê o CSV com cabeçalho (primeira linha contém os nomes das colunas)
+        # ===== 1. LEITURA E NORMALIZAÇÃO =====
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-        # Limpa nomes das colunas (remove espaços, substitui por _, minúsculo)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # ============================================================
-        # GARANTE QUE A COLUNA DE NOMES EXISTA
-        # ============================================================
-        # Tenta identificar a coluna de nomes
-        col_nome = None
-        for possivel in ['nome_completo', 'nome', 'jogador', 'atleta', 'player', 'name']:
-            if possivel in df.columns:
-                col_nome = possivel
-                break
-        
-        if col_nome is None:
-            # Se não encontrar, cria coluna vazia (fallback)
-            df['nome_completo'] = ''
-            col_nome = 'nome_completo'
-        elif col_nome != 'nome_completo':
-            # Renomeia para padronizar
-            df.rename(columns={col_nome: 'nome_completo'}, inplace=True)
+        # ===== 2. REJEITA ARQUIVOS DE ESTATÍSTICAS =====
+        if 'id_jogo' in df.columns:
+            st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
+            return pd.DataFrame()
 
-        # ============================================================
-        # GARANTE OUTRAS COLUNAS OBRIGATÓRIAS
-        # ============================================================
+        # ===== 3. IDENTIFICA A COLUNA DE NOME =====
+        coluna_nome = None
+        for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
+            if possivel in df.columns:
+                coluna_nome = possivel
+                break
+
+        if coluna_nome is None:
+            st.warning(f"⚠️ Nenhuma coluna de nome encontrada em {caminho_arquivo}. Ignorando.")
+            return pd.DataFrame()
+
+        # Padroniza para 'nome_completo'
+        if coluna_nome != 'nome_completo':
+            df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
+
+        # ===== 4. PREENCHE NOME_COMPLETO COM APELIDO SE VAZIO =====
+        if 'apelido' in df.columns:
+            df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
+        # Se ainda houver vazio, usa o próprio nome (ou 'N/I')
+        df['nome_completo'] = df['nome_completo'].fillna('N/I')
+
+        # ===== 5. REMOVE DUPLICATAS =====
+        if 'ogol_id' in df.columns:
+            df = df.drop_duplicates(subset=['ogol_id'], keep='first')
+        else:
+            df = df.drop_duplicates(subset=['nome_completo'], keep='first')
+
+        # ===== 6. GARANTE COLUNAS OBRIGATÓRIAS =====
         for col in ['apelido', 'data_nascimento', 'posicao']:
             if col not in df.columns:
-                df[col] = ''
+                df[col] = None
 
-        # ============================================================
-        # CONVERTE COLUNAS NUMÉRICAS
-        # ============================================================
+        # ===== 7. CONVERTE COLUNAS NUMÉRICAS =====
         for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             else:
                 df[col] = np.nan
 
-        # ============================================================
-        # ATRIBUTOS FM26
-        # ============================================================
         for attr in ATRIBUTOS_FM26:
             if attr in df.columns:
                 df[attr] = pd.to_numeric(df[attr], errors='coerce')
             else:
                 df[attr] = np.nan
 
-        # ============================================================
-        # CÁLCULOS (IMC, IDADE, GORDURA, ETC.)
-        # ============================================================
+        # ===== 8. CÁLCULOS (IMC, IDADE, GORDURA, ETC.) =====
         df['IMC'] = df.apply(
-            lambda x: x['peso_kg'] / ((x['altura_cm']/100)**2)
+            lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
             if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
             else np.nan,
             axis=1
@@ -482,7 +495,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
         df['Massa_Magra_kg'] = df.apply(
-            lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%']/100), 1)
+            lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%'] / 100), 1)
             if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%'])
             else np.nan,
             axis=1
@@ -502,9 +515,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
-        # ============================================================
-        # POSIÇÃO PRINCIPAL
-        # ============================================================
+        # ===== 9. POSIÇÃO PRINCIPAL =====
         def cat_pos(pos_str):
             if pd.isna(pos_str):
                 return 'Outros', []
@@ -553,7 +564,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         df['Posicao_Principal'] = res.apply(lambda x: x[0])
         df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
 
-        # Rating FM26
         df['Rating_Geral_FM26'] = df.apply(
             lambda row: min(100, row['habilidade_atual'] / 2)
             if pd.notna(row.get('habilidade_atual'))
@@ -561,14 +571,14 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
-        # Remove a coluna 'foto' se existir (já que você não a tem)
+        # Remove 'foto' se existir
         if 'foto' in df.columns:
             df.drop(columns=['foto'], inplace=True)
 
         return df
 
     except Exception as e:
-        st.error(f"Erro ao carregar {caminho_arquivo}: {e}")
+        st.error(f"❌ Erro ao carregar {caminho_arquivo}: {e}")
         return pd.DataFrame()
 
 @st.cache_data
@@ -1687,42 +1697,76 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
+    """
+    Adiciona colunas de estatísticas de partidas ao DataFrame do elenco,
+    evitando duplicatas e sufixos _x/_y.
+    Se df_stats_partidas estiver vazio ou sem colunas, apenas adiciona colunas zeradas.
+    """
+    # Cria uma cópia para não alterar o original
+    df_merged = df.copy()
+
+    # Se não houver estatísticas ou estiver vazio, adiciona colunas zeradas
     if df_stats_partidas.empty:
-        max_starts = 1
-        max_90min = 1
-        max_minutos_partidas = 1
-    else:
-        max_starts = df_stats_partidas['starts'].max() if 'starts' in df_stats_partidas.columns else 1
-        max_90min = df_stats_partidas['jogos_90min'].max() if 'jogos_90min' in df_stats_partidas.columns else 1
-        max_minutos_partidas = df_stats_partidas['minutos_totais'].max() if 'minutos_totais' in df_stats_partidas.columns else 1
+        for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
+            df_merged[col] = 0
+        return df_merged
 
-    if 'apelido' in df.columns:
-        df['nome_canonico'] = df['apelido'].apply(mapear_nome_para_canonico)
-    else:
-        df['nome_canonico'] = None
+    # Verifica se as colunas necessárias existem em df_stats_partidas
+    colunas_necessarias = ['starts', 'jogos_90min', 'minutos_totais']
+    colunas_presentes = [col for col in colunas_necessarias if col in df_stats_partidas.columns]
+    if not colunas_presentes:
+        # Se nenhuma coluna estiver presente, adiciona colunas zeradas
+        for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
+            df_merged[col] = 0
+        return df_merged
 
+    # Cria uma coluna 'nome_canonico' no df (usando apelido)
+    if 'apelido' in df_merged.columns:
+        df_merged['nome_canonico'] = df_merged['apelido'].apply(mapear_nome_para_canonico)
+    else:
+        df_merged['nome_canonico'] = None
+
+    # Prepara as estatísticas
     df_stats = df_stats_partidas.copy()
-    df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
+    # Renomeia 'minutos_totais' para 'minutos_totais_partidas' se existir
+    if 'minutos_totais' in df_stats.columns:
+        df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
 
+    # Cria coluna 'jogador_canonico' nas estatísticas (se não existir)
     if 'jogador_canonico' not in df_stats.columns:
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
         elif 'nome_completo' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['nome_completo'].apply(mapear_nome_para_canonico)
         else:
+            # Se não houver coluna de nome, não faz merge
             for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-                if col not in df.columns:
-                    df[col] = 0
-            return df
+                df_merged[col] = 0
+            return df_merged
 
-    df = df.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
+    # Seleciona apenas as colunas necessárias para o merge
+    colunas_merge = ['jogador_canonico', 'starts', 'jogos_90min']
+    if 'minutos_totais_partidas' in df_stats.columns:
+        colunas_merge.append('minutos_totais_partidas')
+    df_stats = df_stats[colunas_merge]
+
+    # Remove linhas com 'jogador_canonico' vazio
+    df_stats = df_stats.dropna(subset=['jogador_canonico'])
+
+    # Merge (left join)
+    df_merged = df_merged.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
+
+    # Remove colunas auxiliares
+    df_merged.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore', inplace=True)
+
+    # Preenche NaN com 0 para as colunas de estatísticas
     for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-        if col in df.columns:
-            df[col] = df[col].fillna(0).astype(int)
+        if col in df_merged.columns:
+            df_merged[col] = df_merged[col].fillna(0).astype(int)
         else:
-            df[col] = 0
-    df = df.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore')
-    return df
+            df_merged[col] = 0
+
+    return df_merged
 
 # =============================================
 # FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO
