@@ -459,13 +459,14 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Verifica se a coluna 'foto' existe e tenta exibir
-            if 'foto' in row and pd.notna(row.get('foto')):
-                caminho_foto = obter_caminho_foto(row, categoria)
-                if caminho_foto:
+            # Busca a foto pelo apelido (ou nome)
+            caminho_foto = obter_caminho_foto(row, categoria)
+            if caminho_foto and os.path.exists(caminho_foto):
+                try:
                     st.image(caminho_foto, width=150)
-                else:
-                    st.write("📷 Sem foto")
+                except Exception as e:
+                    st.write("📷 Sem foto (erro ao carregar)")
+                    st.error(f"Erro: {e}")
             else:
                 st.write("📷 Sem foto")
         with col2:
@@ -526,27 +527,16 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES COMPLETOS - {row.get('nome_completo', 'Jogador')}", expanded=True):
-
-        caminho = obter_caminho_foto(row, categoria)
-        st.write(f"🔍 Caminho da foto para {row.get('apelido')}: {caminho}")
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Verifica se a coluna 'foto' existe e tenta exibir
-            if 'foto' in row and pd.notna(row.get('foto')):
-                caminho_foto = obter_caminho_foto(row, categoria)
-                if caminho_foto:
-                    st.write(f"🔍 Caminho absoluto: {os.path.abspath(caminho_foto)}")
-                    st.write(f"O arquivo existe? {os.path.exists(caminho_foto)}")
-                    try:
-                        st.image(caminho_foto, width=150)
-                    except Exception as e:
-                        st.error(f"Erro ao carregar imagem: {e}")
-                else:
-                    st.write("📷 Sem foto")
-                if caminho_foto:
+            # Busca a foto pelo apelido (ou nome completo)
+            caminho_foto = obter_caminho_foto(row, categoria)
+            if caminho_foto and os.path.exists(caminho_foto):
+                try:
                     st.image(caminho_foto, width=150)
-                else:
-                    st.write("📷 Sem foto")
+                except Exception as e:
+                    st.write("📷 Sem foto (erro ao carregar)")
+                    st.error(f"Erro: {e}")
             else:
                 st.write("📷 Sem foto")
         with col2:

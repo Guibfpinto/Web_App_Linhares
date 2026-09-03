@@ -683,22 +683,19 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         if foto and pd.notna(foto) and str(foto).strip():
             caminho = str(foto).strip()
             if os.path.exists(caminho) or caminho.startswith('http'):
-                return caminho
+                return os.path.abspath(caminho) if not caminho.startswith('http') else caminho
 
     # 2. Obtém o apelido ou nome completo
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if not nome:
         return None
 
-    # Normaliza o nome (remove acentos, espaços -> _)
     nome_clean = normalizar_texto(nome).replace(' ', '_')
-    
-    # Lista de extensões suportadas
     extensoes = ['.png', '.jpg', '.jpeg']
     
-    # Ordem de prioridade: primeiro a pasta 'fotos/' (mais simples)
+    # Pastas em ordem de prioridade (primeiro a pasta 'fotos/')
     pastas_prioridade = [
-        "fotos",  # <-- prioridade máxima
+        "fotos",
         f"fotos_sistema_Analise_Elenco/Jogadores/Profissional",
         f"fotos_sistema_Analise_Elenco/Jogadores/Sub15",
         f"fotos_sistema_Analise_Elenco/Jogadores/Sub17",
@@ -707,17 +704,16 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         f"fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
     
-    # Para cada pasta e extensão, tenta o nome original e o normalizado
     for pasta in pastas_prioridade:
         for ext in extensoes:
-            # Tenta com o nome original (sem normalizar)
+            # Tenta com o nome original
             caminho = os.path.join(pasta, f"{nome}{ext}")
             if os.path.exists(caminho):
-                return caminho
+                return os.path.abspath(caminho)
             # Tenta com o nome normalizado
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
-                return caminho
+                return os.path.abspath(caminho)
     return None
 
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
