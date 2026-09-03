@@ -1111,22 +1111,11 @@ def carregar_cartoes_json(categoria):
         return {}, []
 
 def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
-    # Garantir que datas_globais seja uma lista de strings
-    if datas_globais is None:
-        _, datas_globais = carregar_cartoes_json(categoria)
-    # Converter para lista de strings, removendo duplicatas e ordenando
-    if isinstance(datas_globais, list):
-        datas_globais = sorted(set(str(d) for d in datas_globais))
-    else:
-        datas_globais = []
-
-    # Garantir que cartoes seja um dicionário serializável
-    # (já deve ser, mas faremos uma conversão segura)
-    dados = {
-        'cartoes': cartoes,
-        'datas_globais': datas_globais
-    }
-
+    """
+    Salva cartões e datas globais em um arquivo JSON, garantindo que todos os objetos
+    sejam serializáveis (strings, números, listas, dicionários).
+    """
+    # Define o caminho do arquivo com base na categoria
     if categoria == 'profissional':
         caminho = CAMINHO_CARTOES_PROFISSIONAL
     elif categoria == 'sub15':
@@ -1140,8 +1129,28 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
     elif categoria == 'comissao_sub17':
         caminho = CAMINHO_CARTOES_COMISSAO_SUB17
     else:
-        return
+        caminho = os.path.join(DATA_DIR, f"cartoes_{categoria}.json")
 
+    # Prepara o dicionário a ser salvo
+    dados = {'cartoes': cartoes}
+
+    # Converte datas_globais para um formato serializável
+    if datas_globais:
+        dados_serializaveis = {}
+        for id_jogador, lista_datas in datas_globais.items():
+            # Garante que cada elemento seja string
+            if isinstance(lista_datas, (list, tuple)):
+                dados_serializaveis[id_jogador] = [
+                    d.strftime("%d/%m/%Y") if hasattr(d, 'strftime') else str(d)
+                    for d in lista_datas
+                ]
+            else:
+                dados_serializaveis[id_jogador] = str(lista_datas)
+        dados['datas_globais'] = dados_serializaveis
+    else:
+        dados['datas_globais'] = {}
+
+    # Salva o arquivo JSON
     with open(caminho, 'w', encoding='utf-8') as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
 
@@ -1154,178 +1163,72 @@ def jogador_suspenso(nome, cartoes):
 # INICIALIZAR CARTÕES – COM LÓGICA DE FASE (competição + fase)
 # =============================================
 def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
-    st.info(f"🔄 Reinicializando cartões para {categoria}...")
-    if categoria == 'profissional':
-        pasta = PASTA_ESTATISTICAS_PROFISSIONAL
-    elif categoria == 'sub15':
-        pasta = PASTA_ESTATISTICAS_SUB15
-    elif categoria == 'sub17':
-        pasta = PASTA_ESTATISTICAS_SUB17
-    else:
-        return {}, []
-    if not pasta or not os.path.exists(pasta):
-        st.warning(f"Pasta {pasta} não encontrada.")
-        return {}, []
-    lista_arquivos = [os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith('.csv') and f.startswith('jogo_')]
-    if not lista_arquivos:
-        st.warning("Nenhum CSV de estatísticas encontrado.")
-        return {}, []
-
-    arquivos_com_data = []
-    for arq in lista_arquivos:
-        data_jogo = extrair_data_jogo(arq)
-        if not data_jogo:
-            try:
-                data_jogo = datetime.fromtimestamp(os.path.getmtime(arq))
-            except:
-                continue
-        arquivos_com_data.append((data_jogo, arq))
-    arquivos_com_data.sort(key=lambda x: x[0])
-    datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
+    """
+    Reinicializa os cartões a partir dos CSVs de estatísticas, usando os IDs do oGol.
+    Retorna (cartoes, datas_globais) onde datas_globais é um dicionário serializável
+    com chave = id_ogol e valor = lista de strings de datas (dd/mm/aaaa).
+    """
+    from utils import carregar_estatisticas_partidas
+    df = carregar_estatisticas_partidas(categoria)
+    if df.empty:
+        return {}, {}
 
     cartoes = {}
-    competicao_anterior = None
-    fase_anterior = None
-    ids_processados = set()
-    reset_ids = []
-    reset_apos_ids = []
+    datas_globais = {}  # chave: id_ogol (int ou str), valor: lista de datas (strings)
 
-    df_crono = carregar_cronograma()
-    mapa_jogo = {}
-    if not df_crono.empty and 'id_jogo' in df_crono.columns:
-        for _, row in df_crono.iterrows():
-            jogo_id = row.get('id_jogo')
-            if jogo_id:
-                mapa_jogo[str(jogo_id)] = (row.get('competicao', 'Desconhecida'), row.get('fase', ''))
-
-    for data_jogo, arq in arquivos_com_data:
-        jogo_id = extrair_id_jogo(arq)
-        if jogo_id is not None and jogo_id in ids_processados:
+    for _, row in df.iterrows():
+        nome = row.get('nome_canonico')
+        if not nome:
             continue
-        if jogo_id is not None:
-            ids_processados.add(jogo_id)
+        id_ogol = canonico_para_ogol_id.get(nome)
+        if not id_ogol:
+            continue
 
+        # Inicializa estrutura do jogador se não existir
+        if nome not in cartoes:
+            cartoes[nome] = {
+                'amarelos': 0,
+                'vermelho': False,
+                'suspenso_proxima': False,
+                'historico': [],
+                'id_ogol': id_ogol
+            }
+
+        # Pega a data do jogo (coluna 'data')
+        data_raw = row.get('data')
+        if not data_raw:
+            continue
+
+        # Normaliza para string dd/mm/aaaa
         try:
-            df = pd.read_csv(arq, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-            df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-
-            jogo_id_str = str(jogo_id) if jogo_id else ""
-            if jogo_id_str in mapa_jogo:
-                competicao_atual, fase_atual = mapa_jogo[jogo_id_str]
+            if isinstance(data_raw, str):
+                if '/' in data_raw:
+                    data_str = data_raw.strip()
+                else:
+                    # Tenta converter de aaaa-mm-dd
+                    dt = datetime.strptime(data_raw.strip(), "%Y-%m-%d")
+                    data_str = dt.strftime("%d/%m/%Y")
+            elif hasattr(data_raw, 'strftime'):  # é um datetime/date
+                data_str = data_raw.strftime("%d/%m/%Y")
             else:
-                competicao_atual = df['competicao'].iloc[0] if 'competicao' in df.columns else 'Desconhecida'
-                fase_atual = df['fase'].iloc[0] if 'fase' in df.columns else ''
-            adversario = df['adversario'].iloc[0] if 'adversario' in df.columns else 'Desconhecido'
+                # Fallback: converte para string
+                data_str = str(data_raw)
+        except Exception:
+            data_str = str(data_raw)
 
-            chave_fase_atual = f"{competicao_atual}_{fase_atual}"
-            if competicao_anterior is not None and chave_fase_atual != f"{competicao_anterior}_{fase_anterior}":
-                for dados in cartoes.values():
-                    dados['amarelos'] = 0
-                    dados['vermelho'] = False
-                    dados['suspenso_proxima'] = False
-            competicao_anterior = competicao_atual
-            fase_anterior = fase_atual
+        # Adiciona ao histórico de datas globais (por jogador)
+        if id_ogol not in datas_globais:
+            datas_globais[id_ogol] = []
+        if data_str not in datas_globais[id_ogol]:
+            datas_globais[id_ogol].append(data_str)
 
-            if jogo_id in reset_ids:
-                for dados in cartoes.values():
-                    dados['amarelos'] = 0
-                    dados['vermelho'] = False
-                    dados['suspenso_proxima'] = False
+    # Ordena as datas para cada jogador
+    for jogador in datas_globais:
+        datas_globais[jogador].sort()
 
-            relacionados_ogol_ids = set()
-            for _, row in df.iterrows():
-                nome = row.get('jogador')
-                if pd.isna(nome):
-                    continue
-                canonico = mapear_nome_para_canonico(nome)
-                if canonico and canonico in canonico_para_ogol_id:
-                    relacionados_ogol_ids.add(canonico_para_ogol_id[canonico])
-
-            for nome, dados in list(cartoes.items()):
-                if dados.get('suspenso_proxima', False):
-                    ogol_id = dados.get('ogol_id')
-                    if ogol_id and ogol_id in relacionados_ogol_ids:
-                        continue
-                    if nome in [mapear_nome_para_canonico(row.get('jogador')) for _, row in df.iterrows() if pd.notna(row.get('jogador'))]:
-                        continue
-                    dados['amarelos'] = 0
-                    dados['vermelho'] = False
-                    dados['suspenso_proxima'] = False
-                    for ev in reversed(dados.get('historico', [])):
-                        if ev.get('suspenso_causada') and not ev.get('suspenso_cumprida'):
-                            ev['suspenso_cumprida'] = True
-                            break
-
-            suspensos_neste_jogo = set()
-            for _, row in df.iterrows():
-                nome = row.get('jogador')
-                if pd.isna(nome):
-                    continue
-                canonico = mapear_nome_para_canonico(nome)
-                if not canonico:
-                    continue
-
-                amarelos = int(row.get('cartoes_amarelos', 0))
-                vermelhos = int(row.get('cartoes_vermelhos', 0))
-                if amarelos == 0 and vermelhos == 0:
-                    continue
-
-                if canonico not in cartoes:
-                    cartoes[canonico] = {
-                        'amarelos': 0,
-                        'vermelho': False,
-                        'suspenso_proxima': False,
-                        'historico': [],
-                        'ogol_id': canonico_para_ogol_id.get(canonico)
-                    }
-
-                for _ in range(amarelos):
-                    cartoes[canonico]['amarelos'] += 1
-                    terceiro = cartoes[canonico]['amarelos'] >= 3
-                    if terceiro:
-                        cartoes[canonico]['suspenso_proxima'] = True
-                        suspensos_neste_jogo.add(canonico)
-                    cartoes[canonico]['historico'].append({
-                        'data': data_jogo.strftime("%d/%m/%Y"),
-                        'adversario': adversario,
-                        'competicao': competicao_atual,
-                        'fase': fase_atual,
-                        'cor': 'amarelo',
-                        'terceiro_amarelo': terceiro,
-                        'suspenso_causada': terceiro,
-                        'suspenso_cumprida': False
-                    })
-
-                for _ in range(vermelhos):
-                    cartoes[canonico]['vermelho'] = True
-                    cartoes[canonico]['suspenso_proxima'] = True
-                    suspensos_neste_jogo.add(canonico)
-                    cartoes[canonico]['historico'].append({
-                        'data': data_jogo.strftime("%d/%m/%Y"),
-                        'adversario': adversario,
-                        'competicao': competicao_atual,
-                        'fase': fase_atual,
-                        'cor': 'vermelho',
-                        'terceiro_amarelo': False,
-                        'suspenso_causada': True,
-                        'suspenso_cumprida': False
-                    })
-
-            if jogo_id in reset_apos_ids:
-                for dados in cartoes.values():
-                    dados['amarelos'] = 0
-                    dados['vermelho'] = False
-                    dados['suspenso_proxima'] = False
-                for nome in suspensos_neste_jogo:
-                    if nome in cartoes:
-                        cartoes[nome]['suspenso_proxima'] = True
-
-        except Exception as e:
-            st.warning(f"Erro ao processar {arq}: {e}")
-
-    # CORREÇÃO: garantir que datas_globais seja uma lista de strings
+    # Salva no JSON (chamando a função corrigida)
     salvar_cartoes_json(cartoes, categoria, datas_globais)
-    st.success(f"✅ Cartões reinicializados para {categoria}.")
+
     return cartoes, datas_globais
 
 def inicializar_cartoes_comissao(categoria, df_comissao):
