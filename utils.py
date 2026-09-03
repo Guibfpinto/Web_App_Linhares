@@ -1169,29 +1169,26 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     Reinicializa os cartões a partir do CSV de estatísticas por partida.
     Lógica:
       - Amarelos acumulam até 3.
-      - Ao atingir 3, jogador fica suspenso (suspenso_proxima = True) e guardamos
-        a data do próximo jogo (do cronograma) como data de cumprimento.
-      - Quando o jogador voltar a aparecer em uma partida após essa data,
-        consideramos que a suspensão foi cumprida na data armazenada, resetamos
-        o contador e adicionamos evento 'suspensao_cumprida' naquela data.
+      - Ao atingir 3, jogador fica suspenso (suspenso_proxima = True).
+      - Quando o jogador não aparece na partida seguinte (detectado pelo
+        reaparicionamento em uma partida posterior), a suspensão é cumprida:
+        - Adiciona evento 'suspensao_cumprida' na data da partida que ele não jogou.
+        - Reseta contador de amarelos para 0.
+        - Marca suspenso_proxima = False.
+        - suspensoes_cumpridas = 0 (sempre 0).
     Retorna (cartoes, datas_globais).
     """
-    from utils import carregar_cronograma
-
     df = carregar_estatisticas_partidas(categoria)
     if df.empty:
         return {}, {}
 
-    # Ordena por data
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Carrega cronograma para obter datas dos jogos
+    # Carrega cronograma para obter as datas dos jogos
     df_crono = carregar_cronograma(categoria.capitalize())
-    # Mapeia datas do cronograma (em string) para a lista de datas
+    datas_cronograma = []
     if not df_crono.empty and 'data' in df_crono.columns:
         datas_cronograma = sorted(df_crono['data'].dt.strftime('%d/%m/%Y').tolist())
-    else:
-        datas_cronograma = []
 
     cartoes = {}
     datas_globais = {}
@@ -1209,11 +1206,11 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 'historico': [],
                 'id_ogol': row.get('id_ogol_jogador', ''),
                 'contador_amarelos_desde_reset': 0,
-                'suspensoes_cumpridas': 0,
-                'data_suspensao': None  # data do 3º amarelo
+                'suspensoes_cumpridas': 0,   # sempre 0, mantido para compatibilidade
+                'data_suspensao': None
             }
 
-        # Dados da partida
+        # Processa data
         data_raw = row.get('data_jogo') or row.get('data')
         if not data_raw:
             continue
@@ -1236,17 +1233,13 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
         # ============================================================
-        # 1. VERIFICA SE O JOGADOR ESTAVA SUSPENSO E ESTÁ VOLTANDO
+        # 1. SE O JOGADOR ESTAVA SUSPENSO E APARECEU NESTA PARTIDA
+        #    -> ELE CUMPRIU A SUSPENSÃO (porque ficou de fora na anterior)
         # ============================================================
         if cartoes[nome]['suspenso_proxima']:
-            # Se ele apareceu nesta partida, significa que a partida anterior (a que ele não jogou)
-            # foi a data de cumprimento. Usamos a data armazenada (data_suspensao) para o evento.
-            # Mas só processamos se a data atual for posterior à data de suspensão.
             data_susp = cartoes[nome].get('data_suspensao')
             if data_susp and data_susp in datas_cronograma:
-                # Encontra a próxima data no cronograma após a data de suspensão (a partida que ele não jogou)
-                # Na verdade, a data_suspensao já é a data do 3º amarelo, e o cumprimento ocorre na próxima partida.
-                # Precisamos da data da partida seguinte no cronograma.
+                # Encontra a próxima data no cronograma após a data de suspensão
                 try:
                     idx = datas_cronograma.index(data_susp)
                     if idx + 1 < len(datas_cronograma):
@@ -1254,7 +1247,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                     else:
                         data_cumprimento = data  # fallback
                 except:
-                    data_cumprimento = data  # fallback
+                    data_cumprimento = data
 
                 # Adiciona evento de cumprimento na data da partida em que ele não jogou
                 cartoes[nome]['historico'].append({
@@ -1272,7 +1265,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
                 cartoes[nome]['suspenso_proxima'] = False
-                cartoes[nome]['suspensoes_cumpridas'] += 1
+                cartoes[nome]['suspensoes_cumpridas'] = 0   # sempre 0
                 cartoes[nome]['data_suspensao'] = None
 
         # ============================================================
@@ -1292,17 +1285,14 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 })
                 cartoes[nome]['contador_amarelos_desde_reset'] += 1
 
-                # Verifica se atingiu 3 amarelos
                 if cartoes[nome]['contador_amarelos_desde_reset'] >= 3:
-                    # Marca o último amarelo como terceiro
                     if cartoes[nome]['historico']:
                         ultimo = cartoes[nome]['historico'][-1]
                         ultimo['terceiro_amarelo'] = True
                         ultimo['suspenso_causada'] = True
-                    # Ativa suspensão
                     cartoes[nome]['suspenso_proxima'] = True
-                    # Guarda a data atual como data de suspensão (para encontrar a próxima partida)
                     cartoes[nome]['data_suspensao'] = data
+                    cartoes[nome]['suspensoes_cumpridas'] = 0
 
         # ============================================================
         # 3. PROCESSAR VERMELHOS
@@ -1322,17 +1312,18 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
                 })
                 cartoes[nome]['suspenso_proxima'] = True
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
-                cartoes[nome]['data_suspensao'] = data  # também guarda a data do vermelho
+                cartoes[nome]['data_suspensao'] = data
+                cartoes[nome]['suspensoes_cumpridas'] = 0
 
         # ============================================================
-        # 4. ATUALIZA AMARELOS ATUAIS
+        # 4. ATUALIZA AMARELOS ATUAIS E SUSPENSO_PROXIMA
         # ============================================================
         cartoes[nome]['amarelos'] = cartoes[nome]['contador_amarelos_desde_reset']
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
 
         # ============================================================
-        # 5. REGISTRA DATAS GLOBAIS
+        # 5. DATAS GLOBAIS
         # ============================================================
         id_ogol = row.get('id_ogol_jogador')
         if id_ogol:
@@ -1345,9 +1336,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     for jogador in datas_globais:
         datas_globais[jogador].sort()
 
-    # Salva no JSON
     salvar_cartoes_json(cartoes, categoria, datas_globais)
-
     return cartoes, datas_globais
 
 def inicializar_cartoes_comissao(categoria, df_comissao):
@@ -2078,14 +2067,13 @@ def obter_historico_clubes(jogador_row):
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
     """
     Retorna um texto formatado com o resumo de cartões.
-    Mostra: amarelos atuais (não pagos), vermelho direto, suspenso para o próximo jogo,
-    suspensão cumprida? e histórico dos eventos.
+    Mostra: amarelos atuais, vermelho direto, suspenso para o próximo jogo,
+    e "Suspensão cumprida?" baseado na existência de evento 'suspensao_cumprida' no histórico.
     """
     if not cartoes:
         return "Nenhum dado de cartões disponível."
 
     if nome_jogador:
-        # Busca o jogador
         dados = None
         for chave, valor in cartoes.items():
             if chave.lower() == nome_jogador.lower() or mapear_nome_para_canonico(chave) == nome_jogador:
@@ -2097,21 +2085,20 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
         if not dados:
             return f"Jogador '{nome_jogador}' não encontrado."
 
-        # Dados atuais
         amarelos_atuais = dados.get('amarelos', 0)
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
-        suspensoes_cumpridas = dados.get('suspensoes_cumpridas', 0)
-        tem_suspensao = "Sim" if suspensoes_cumpridas > 0 else "Não"
-
         historico = dados.get('historico', [])
+        # Verifica se existe algum evento de cumprimento
+        ja_cumpriu = any(ev.get('cor') == 'suspensao_cumprida' for ev in historico)
+        cumprida = "Sim" if ja_cumpriu else "Não"
 
         linhas = [
             f"📋 **Cartões de {nome_jogador}**",
             f"  🟨 Amarelos atuais (não pagos): {amarelos_atuais}",
             f"  🟥 Vermelho direto (ativo): {vermelho}",
             f"  ⚠️ Suspenso para o próximo jogo: {suspenso}",
-            f"  ✅ Suspensão cumprida? {tem_suspensao}",
+            f"  ✅ Suspensão cumprida? {cumprida}",
             ""
         ]
         if historico:
@@ -2120,8 +2107,7 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 data = ev.get('data', 'data desconhecida')
                 adv = ev.get('adversario', 'adversário')
                 cor = ev.get('cor', '')
-                cumprida = ev.get('suspenso_cumprida', False)
-                cumprida_str = "Sim" if cumprida else "Não"
+                cumprida_evento = "Sim" if ev.get('suspenso_cumprida', False) else "Não"
 
                 if cor == 'amarelo':
                     emoji = "🟨"
@@ -2136,7 +2122,7 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                     emoji = "ℹ️"
                     extra = ""
 
-                linha = f"    {emoji} {data} vs {adv} - {cor}{extra} [Cumprida: {cumprida_str}]"
+                linha = f"    {emoji} {data} vs {adv} - {cor}{extra} [Cumprida: {cumprida_evento}]"
                 if ev.get('competicao'):
                     linha += f" [{ev.get('competicao')}"
                     if ev.get('fase'):
@@ -2156,8 +2142,9 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             amarelos_atuais = dados.get('amarelos', 0)
             vermelho = "Sim" if dados.get('vermelho', False) else "Não"
             suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
-            suspensoes = dados.get('suspensoes_cumpridas', 0)
-            cumprida = "Sim" if suspensoes > 0 else "Não"
+            historico = dados.get('historico', [])
+            ja_cumpriu = any(ev.get('cor') == 'suspensao_cumprida' for ev in historico)
+            cumprida = "Sim" if ja_cumpriu else "Não"
             linhas.append(f"{jog:<25} {amarelos_atuais:<10} {vermelho:<10} {suspenso:<10} {cumprida:<15}")
         return "\n".join(linhas)
 
