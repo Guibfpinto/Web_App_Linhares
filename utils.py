@@ -44,6 +44,12 @@ RELATORIOS_DIR = "relatorios"
 NOME_TIME = "Linhares FC"
 TEMPORADA = str(datetime.now().year)
 
+
+# =============================================
+# CONSTANTE DE FORMATAÇÃO DE DATA (JSON)
+# =============================================
+FORMATO_DATA_JSON = "%Y-%m-%d"   # ISO 8601
+
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
 # =============================================
@@ -1247,7 +1253,7 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
         for id_jogador, lista_datas in datas_globais.items():
             if isinstance(lista_datas, (list, tuple)):
                 dados_serializaveis[id_jogador] = [
-                    d.strftime("%d/%m/%Y") if hasattr(d, 'strftime') else str(d)
+                    d.strftime(FORMATO_DATA_JSON) if hasattr(d, 'strftime') else str(d)
                     for d in lista_datas
                 ]
             else:
@@ -1268,21 +1274,26 @@ def jogador_suspenso(nome, cartoes):
 # INICIALIZAR CARTÕES – COM RESET DE AMARELOS E VERIFICAÇÃO POR DATA (CORRIGIDO)
 # =============================================
 def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
+    """
+    Reinicializa os cartões a partir de um DataFrame de estatísticas por partida.
+    Usa as datas do próprio CSV para determinar a próxima partida após a suspensão.
+    """
     if df.empty:
         return {}, {}
 
+    # Converte data_jogo para datetime
+    if 'data_jogo' in df.columns:
+        df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
+        df = df.dropna(subset=['data_jogo'])
+
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Carrega cronograma
-    df_crono = carregar_cronograma(categoria.capitalize())
-    datas_cronograma = []
-    if not df_crono.empty and 'data' in df_crono.columns:
-        datas_validas = df_crono['data'].dropna()
-        datas_cronograma = sorted(datas_validas.dt.strftime('%d/%m/%Y').tolist())
+    # Obtém todas as datas de jogos únicas do CSV (ordem cronológica)
+    todas_datas = sorted(df['data_jogo'].dt.strftime('%Y-%m-%d').unique())
 
     cartoes = {}
     datas_globais = {}
-    jogador_datas = {}
+    jogador_datas = {}  # datas em que o jogador jogou (YYYY-MM-DD)
 
     for _, row in df.iterrows():
         nome = row.get('jogador')
@@ -1292,21 +1303,14 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             continue
         nome = str(nome).strip()
 
-        data_raw = row.get('data_jogo') or row.get('data')
-        if data_raw:
-            try:
-                if isinstance(data_raw, pd.Timestamp):
-                    data = data_raw.strftime("%d/%m/%Y")
-                elif '/' in str(data_raw):
-                    data = str(data_raw).strip()
-                else:
-                    dt = pd.to_datetime(data_raw, dayfirst=True)
-                    data = dt.strftime("%d/%m/%Y")
-            except:
-                data = str(data_raw).strip()
-            if nome not in jogador_datas:
-                jogador_datas[nome] = set()
-            jogador_datas[nome].add(data)
+        data_dt = row.get('data_jogo')
+        if pd.isna(data_dt):
+            continue
+        data = data_dt.strftime('%Y-%m-%d')
+
+        if nome not in jogador_datas:
+            jogador_datas[nome] = set()
+        jogador_datas[nome].add(data)
 
         if nome not in cartoes:
             id_ogol = row.get('id_ogol_jogador')
@@ -1317,7 +1321,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     id_ogol = str(int(float(id_ogol))) if not pd.isna(id_ogol) else None
                 except:
                     id_ogol = None
-
             cartoes[nome] = {
                 'amarelos': 0,
                 'vermelho': False,
@@ -1326,8 +1329,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 'id_ogol': id_ogol,
                 'contador_amarelos_desde_reset': 0,
                 'suspensoes_cumpridas': 0,
-                'data_suspensao': None,
-                'data_cumprimento': None  # data da partida em que a suspensão foi cumprida
+                'data_suspensao': None
             }
 
         adversario = row.get('adversario', 'N/I')
@@ -1336,7 +1338,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # --- Processar amarelos ---
+        # --- Amarelos ---
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1351,17 +1353,15 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 })
                 cartoes[nome]['contador_amarelos_desde_reset'] += 1
                 if cartoes[nome]['contador_amarelos_desde_reset'] >= 3:
-                    # Marca o último amarelo como terceiro
                     if cartoes[nome]['historico']:
                         ultimo = cartoes[nome]['historico'][-1]
                         ultimo['terceiro_amarelo'] = True
                         ultimo['suspenso_causada'] = True
-                    # Ativa suspensão e guarda a data do terceiro amarelo (data_suspensao)
                     cartoes[nome]['suspenso_proxima'] = True
                     cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # --- Processar vermelhos ---
+        # --- Vermelhos ---
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
@@ -1384,19 +1384,18 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
 
-        id_ogol = cartoes[nome]['id_ogol']
-        if id_ogol:
-            if id_ogol not in datas_globais:
-                datas_globais[id_ogol] = []
-            if data not in datas_globais[id_ogol]:
-                datas_globais[id_ogol].append(data)
+        # Datas globais (apenas se tiver id_ogol)
+        if cartoes[nome]['id_ogol']:
+            if cartoes[nome]['id_ogol'] not in datas_globais:
+                datas_globais[cartoes[nome]['id_ogol']] = []
+            if data not in datas_globais[cartoes[nome]['id_ogol']]:
+                datas_globais[cartoes[nome]['id_ogol']].append(data)
 
     # ============================================================
-    # VERIFICAÇÃO FINAL: Suspensões não cumpridas
+    # VERIFICAÇÃO FINAL: cumprimento de suspensões
     # ============================================================
     hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 
-    # Para cada jogador suspenso, encontrar a próxima partida no cronograma após data_suspensao
     for nome, dados in cartoes.items():
         if not dados.get('suspenso_proxima', False):
             continue
@@ -1405,35 +1404,31 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if not data_susp:
             continue
 
-        data_cumprimento = None
+        # Converte data de suspensão para date
+        try:
+            dt_susp = datetime.strptime(data_susp, "%Y-%m-%d").date()
+        except:
+            continue
 
-        # Tenta encontrar a próxima data no cronograma após data_susp
-        if datas_cronograma and data_susp in datas_cronograma:
-            try:
-                idx = datas_cronograma.index(data_susp)
-                if idx + 1 < len(datas_cronograma):
-                    data_cumprimento_str = datas_cronograma[idx + 1]
-                    data_cumprimento = datetime.strptime(data_cumprimento_str, "%d/%m/%Y").date()
-            except:
-                pass
+        # Encontra a próxima data de jogo (do CSV) após a data de suspensão
+        data_proximo_jogo = None
+        for d in todas_datas:
+            if d > data_susp:
+                data_proximo_jogo = datetime.strptime(d, "%Y-%m-%d").date()
+                break
 
-        # Fallback: se não houver cronograma, usa a data_susp + 7 dias
-        if data_cumprimento is None:
-            try:
-                dt_susp = datetime.strptime(data_susp, "%d/%m/%Y").date()
-                data_cumprimento = dt_susp + timedelta(days=7)
-            except:
-                continue
+        # Se não houver próxima partida (fim da temporada), a suspensão não é cumprida ainda
+        if data_proximo_jogo is None:
+            continue
 
-        # Agora, data_cumprimento é a data da partida seguinte (prevista)
-        # Verifica se essa data já passou
-        if data_cumprimento < hoje:
-            data_str_cump = data_cumprimento.strftime("%d/%m/%Y")
+        # Se a próxima partida já passou
+        if data_proximo_jogo < hoje:
+            data_str_prox = data_proximo_jogo.strftime("%Y-%m-%d")
             # Verifica se o jogador jogou nessa data
-            if data_str_cump not in jogador_datas.get(nome, set()):
-                # Suspensão cumprida!
+            if data_str_prox not in jogador_datas.get(nome, set()):
+                # === SUSPENSÃO CUMPRIDA ===
                 cartoes[nome]['historico'].append({
-                    'data': data_str_cump,
+                    'data': data_str_prox,
                     'adversario': 'Suspensão cumprida (não jogou)',
                     'cor': 'suspensao_cumprida',
                     'terceiro_amarelo': False,
@@ -1441,14 +1436,14 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     'suspenso_cumprida': True,
                     'competicao': '',
                     'fase': '',
-                    'observacao': f"Suspensão cumprida em {data_str_cump}"
+                    'observacao': f"Suspensão cumprida em {data_str_prox}"
                 })
+                # Reseta estado
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
                 cartoes[nome]['suspenso_proxima'] = False
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
-                cartoes[nome]['data_cumprimento'] = data_str_cump
 
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     return cartoes, datas_globais
