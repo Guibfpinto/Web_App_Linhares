@@ -673,16 +673,15 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
 # EXIBIR FOTO (CORRIGIDO PARA NÃO DAR ERRO SE NÃO HOUVER COLUNA 'foto')
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
-    # Verifica se a coluna 'foto' existe no dicionário
-    if 'foto' not in pessoa_row.index:
-        return None
-    foto = pessoa_row.get('foto')
-    if foto and pd.notna(foto) and str(foto).strip():
-        caminho = str(foto).strip()
-        if os.path.exists(caminho):
-            return caminho
-        if caminho.startswith('http'):
-            return caminho
+    # 1. Tenta usar a coluna 'foto' (se existir)
+    if 'foto' in pessoa_row.index:
+        foto = pessoa_row.get('foto')
+        if foto and pd.notna(foto) and str(foto).strip():
+            caminho = str(foto).strip()
+            if os.path.exists(caminho) or caminho.startswith('http'):
+                return caminho
+
+    # 2. Se não houver coluna 'foto', usa o apelido ou nome completo
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
         nome_clean = normalizar_texto(nome).replace(' ', '_')
