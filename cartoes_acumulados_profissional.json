@@ -177,9 +177,9 @@
       "data_suspensao": null
     },
     "Borjão": {
-      "amarelos": 2,
+      "amarelos": 0,
       "vermelho": true,
-      "suspenso_proxima": true,
+      "suspenso_proxima": false,
       "historico": [
         {
           "data": "08/08/2026",
@@ -190,17 +190,6 @@
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
           "fase": 1
-        },
-        {
-          "data": "09/05/2026",
-          "adversario": "Suspensão cumprida (não jogou)",
-          "cor": "suspensao_cumprida",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": true,
-          "competicao": "Capixaba Série B",
-          "fase": 1,
-          "observacao": "Suspensão cumprida (ficou de fora em 09/05/2026)"
         },
         {
           "data": "19/07/2026",
@@ -221,10 +210,21 @@
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
           "fase": 1
+        },
+        {
+          "data": "09/08/2026",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "",
+          "fase": "",
+          "observacao": "Suspensão cumprida em 09/08/2026"
         }
       ],
       "id_ogol": "481421",
-      "contador_amarelos_desde_reset": 2,
+      "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
@@ -264,15 +264,15 @@
           "fase": 1
         },
         {
-          "data": "28/07/2026",
+          "data": "02/09/2026",
           "adversario": "Suspensão cumprida (não jogou)",
           "cor": "suspensao_cumprida",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
           "suspenso_cumprida": true,
-          "competicao": "Capixaba Série B",
-          "fase": 1,
-          "observacao": "Suspensão cumprida (ficou de fora em 28/07/2026)"
+          "competicao": "",
+          "fase": "",
+          "observacao": "Suspensão cumprida em 02/09/2026"
         }
       ],
       "id_ogol": "649473",
@@ -281,9 +281,9 @@
       "data_suspensao": null
     },
     "Wendy": {
-      "amarelos": 1,
+      "amarelos": 0,
       "vermelho": true,
-      "suspenso_proxima": true,
+      "suspenso_proxima": false,
       "historico": [
         {
           "data": "08/08/2026",
@@ -296,17 +296,6 @@
           "fase": 1
         },
         {
-          "data": "09/05/2026",
-          "adversario": "Suspensão cumprida (não jogou)",
-          "cor": "suspensao_cumprida",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": true,
-          "competicao": "Capixaba Série B",
-          "fase": 1,
-          "observacao": "Suspensão cumprida (ficou de fora em 09/05/2026)"
-        },
-        {
           "data": "12/07/2026",
           "adversario": "Audax São Mateus",
           "cor": "amarelo",
@@ -315,10 +304,21 @@
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
           "fase": 1
+        },
+        {
+          "data": "09/08/2026",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "",
+          "fase": "",
+          "observacao": "Suspensão cumprida em 09/08/2026"
         }
       ],
       "id_ogol": "391833",
-      "contador_amarelos_desde_reset": 1,
+      "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
