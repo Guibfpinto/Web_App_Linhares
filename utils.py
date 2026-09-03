@@ -2039,16 +2039,15 @@ def obter_historico_clubes(jogador_row):
 # =============================================
 def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
     """
-    Retorna um texto formatado com o resumo de cartões de um jogador ou de todos.
-    Inclui amarelos atuais, vermelho, suspenso_proxima, número de suspensões cumpridas,
-    e uma flag "Suspensão cumprida?" (Sim/Não).
-    No histórico, cada evento mostra se a suspensão foi cumprida.
+    Retorna um texto formatado com o resumo de cartões.
+    Mostra: amarelos atuais (não pagos), vermelho direto, suspenso para o próximo jogo,
+    suspensão cumprida? e histórico dos eventos.
     """
     if not cartoes:
         return "Nenhum dado de cartões disponível."
 
     if nome_jogador:
-        # Busca pelo nome canônico ou pela chave original
+        # Busca o jogador
         dados = None
         for chave, valor in cartoes.items():
             if chave.lower() == nome_jogador.lower() or mapear_nome_para_canonico(chave) == nome_jogador:
@@ -2058,23 +2057,23 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 dados = valor
                 break
         if not dados:
-            return f"Jogador '{nome_jogador}' não encontrado nos registros."
+            return f"Jogador '{nome_jogador}' não encontrado."
 
-        amarelos = dados.get('amarelos', 0)
+        # Dados atuais
+        amarelos_atuais = dados.get('amarelos', 0)
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
         suspensoes_cumpridas = dados.get('suspensoes_cumpridas', 0)
-        # Flag "Suspensão cumprida?" para o jogador
-        tem_suspensao_cumprida = "Sim" if suspensoes_cumpridas > 0 else "Não"
+        tem_suspensao = "Sim" if suspensoes_cumpridas > 0 else "Não"
+
         historico = dados.get('historico', [])
 
         linhas = [
             f"📋 **Cartões de {nome_jogador}**",
-            f"  🟨 Amarelos atuais: {amarelos}",
-            f"  🟥 Vermelho direto: {vermelho}",
+            f"  🟨 Amarelos atuais (não pagos): {amarelos_atuais}",
+            f"  🟥 Vermelho direto (ativo): {vermelho}",
             f"  ⚠️ Suspenso para o próximo jogo: {suspenso}",
-            f"  🔄 Suspensões cumpridas: {suspensoes_cumpridas}",
-            f"  ✅ Suspensão cumprida? {tem_suspensao_cumprida}",
+            f"  ✅ Suspensão cumprida? {tem_suspensao}",
             ""
         ]
         if historico:
@@ -2083,23 +2082,22 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
                 data = ev.get('data', 'data desconhecida')
                 adv = ev.get('adversario', 'adversário')
                 cor = ev.get('cor', '')
-                # Determina se este evento específico teve a suspensão cumprida
-                if cor == 'suspensao_cumprida':
-                    cumprida_str = "Sim"
+                cumprida = ev.get('suspenso_cumprida', False)
+                cumprida_str = "Sim" if cumprida else "Não"
+
+                if cor == 'amarelo':
+                    emoji = "🟨"
+                    extra = " (3º amarelo!)" if ev.get('terceiro_amarelo', False) else ""
+                elif cor == 'vermelho':
+                    emoji = "🟥"
+                    extra = " (expulsão)"
+                elif cor == 'suspensao_cumprida':
                     emoji = "🔄"
                     extra = " (suspensão cumprida)"
                 else:
-                    cumprida = ev.get('suspenso_cumprida', False)
-                    cumprida_str = "Sim" if cumprida else "Não"
-                    if cor == 'amarelo':
-                        emoji = "🟨"
-                        extra = " (terceiro!)" if ev.get('terceiro_amarelo', False) else ""
-                    elif cor == 'vermelho':
-                        emoji = "🟥"
-                        extra = " (expulsão)"
-                    else:
-                        emoji = "ℹ️"
-                        extra = ""
+                    emoji = "ℹ️"
+                    extra = ""
+
                 linha = f"    {emoji} {data} vs {adv} - {cor}{extra} [Cumprida: {cumprida_str}]"
                 if ev.get('competicao'):
                     linha += f" [{ev.get('competicao')}"
@@ -2114,15 +2112,15 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
     else:
         # Resumo de todos os jogadores
         linhas = ["📊 **RESUMO DE CARTÕES DE TODOS OS JOGADORES**", ""]
-        linhas.append(f"{'Jogador':<25} {'Amarelos':<10} {'Vermelho':<10} {'Suspenso':<10} {'Susp.Cumprida':<15}")
+        linhas.append(f"{'Jogador':<25} {'Atuais':<10} {'Vermelho':<10} {'Suspenso':<10} {'Cumprida':<15}")
         linhas.append("-" * 70)
         for jog, dados in sorted(cartoes.items()):
-            amarelos = dados.get('amarelos', 0)
+            amarelos_atuais = dados.get('amarelos', 0)
             vermelho = "Sim" if dados.get('vermelho', False) else "Não"
             suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
             suspensoes = dados.get('suspensoes_cumpridas', 0)
             cumprida = "Sim" if suspensoes > 0 else "Não"
-            linhas.append(f"{jog:<25} {amarelos:<10} {vermelho:<10} {suspenso:<10} {cumprida:<15}")
+            linhas.append(f"{jog:<25} {amarelos_atuais:<10} {vermelho:<10} {suspenso:<10} {cumprida:<15}")
         return "\n".join(linhas)
 
 # =============================================
