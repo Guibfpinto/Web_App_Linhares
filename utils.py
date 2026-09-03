@@ -790,6 +790,34 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
     st.write("📷")
 
 # =============================================
+# FOTO DE ÁRBITROS
+# =============================================
+def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
+    """
+    Retorna o caminho absoluto da foto do árbitro, se existir.
+    Procura na pasta 'fotos_arbitros/' com o nome normalizado.
+    """
+    if not nome_arbitro or pd.isna(nome_arbitro):
+        return None
+
+    # Normaliza o nome (remove acentos, espaços -> _)
+    nome_clean = normalizar_texto(nome_arbitro).replace(' ', '_')
+    pastas = ["fotos_arbitros"]
+    extensoes = ['.png', '.jpg', '.jpeg']
+
+    for pasta in pastas:
+        for ext in extensoes:
+            # Tenta com o nome original (sem normalizar)
+            caminho = os.path.join(pasta, f"{nome_arbitro}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
+            # Tenta com o nome normalizado
+            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
+    return None
+
+# =============================================
 # LESÕES (CSV)
 # =============================================
 def parse_data_flexivel(data_str):

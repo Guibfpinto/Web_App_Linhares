@@ -17,6 +17,9 @@ from utils import (
     mapear_nome_para_canonico,
     inicializar_banco,
     jogador_suspenso,
+    obter_caminho_foto,          # para fotos dos jogadores
+    obter_caminho_foto_arbitro,  # para fotos dos árbitros
+    normalizar_texto,            # <-- CORREÇÃO: importado
 )
 
 # ============================================================
@@ -100,7 +103,7 @@ DB_PATH = "meu_futebol.db"
 
 def conectar_banco():
     conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row  # ESSENCIAL: permite dict(row)
+    conn.row_factory = sqlite3.Row
     return conn
 
 def verificar_jogo_ao_vivo_sql(team_id):
@@ -269,7 +272,7 @@ def obter_tecnicos_por_time(time_id, competicao_id=None):
     tecnicos = []
     for r in rows:
         d = dict(r)
-        d['cargo'] = 'Técnico'  # Adiciona campo cargo para evitar KeyError
+        d['cargo'] = 'Técnico'
         tecnicos.append(d)
     return tecnicos
 
@@ -296,44 +299,58 @@ def obter_staff_completo(time_id, competicao_id=None):
         c.setdefault('cargo', 'Membro')
     return tecnicos + comissao
 
-# ============================================================
-# FUNÇÕES DE EXIBIÇÃO DE FOTOS (caminhos relativos)
-# ============================================================
-PASTA_FOTOS_COMISSAO = "assets/fotos_comissao/"
-PASTA_FOTOS_TECNICOS = "assets/fotos_tecnicos/"
-PASTA_FOTOS_ARBITROS = "assets/fotos_arbitros/"
-
 def caminho_foto_membro(membro):
-    foto = membro.get('foto', '')
-    if not foto:
-        return None
-    if foto.startswith('C:') or '\\' in foto:
-        nome_arquivo = os.path.basename(foto)
-    else:
-        nome_arquivo = foto
-    for pasta in [PASTA_FOTOS_COMISSAO, PASTA_FOTOS_TECNICOS]:
-        caminho = os.path.join(pasta, nome_arquivo)
+    """
+    Busca a foto de um membro da comissão ou técnico.
+    Prioriza:
+      1. O caminho exato da coluna 'foto'
+      2. Busca pelo apelido ou nome em pastas específicas
+      3. Busca recursiva em 'assets/fotos_comissao/' e 'assets/fotos_tecnicos/'
+    """
+    # 1. Tenta usar a coluna 'foto' (se existir)
+    foto = membro.get('foto')
+    if foto and pd.notna(foto) and str(foto).strip():
+        caminho = str(foto).strip()
         if os.path.exists(caminho):
-            return caminho
-    for pasta in [PASTA_FOTOS_COMISSAO, PASTA_FOTOS_TECNICOS]:
-        for root, dirs, files in os.walk(pasta):
-            if nome_arquivo in files:
-                return os.path.join(root, nome_arquivo)
-    return None
+            return os.path.abspath(caminho)
 
-def caminho_foto_arbitro(foto):
-    if not foto:
+    # 2. Obtém o nome (prioriza apelido, depois nome)
+    nome = membro.get('apelido') or membro.get('nome')
+    if not nome:
         return None
-    if foto.startswith('C:') or '\\' in foto:
-        nome_arquivo = os.path.basename(foto)
-    else:
-        nome_arquivo = foto
-    caminho = os.path.join(PASTA_FOTOS_ARBITROS, nome_arquivo)
-    if os.path.exists(caminho):
-        return caminho
-    for root, dirs, files in os.walk(PASTA_FOTOS_ARBITROS):
-        if nome_arquivo in files:
-            return os.path.join(root, nome_arquivo)
+
+    # Normaliza o nome (remove acentos, espaços -> _)
+    nome_clean = normalizar_texto(nome).replace(' ', '_')
+    extensoes = ['.png', '.jpg', '.jpeg']
+
+    # Pastas para procurar (ordem de prioridade)
+    pastas = [
+        "assets/fotos_comissao/",
+        "assets/fotos_tecnicos/",
+        "fotos/",                     # fallback na raiz
+        "assets/fotos/",              # fallback genérico
+    ]
+
+    for pasta in pastas:
+        for ext in extensoes:
+            # Tenta com o nome original (sem normalizar)
+            caminho = os.path.join(pasta, f"{nome}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
+            # Tenta com o nome normalizado
+            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
+
+    # 3. Busca recursiva nas pastas (caso o arquivo esteja em subpastas)
+    for pasta in pastas:
+        if os.path.exists(pasta):
+            for root, dirs, files in os.walk(pasta):
+                for ext in extensoes:
+                    if f"{nome}{ext}" in files:
+                        return os.path.join(root, f"{nome}{ext}")
+                    if f"{nome_clean}{ext}" in files:
+                        return os.path.join(root, f"{nome_clean}{ext}")
     return None
 
 # ============================================================
@@ -371,7 +388,7 @@ def atualizar_arbitro_jogo(jogo_id, arbitro_id):
     conn.close()
 
 # ============================================================
-# FUNÇÃO AUXILIAR PARA MONTAR TIME
+# FUNÇÃO AUXILIAR PARA MONTAR TIME (COM FOTOS)
 # ============================================================
 def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
     if df.empty:
@@ -523,7 +540,7 @@ def show():
     eh_hoje = (data_jogo == hoje) if data_jogo else False
 
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
-    col1, col2, col_arb = st.columns([2, 1, 1.5])
+    col1, col2, col_arb = st.columns([2, 1, 2])
     with col1:
         st.write(f"**Status:** {status} | **Data:** {data_hora}")
     with col2:
@@ -532,10 +549,16 @@ def show():
     with col_arb:
         arbitro = obter_arbitro_por_id(arbitro_id_atual)
         if arbitro:
-            foto_arb = caminho_foto_arbitro(arbitro.get('foto'))
-            if foto_arb:
-                st.image(foto_arb, width=30)
-            st.write(f"**🟨 Árbitro:** {arbitro['nome']} ({arbitro.get('categoria', 'N/I')})")
+            nome_arbitro = arbitro['nome']
+            foto_arb = obter_caminho_foto_arbitro(nome_arbitro)
+            col_foto, col_texto = st.columns([1, 3])
+            with col_foto:
+                if foto_arb and os.path.exists(foto_arb):
+                    st.image(foto_arb, width=150)  # <-- TAMANHO 150px
+                else:
+                    st.write("👤")
+            with col_texto:
+                st.write(f"**🟨 Árbitro:** {nome_arbitro} ({arbitro.get('categoria', 'N/I')})")
         else:
             st.write("**🟨 Árbitro:** Não definido")
 
@@ -672,7 +695,7 @@ def show():
 
     conn = conectar_banco()
     df_lineup = pd.read_sql_query(f"""
-        SELECT e.*, el.nome
+        SELECT e.*, el.nome, el.apelido, el.foto
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
         WHERE e.jogo_id = {jogo_selecionado_id} AND e.tipo = 'Lineup'
@@ -682,18 +705,39 @@ def show():
     if not df_lineup.empty:
         st.info("Escalação já registrada.")
         col1, col2 = st.columns(2)
+
         with col1:
             st.write(f"**{time_casa}**")
             titulares_casa = df_lineup[df_lineup['detalhes'].str.contains('Titular', na=False)]
             for _, row in titulares_casa.iterrows():
-                nome = row['nome'] if row['nome'] else 'Desconhecido'
-                st.write(f"• {nome}")
+                nome = row['nome'] if row['nome'] else row['apelido'] or 'Desconhecido'
+                foto = row.get('foto')
+                if foto and os.path.exists(foto):
+                    st.image(foto, width=150)
+                else:
+                    # Tenta buscar pelo apelido
+                    caminho = obter_caminho_foto(row, "Profissional")
+                    if caminho and os.path.exists(caminho):
+                        st.image(caminho, width=150)
+                    else:
+                        st.write(f"📷 {nome}")
+                st.caption(nome)
+
         with col2:
             st.write(f"**{time_fora}**")
             titulares_fora = df_lineup[df_lineup['detalhes'].str.contains('Visitante', na=False)]
             for _, row in titulares_fora.iterrows():
-                nome = row['nome'] if row['nome'] else 'Desconhecido'
-                st.write(f"• {nome}")
+                nome = row['nome'] if row['nome'] else row['apelido'] or 'Desconhecido'
+                foto = row.get('foto')
+                if foto and os.path.exists(foto):
+                    st.image(foto, width=150)
+                else:
+                    caminho = obter_caminho_foto(row, "Profissional")
+                    if caminho and os.path.exists(caminho):
+                        st.image(caminho, width=150)
+                    else:
+                        st.write(f"📷 {nome}")
+                st.caption(nome)
     else:
         st.write("**Definir escalação manual:**")
         if df_elenco.empty:
@@ -720,27 +764,29 @@ def show():
 
     st.markdown("---")
 
-    # ===== STAFF TÉCNICO (COMISSÃO + TÉCNICOS) =====
+    # ===== STAFF TÉCNICO (COMISSÃO + TÉCNICOS) COM FOTOS EM 150px =====
     st.subheader("👔 Staff Técnico")
 
     staff_casa = obter_staff_completo(jogo['time_casa_id'], jogo.get('competicao_id'))
     staff_fora = obter_staff_completo(jogo['time_fora_id'], jogo.get('competicao_id'))
 
     col1, col2 = st.columns(2)
+
     with col1:
         st.markdown(f"**{time_casa}**")
         if staff_casa:
             for membro in staff_casa:
-                foto_path = caminho_foto_membro(membro)
                 col_foto, col_texto = st.columns([1, 4])
                 with col_foto:
-                    if foto_path:
-                        st.image(foto_path, width=30)
+                    foto_path = caminho_foto_membro(membro)
+                    if foto_path and os.path.exists(foto_path):
+                        st.image(foto_path, width=150)  # <-- TAMANHO 150px
                     else:
                         st.write("📌")
                 with col_texto:
-                    cargo = membro.get('cargo', 'Técnico')  # Garante que 'cargo' existe
-                    st.write(f"{membro['nome']} ({cargo})")
+                    cargo = membro.get('cargo', 'Técnico')
+                    st.write(f"**{membro['nome']}**")
+                    st.caption(cargo)
         else:
             st.write("*Nenhum staff cadastrado.*")
 
@@ -748,21 +794,23 @@ def show():
         st.markdown(f"**{time_fora}**")
         if staff_fora:
             for membro in staff_fora:
-                foto_path = caminho_foto_membro(membro)
                 col_foto, col_texto = st.columns([1, 4])
                 with col_foto:
-                    if foto_path:
-                        st.image(foto_path, width=30)
+                    foto_path = caminho_foto_membro(membro)
+                    if foto_path and os.path.exists(foto_path):
+                        st.image(foto_path, width=150)  # <-- TAMANHO 150px
                     else:
                         st.write("📌")
                 with col_texto:
                     cargo = membro.get('cargo', 'Técnico')
-                    st.write(f"{membro['nome']} ({cargo})")
+                    st.write(f"**{membro['nome']}**")
+                    st.caption(cargo)
         else:
             st.write("*Nenhum staff cadastrado.*")
 
     st.markdown("---")
 
+    # ===== MONITORAMENTO AUTOMÁTICO =====
     st.subheader("🔄 Monitoramento Automático")
     if not eh_hoje:
         st.warning("⚠️ O monitoramento só pode ser iniciado no dia da partida.")
