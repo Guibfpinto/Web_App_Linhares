@@ -1,6 +1,6 @@
 {
   "cartoes": {
-    "Matheus Toribes Ferreira Souza": {
+    "Matheus Toribes": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -10,7 +10,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Ruan Amaral Rios": {
+    "Ruan Rios": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -20,7 +20,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Yuri Ribeiro Giovanelli": {
+    "Yuri Ribeiro": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -41,7 +41,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Karlos Henrique dos Reis Calavort": {
+    "Kaká": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -62,7 +62,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Rayner Silva Gomes": {
+    "Rayner": {
       "amarelos": 2,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -93,17 +93,28 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Junior Espeto": {
-      "amarelos": 0,
+    "Júnior Espeto": {
+      "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
-      "historico": [],
+      "historico": [
+        {
+          "data": "12/07/2026",
+          "adversario": "Audax São Mateus",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 1
+        }
+      ],
       "id_ogol": "391818",
-      "contador_amarelos_desde_reset": 0,
+      "contador_amarelos_desde_reset": 1,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Gabriel Amorim de Aguiar": {
+    "Gabriel Amorim": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -124,7 +135,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Francisco de Assis Rapozo Neto": {
+    "Francisco Neto": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -134,7 +145,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Lucas Titol Lopes": {
+    "Lucas Titol": {
       "amarelos": 2,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -165,7 +176,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Virgílio Santos Borges": {
+    "Borjão": {
       "amarelos": 2,
       "vermelho": true,
       "suspenso_proxima": true,
@@ -179,6 +190,17 @@
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
           "fase": 1
+        },
+        {
+          "data": "09/05/2026",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "Capixaba Série B",
+          "fase": 1,
+          "observacao": "Suspensão cumprida (ficou de fora em 09/05/2026)"
         },
         {
           "data": "19/07/2026",
@@ -204,12 +226,12 @@
       "id_ogol": "481421",
       "contador_amarelos_desde_reset": 2,
       "suspensoes_cumpridas": 0,
-      "data_suspensao": "08/08/2026"
+      "data_suspensao": null
     },
-    "João Pedro Firmino Oliveira": {
-      "amarelos": 3,
+    "João Firmino": {
+      "amarelos": 0,
       "vermelho": false,
-      "suspenso_proxima": true,
+      "suspenso_proxima": false,
       "historico": [
         {
           "data": "12/07/2026",
@@ -240,14 +262,25 @@
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
           "fase": 1
+        },
+        {
+          "data": "28/07/2026",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "Capixaba Série B",
+          "fase": 1,
+          "observacao": "Suspensão cumprida (ficou de fora em 28/07/2026)"
         }
       ],
       "id_ogol": "649473",
-      "contador_amarelos_desde_reset": 3,
+      "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
-      "data_suspensao": "26/08/2026"
+      "data_suspensao": null
     },
-    "Wenderson Silva Neves": {
+    "Wendy": {
       "amarelos": 1,
       "vermelho": true,
       "suspenso_proxima": true,
@@ -263,6 +296,17 @@
           "fase": 1
         },
         {
+          "data": "09/05/2026",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "Capixaba Série B",
+          "fase": 1,
+          "observacao": "Suspensão cumprida (ficou de fora em 09/05/2026)"
+        },
+        {
           "data": "12/07/2026",
           "adversario": "Audax São Mateus",
           "cor": "amarelo",
@@ -276,9 +320,9 @@
       "id_ogol": "391833",
       "contador_amarelos_desde_reset": 1,
       "suspensoes_cumpridas": 0,
-      "data_suspensao": "08/08/2026"
+      "data_suspensao": null
     },
-    "Clavis Severo Leão": {
+    "Clavis Neto": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -288,7 +332,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Davi Fornaciari Lima": {
+    "Davi Fornaciari": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -298,7 +342,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Kayque Santos da Cunha": {
+    "Kayque Santos": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -308,7 +352,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Francisco Wesley da Silva Sousa": {
+    "Wesley": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -318,7 +362,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Luander da Silva Denerval": {
+    "Luander": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -328,7 +372,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "João Marcos Santos Ferraz Luz": {
+    "João Marcos": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -338,7 +382,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Daniel Olmo Morais Gonçalves": {
+    "Daniel Olmo": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -348,7 +392,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Gabriel de Jesus Rodrigues": {
+    "Gabriel Jesus": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -358,7 +402,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Marcus Paulo Sousa Oliveira": {
+    "Marcus Paulo": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -368,7 +412,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Stuart Asafe Ferreira Alves": {
+    "Stuart": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -378,7 +422,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Matheus Sarmento Mesquita": {
+    "Mateus Nossa": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -388,7 +432,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Jeferson David Palacios Cantillo": {
+    "Jeferson Palacios": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -409,28 +453,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Júnior Espeto": {
-      "amarelos": 1,
-      "vermelho": false,
-      "suspenso_proxima": false,
-      "historico": [
-        {
-          "data": "12/07/2026",
-          "adversario": "Audax São Mateus",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false,
-          "competicao": "Capixaba Série B",
-          "fase": 1
-        }
-      ],
-      "id_ogol": null,
-      "contador_amarelos_desde_reset": 1,
-      "suspensoes_cumpridas": 0,
-      "data_suspensao": null
-    },
-    "Arthur Luiz Darros": {
+    "Arthur Darros": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -440,7 +463,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Júlio César Fontana Leite": {
+    "Julio César": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -450,12 +473,22 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Thayson Lourenço dos Santos": {
+    "Thayson": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
       "historico": [],
       "id_ogol": "2530125",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Matheus Nossa": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2541477",
       "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
@@ -508,6 +541,7 @@
     "391818": [
       "05/08/2026",
       "08/08/2026",
+      "12/07/2026",
       "14/08/2026",
       "19/07/2026",
       "26/08/2026",

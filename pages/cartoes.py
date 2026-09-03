@@ -67,12 +67,10 @@ def show():
     # ============================================================
     # DIAGNÓSTICO (mostra o valor de amarelos para João Firmino)
     # ============================================================
-    with st.expander("🔍 Diagnóstico do JSON (João Firmino)"):
-        if "João Firmino" in cartoes:
-            st.write("Dados de João Firmino:", cartoes["João Firmino"])
-            st.write("Amarelos lidos:", cartoes["João Firmino"].get("amarelos", 0))
-        else:
-            st.warning("João Firmino não encontrado no JSON.")
+    with st.expander("🔍 Diagnóstico do JSON (primeiros 5 jogadores)"):
+        for i, (jogador, dados) in enumerate(list(cartoes.items())[:5]):
+            st.write(f"**{jogador}**: amarelos={dados.get('amarelos', 0)}, suspenso={dados.get('suspenso_proxima', False)}")
+        st.write(f"Total de jogadores: {len(cartoes)}")
 
     # Extrai competições e fases
     competicoes = set()
