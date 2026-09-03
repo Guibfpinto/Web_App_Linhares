@@ -16,6 +16,13 @@ def show():
     st.title("🟨 Gestão de Cartões")
     st.markdown("---")
 
+    # ============================================================
+    # FORÇA RECARREGAMENTO (BOTÃO)
+    # ============================================================
+    if st.button("🔄 Forçar recarregamento do JSON"):
+        st.cache_data.clear()
+        st.rerun()
+
     categoria = st.selectbox(
         "Categoria",
         ["Profissional", "Sub-15", "Sub-17", "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"],
@@ -23,7 +30,7 @@ def show():
     )
 
     # ============================================================
-    # REINICIALIZAÇÃO AUTOMÁTICA DIÁRIA (apenas para jogadores)
+    # REINICIALIZAÇÃO AUTOMÁTICA (apenas jogadores)
     # ============================================================
     if categoria in ["Profissional", "Sub-15", "Sub-17"]:
         reiniciou = verificar_e_reinicializar_cartoes(categoria)
@@ -41,11 +48,31 @@ def show():
     }
     chave_categoria = mapeamento_categoria[categoria]
 
-    cartoes, datas_globais = carregar_cartoes_json(chave_categoria)
+    # ============================================================
+    # CARREGA O JSON (SEM CACHE - usando @st.cache_data com ttl=0)
+    # ============================================================
+    # Para garantir que sempre leia do disco, vamos usar uma função que não usa cache
+    # ou usar st.cache_data(ttl=0) para forçar recarregamento
+    @st.cache_data(ttl=0)
+    def carregar_json_sem_cache(chave):
+        cartoes, datas = carregar_cartoes_json(chave)
+        return cartoes, datas
+
+    cartoes, datas_globais = carregar_json_sem_cache(chave_categoria)
 
     if not cartoes:
         st.info(f"Nenhum cartão registrado para {categoria}.")
         return
+
+    # ============================================================
+    # DIAGNÓSTICO (mostra o valor de amarelos para João Firmino)
+    # ============================================================
+    with st.expander("🔍 Diagnóstico do JSON (João Firmino)"):
+        if "João Firmino" in cartoes:
+            st.write("Dados de João Firmino:", cartoes["João Firmino"])
+            st.write("Amarelos lidos:", cartoes["João Firmino"].get("amarelos", 0))
+        else:
+            st.warning("João Firmino não encontrado no JSON.")
 
     # Extrai competições e fases
     competicoes = set()
@@ -89,7 +116,7 @@ def show():
         if historico:
             novos_dados = dados.copy()
             novos_dados['historico'] = historico
-            # === CORREÇÃO: usa o campo 'amarelos' do JSON, não recalcula do histórico ===
+            # --- USAR O VALOR DO JSON (NÃO RECALCULAR) ---
             novos_dados['amarelos'] = dados.get('amarelos', 0)
             novos_dados['vermelho'] = dados.get('vermelho', False)
             novos_dados['suspenso_proxima'] = dados.get('suspenso_proxima', False)
@@ -101,11 +128,10 @@ def show():
         return
 
     # ============================================================
-    # TABELA DE RESUMO (com colunas: Jogador, Amarelos, Vermelho, Suspenso, Cumprida)
+    # TABELA DE RESUMO
     # ============================================================
     dados_tabela = []
     for jogador, dados in cartoes_filtrados.items():
-        # Usa o campo 'amarelos' do JSON
         amarelos = dados.get('amarelos', 0)
         vermelho = "Sim" if dados.get('vermelho', False) else "Não"
         suspenso = "Sim" if dados.get('suspenso_proxima', False) else "Não"
@@ -166,6 +192,7 @@ def show():
                 canonico_para_ogol_id = {}
                 novos_cartoes, _ = inicializar_cartoes_por_csvs(chave_categoria, canonico_para_ogol_id)
             st.success("Cartões reinicializados com sucesso!")
+            st.cache_data.clear()
             st.rerun()
 
     st.markdown("---")
