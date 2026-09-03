@@ -407,12 +407,12 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
-        # Lê o CSV com cabeçalho
+        # Lê o CSV com cabeçalho (primeira linha contém os nomes das colunas)
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-        # Limpa nomes das colunas: remove espaços, substitui por _
-        df.columns = df.columns.str.strip().str.replace(' ', '_').str.lower()
+        # Limpa os nomes das colunas: remove espaços extras, converte para minúsculo
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # Verifica se a coluna 'nome_completo' existe; se não, tenta encontrar uma coluna de nome
+        # Garante que a coluna 'nome_completo' exista
         if 'nome_completo' not in df.columns:
             for col in df.columns:
                 if col in ['nome', 'jogador', 'atleta', 'player', 'name']:
