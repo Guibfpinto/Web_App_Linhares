@@ -404,65 +404,124 @@ def inicializar_banco():
 # FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
+    """
+    Carrega o CSV de elenco, seja com cabeçalho ou sem.
+    Se tiver cabeçalho, usa as colunas diretamente.
+    Se não tiver, aplica renomeação manual.
+    """
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
+
     try:
-        df_raw = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
-                             header=None, on_bad_lines='skip')
-        if len(df_raw) == 0:
-            return pd.DataFrame()
-        cabecalhos = df_raw.iloc[0].tolist()
-        df = df_raw.iloc[1:].reset_index(drop=True)
-        nomes_fixos = [
-            'nome_completo', 'apelido', 'data_nascimento', 'posicao', 'pe_pref',
-            'altura_cm', 'peso_kg', 'salario', 'cidade_nascimento', 'uf_nascimento',
-            'pais_nascimento', 'historico', 'foto'
-        ]
-        for i, nome in enumerate(nomes_fixos):
-            if i < df.shape[1]:
-                df.rename(columns={i: nome}, inplace=True)
-        colunas_restantes = {}
-        for i in range(13, df.shape[1]):
-            nome_original = cabecalhos[i] if i < len(cabecalhos) else f'col_{i}'
-            nome_normalizado = str(nome_original).strip().replace('\ufeff', '').replace(' ', '_').lower()
-            colunas_restantes[i] = nome_normalizado
-        df.rename(columns=colunas_restantes, inplace=True)
-        for col in ['nome_completo', 'data_nascimento', 'posicao']:
-            if col not in df.columns:
+        # Primeiro, tenta ler com cabeçalho (modo normal)
+        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
+        
+        # Verifica se as colunas esperadas existem
+        colunas_esperadas = ['nome_completo', 'apelido', 'data_nascimento', 'posicao']
+        tem_cabecalho = all(col in df.columns for col in colunas_esperadas)
+        
+        if tem_cabecalho:
+            # Já tem cabeçalho, faz apenas os ajustes necessários
+            df.columns = df.columns.str.strip()
+            # Se a primeira coluna for sem nome (Unnamed), renomeia
+            if df.columns[0] == 'Unnamed: 0':
+                df = df.drop(columns=[df.columns[0]])
+        else:
+            # Se não tiver cabeçalho, usa a lógica antiga (header=None)
+            df_raw = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
+                                 header=None, on_bad_lines='skip')
+            if len(df_raw) == 0:
                 return pd.DataFrame()
+            
+            cabecalhos = df_raw.iloc[0].tolist()
+            df = df_raw.iloc[1:].reset_index(drop=True)
+            
+            nomes_fixos = [
+                'nome_completo', 'apelido', 'data_nascimento', 'posicao', 'pe_pref',
+                'altura_cm', 'peso_kg', 'salario', 'cidade_nascimento', 'uf_nascimento',
+                'pais_nascimento', 'historico', 'foto'
+            ]
+            for i, nome in enumerate(nomes_fixos):
+                if i < df.shape[1]:
+                    df.rename(columns={i: nome}, inplace=True)
+            
+            colunas_restantes = {}
+            for i in range(13, df.shape[1]):
+                nome_original = cabecalhos[i] if i < len(cabecalhos) else f'col_{i}'
+                nome_normalizado = str(nome_original).strip().replace('\ufeff', '').replace(' ', '_').lower()
+                colunas_restantes[i] = nome_normalizado
+            df.rename(columns=colunas_restantes, inplace=True)
+        
+        # --- AJUSTES COMUNS PARA AMBOS OS CASOS ---
+        
+        # Garante que colunas essenciais existam
+        if 'nome_completo' not in df.columns:
+            # Tenta encontrar uma coluna que possa ser o nome
+            for col in df.columns:
+                if col.lower() in ['nome', 'jogador', 'atleta', 'player', 'name', 'nome_completo']:
+                    df.rename(columns={col: 'nome_completo'}, inplace=True)
+                    break
+            else:
+                # Se não encontrar, cria uma coluna vazia (fallback)
+                df['nome_completo'] = ''
+        
+        if 'apelido' not in df.columns:
+            # Tenta usar 'nome_completo' como apelido se não houver
+            df['apelido'] = df['nome_completo']
+        
+        if 'data_nascimento' not in df.columns:
+            df['data_nascimento'] = None
+            
+        if 'posicao' not in df.columns:
+            df['posicao'] = ''
+        
         if 'pe_pref' not in df.columns:
             df['pe_pref'] = np.nan
         else:
             df['pe_pref'] = df['pe_pref'].replace(['', 'nan', 'NaN', 'None'], np.nan)
+        
         for col in ['cidade_nascimento', 'uf_nascimento', 'pais_nascimento']:
             if col not in df.columns:
                 df[col] = None
+        
+        # --- PROCESSAMENTO DE ATRIBUTOS NUMÉRICOS ---
         cols_num = ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']
         for col in cols_num:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Atributos FM26
         for attr in ATRIBUTOS_FM26:
             if attr in df.columns:
                 df[attr] = pd.to_numeric(df[attr], errors='coerce')
+        
+        # Calcular IMC, Idade, etc.
         df['IMC'] = df.apply(lambda x: x['peso_kg'] / ((x['altura_cm']/100)**2)
                              if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
                              else np.nan, axis=1).round(1)
+        
         df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
         df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
+        
         df['Gordura_Corporal_%'] = df.apply(lambda row: round((1.20*row['IMC']) + (0.23*row['Idade']) - 16.2, 1)
                                             if pd.notna(row['IMC']) and pd.notna(row['Idade']) else np.nan, axis=1)
+        
         df['Massa_Magra_kg'] = df.apply(
             lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%']/100), 1)
             if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%']) else np.nan,
             axis=1
         )
+        
         df['Massa_Muscular_Estimada_kg'] = df.apply(
             lambda row: round(row['Massa_Magra_kg'] * 0.55, 1)
             if pd.notna(row['Massa_Magra_kg']) else np.nan,
             axis=1
         )
+        
         df['Classificacao_Gordura'] = df.apply(lambda x: classif_gordura(x['Gordura_Corporal_%'], x['Idade']), axis=1)
         df['Estado_Fisico'] = df.apply(lambda row: estado_fisico(row['Classificacao_IMC'], row['Classificacao_Gordura']), axis=1)
+        
+        # Classificação de posição
         def cat_pos(pos_str):
             if pd.isna(pos_str): return 'Outros', []
             pos = str(pos_str).upper().strip()
@@ -489,11 +548,17 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             cats = [c for c in cats if c != 'Outros']
             cats = list(dict.fromkeys(cats))
             return cats[0] if cats else 'Outros', cats
+        
         res = df['posicao'].apply(cat_pos)
         df['Posicao_Principal'] = res.apply(lambda x: x[0])
         df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
-        df['Rating_Geral_FM26'] = df.apply(lambda row: min(100, row['habilidade_atual']/2) if pd.notna(row.get('habilidade_atual')) else 50, axis=1)
+        
+        # Rating Geral
+        df['Rating_Geral_FM26'] = df.apply(lambda row: min(100, row['habilidade_atual']/2) 
+                                            if pd.notna(row.get('habilidade_atual')) else 50, axis=1)
+        
         return df
+        
     except Exception as e:
         st.error(f"Erro ao carregar elenco de {caminho_arquivo}: {e}")
         return pd.DataFrame()
