@@ -535,6 +535,15 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             if 'foto' in row and pd.notna(row.get('foto')):
                 caminho_foto = obter_caminho_foto(row, categoria)
                 if caminho_foto:
+                    st.write(f"🔍 Caminho absoluto: {os.path.abspath(caminho_foto)}")
+                    st.write(f"O arquivo existe? {os.path.exists(caminho_foto)}")
+                    try:
+                        st.image(caminho_foto, width=150)
+                    except Exception as e:
+                        st.error(f"Erro ao carregar imagem: {e}")
+                else:
+                    st.write("📷 Sem foto")
+                if caminho_foto:
                     st.image(caminho_foto, width=150)
                 else:
                     st.write("📷 Sem foto")
