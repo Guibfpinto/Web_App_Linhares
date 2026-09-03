@@ -795,6 +795,8 @@ with tabs[0]:
     cat_analise = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"])
     df_analise, cartoes_analise = get_df_cartoes(cat_analise)
     if df_analise is not None and not df_analise.empty:
+        st.write("Colunas disponíveis:", df_analise.columns.tolist())
+        st.write("Primeiras linhas:", df_analise.head())
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total", len(df_analise))
