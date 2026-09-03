@@ -639,9 +639,12 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
     """
     Carrega o cronograma. Primeiro tenta o CSV; se não existir, tenta importar
     do script específico (ex: linhares_profissional_crono_2026.py).
-    Filtra datas inválidas (NaT) para evitar TypeError.
+    Filtra datas inválidas (NaT) e retorna um DataFrame com coluna 'data' em datetime.
     """
-    # Mapeia categoria para arquivo CSV
+    import importlib.util
+    from pathlib import Path
+
+    # Mapeia categoria para arquivo CSV e nome do script
     if categoria == "Profissional":
         arquivo_csv = ARQUIVO_CRONO_PROF
         nome_script = "linhares_profissional_crono_2026"
@@ -654,23 +657,26 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
     else:
         return pd.DataFrame()
 
+    df = None
+
     # Tenta carregar do CSV
     if os.path.exists(arquivo_csv):
         try:
             df = pd.read_csv(arquivo_csv, sep=';', encoding='utf-8-sig')
             if 'data' in df.columns:
                 df['data'] = pd.to_datetime(df['data'], errors='coerce')
-                # Remove linhas com data inválida (NaT)
                 df = df.dropna(subset=['data'])
             if 'competicao' not in df.columns:
                 df['competicao'] = 'Desconhecida'
             if 'fase' not in df.columns:
                 df['fase'] = ''
-            return df
+            # Se o CSV tem dados, retorna
+            if not df.empty:
+                return df
         except Exception as e:
-            st.warning(f"Erro ao ler CSV de cronograma: {e}")
+            print(f"Erro ao ler CSV de cronograma: {e}")
 
-    # Se não há CSV, tenta importar do script
+    # Se não há CSV ou está vazio, tenta importar do script
     try:
         spec = importlib.util.find_spec(nome_script)
         if spec is None:
@@ -701,7 +707,7 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
                     df['fase'] = ''
                 return df
     except Exception as e:
-        st.warning(f"Erro ao carregar cronograma do script {nome_script}: {e}")
+        print(f"Erro ao carregar cronograma do script {nome_script}: {e}")
 
     return pd.DataFrame()
 
@@ -1267,12 +1273,12 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
 
     df = df.sort_values('data_jogo', ascending=True)
 
+    # Carrega cronograma
     df_crono = carregar_cronograma(categoria.capitalize())
+    datas_cronograma = []
     if not df_crono.empty and 'data' in df_crono.columns:
         datas_validas = df_crono['data'].dropna()
         datas_cronograma = sorted(datas_validas.dt.strftime('%d/%m/%Y').tolist())
-    else:
-        datas_cronograma = []
 
     cartoes = {}
     datas_globais = {}
@@ -1320,7 +1326,8 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 'id_ogol': id_ogol,
                 'contador_amarelos_desde_reset': 0,
                 'suspensoes_cumpridas': 0,
-                'data_suspensao': None
+                'data_suspensao': None,
+                'data_cumprimento': None  # data da partida em que a suspensão foi cumprida
             }
 
         adversario = row.get('adversario', 'N/I')
@@ -1329,7 +1336,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # --- Amarelos ---
+        # --- Processar amarelos ---
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1349,11 +1356,12 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                         ultimo = cartoes[nome]['historico'][-1]
                         ultimo['terceiro_amarelo'] = True
                         ultimo['suspenso_causada'] = True
+                    # Ativa suspensão e guarda a data do terceiro amarelo (data_suspensao)
                     cartoes[nome]['suspenso_proxima'] = True
-                    cartoes[nome]['data_suspensao'] = data  # data do terceiro amarelo
+                    cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # --- Vermelhos ---
+        # --- Processar vermelhos ---
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
@@ -1384,56 +1392,63 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 datas_globais[id_ogol].append(data)
 
     # ============================================================
-    # VERIFICAÇÃO FINAL (suspensões não cumpridas)
+    # VERIFICAÇÃO FINAL: Suspensões não cumpridas
     # ============================================================
     hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+
+    # Para cada jogador suspenso, encontrar a próxima partida no cronograma após data_suspensao
     for nome, dados in cartoes.items():
-        if dados.get('suspenso_proxima', False):
-            data_susp = dados.get('data_suspensao')
-            if not data_susp:
-                continue  # sem data de suspensão, ignora
+        if not dados.get('suspenso_proxima', False):
+            continue
 
-            data_proximo_jogo = None
-            # Tenta encontrar a próxima partida no cronograma após data_susp
-            if datas_cronograma and data_susp in datas_cronograma:
-                try:
-                    idx = datas_cronograma.index(data_susp)
-                    if idx + 1 < len(datas_cronograma):
-                        data_proximo_jogo_str = datas_cronograma[idx + 1]
-                        data_proximo_jogo = datetime.strptime(data_proximo_jogo_str, "%d/%m/%Y").date()
-                except:
-                    pass
+        data_susp = dados.get('data_suspensao')
+        if not data_susp:
+            continue
 
-            # Fallback: se não encontrou, usa 7 dias após a data de suspensão
-            if data_proximo_jogo is None:
-                try:
-                    dt_susp = datetime.strptime(data_susp, "%d/%m/%Y").date()
-                    data_proximo_jogo = dt_susp + timedelta(days=7)
-                except:
-                    continue
+        data_cumprimento = None
 
-            # Se a data do próximo jogo já passou
-            if data_proximo_jogo < hoje:
-                data_str_prox = data_proximo_jogo.strftime("%d/%m/%Y")
-                # Verifica se o jogador jogou na data do próximo jogo (se não jogou, cumpriu)
-                if data_str_prox not in jogador_datas.get(nome, set()):
-                    # Suspensão cumprida
-                    cartoes[nome]['historico'].append({
-                        'data': data_str_prox,
-                        'adversario': 'Suspensão cumprida (não jogou)',
-                        'cor': 'suspensao_cumprida',
-                        'terceiro_amarelo': False,
-                        'suspenso_causada': False,
-                        'suspenso_cumprida': True,
-                        'competicao': '',
-                        'fase': '',
-                        'observacao': f"Suspensão cumprida em {data_str_prox}"
-                    })
-                    cartoes[nome]['contador_amarelos_desde_reset'] = 0
-                    cartoes[nome]['amarelos'] = 0
-                    cartoes[nome]['suspenso_proxima'] = False
-                    cartoes[nome]['suspensoes_cumpridas'] = 0
-                    cartoes[nome]['data_suspensao'] = None
+        # Tenta encontrar a próxima data no cronograma após data_susp
+        if datas_cronograma and data_susp in datas_cronograma:
+            try:
+                idx = datas_cronograma.index(data_susp)
+                if idx + 1 < len(datas_cronograma):
+                    data_cumprimento_str = datas_cronograma[idx + 1]
+                    data_cumprimento = datetime.strptime(data_cumprimento_str, "%d/%m/%Y").date()
+            except:
+                pass
+
+        # Fallback: se não houver cronograma, usa a data_susp + 7 dias
+        if data_cumprimento is None:
+            try:
+                dt_susp = datetime.strptime(data_susp, "%d/%m/%Y").date()
+                data_cumprimento = dt_susp + timedelta(days=7)
+            except:
+                continue
+
+        # Agora, data_cumprimento é a data da partida seguinte (prevista)
+        # Verifica se essa data já passou
+        if data_cumprimento < hoje:
+            data_str_cump = data_cumprimento.strftime("%d/%m/%Y")
+            # Verifica se o jogador jogou nessa data
+            if data_str_cump not in jogador_datas.get(nome, set()):
+                # Suspensão cumprida!
+                cartoes[nome]['historico'].append({
+                    'data': data_str_cump,
+                    'adversario': 'Suspensão cumprida (não jogou)',
+                    'cor': 'suspensao_cumprida',
+                    'terceiro_amarelo': False,
+                    'suspenso_causada': False,
+                    'suspenso_cumprida': True,
+                    'competicao': '',
+                    'fase': '',
+                    'observacao': f"Suspensão cumprida em {data_str_cump}"
+                })
+                cartoes[nome]['contador_amarelos_desde_reset'] = 0
+                cartoes[nome]['amarelos'] = 0
+                cartoes[nome]['suspenso_proxima'] = False
+                cartoes[nome]['suspensoes_cumpridas'] = 0
+                cartoes[nome]['data_suspensao'] = None
+                cartoes[nome]['data_cumprimento'] = data_str_cump
 
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     return cartoes, datas_globais
