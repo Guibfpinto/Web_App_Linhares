@@ -665,18 +665,19 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
-    # ============================================================
-    df_eventos = pd.read_sql_query(f"""
-        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
-            e.fonte
-        FROM eventos e
-        LEFT JOIN elenco el ON e.jogador_id = el.id
-        WHERE e.jogo_id = {jogo_selecionado_id}
-        ORDER BY e.tempo DESC LIMIT 20
-    """, conn)
-    conn.close()
+# LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
+    conn = conectar_banco()
+    try:
+        df_eventos = pd.read_sql_query(f"""
+            SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
+                e.fonte
+            FROM eventos e
+            LEFT JOIN elenco el ON e.jogador_id = el.id
+            WHERE e.jogo_id = {jogo_selecionado_id}
+            ORDER BY e.tempo DESC LIMIT 20
+        """, conn)
+    finally:
+        conn.close()
 
     if not df_eventos.empty:
         st.write("**📋 Últimos eventos:**")
