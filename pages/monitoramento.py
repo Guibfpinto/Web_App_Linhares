@@ -20,8 +20,10 @@ from utils import (
     obter_caminho_foto,
     obter_caminho_foto_arbitro,
     normalizar_texto,
-    sanitizar_dataframe,  # <-- IMPORTADO
+    sanitizar_dataframe,
+    CATEGORIA_CONFIG,
 )
+from fastapi_client import FastAPIMonitorClient
 
 # ============================================================
 # CONFIGURAÇÕES DE ÁUDIO
@@ -36,7 +38,7 @@ SOUND_FILES = {
 }
 
 def play_sound(sound_key):
-    """Toca um som baseado na chave: gol_linhares, gol_adversario, cartao, inicio, notificacao."""
+    """Toca um som baseado na chave."""
     filename = SOUND_FILES.get(sound_key)
     sound_path = os.path.join(SOUNDS_DIR, filename) if filename else None
     if sound_path and os.path.exists(sound_path):
@@ -50,7 +52,6 @@ def play_sound(sound_key):
         """
         st.components.v1.html(audio_html, height=0)
     else:
-        # Fallback: beep simples
         st.components.v1.html("""
             <script>
                 try {
@@ -69,34 +70,7 @@ def play_sound(sound_key):
         """, height=0)
 
 # ============================================================
-# CONFIGURAÇÕES DA CATEGORIA
-# ============================================================
-CATEGORIA_CONFIG = {
-    "Profissional": {
-        "team_id": 12928,
-        "nome_time": "Linhares FC",
-        "elenco_func": carregar_elenco_profissional,
-        "cartoes_key": "profissional",
-        "liga_nome": "Campeonato Capixaba Série B"
-    },
-    "Sub-15": {
-        "team_id": 27831,
-        "nome_time": "Linhares FC Sub-15",
-        "elenco_func": carregar_elenco_sub15,
-        "cartoes_key": "sub15",
-        "liga_nome": "Copa Espírito Santo Sub-15"
-    },
-    "Sub-17": {
-        "team_id": 27832,
-        "nome_time": "Linhares FC Sub-17",
-        "elenco_func": carregar_elenco_sub17,
-        "cartoes_key": "sub17",
-        "liga_nome": "Copa Espírito Santo Sub-17"
-    }
-}
-
-# ============================================================
-# FUNÇÕES DE BANCO DE DADOS (SQLite)
+# FUNÇÕES DE BANCO DE DADOS (SQLite) - Para fallback manual
 # ============================================================
 DB_PATH = "meu_futebol.db"
 
@@ -106,7 +80,6 @@ def conectar_banco():
     return conn
 
 def garantir_coluna_fonte():
-    """Verifica e cria a coluna 'fonte' na tabela eventos, se não existir."""
     conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("PRAGMA table_info(eventos)")
@@ -115,82 +88,6 @@ def garantir_coluna_fonte():
         cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
         conn.commit()
     conn.close()
-
-def verificar_jogo_ao_vivo_sql(team_id):
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id FROM jogos
-        WHERE (time_casa_id = ? OR time_fora_id = ?)
-        AND status IN ('1H', '2H', 'HT', 'ET', 'P')
-        LIMIT 1
-    """, (team_id, team_id))
-    row = cursor.fetchone()
-    conn.close()
-    return row['id'] if row else None
-
-def obter_detalhes_jogo_sql(fixture_id):
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT j.*,
-               tc.nome AS time_casa_nome,
-               tf.nome AS time_fora_nome,
-               v.nome AS estadio
-        FROM jogos j
-        LEFT JOIN times tc ON j.time_casa_id = tc.id
-        LEFT JOIN times tf ON j.time_fora_id = tf.id
-        LEFT JOIN venues v ON j.venue_id = v.id
-        WHERE j.id = ?
-    """, (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        return None
-    dados = dict(row)
-    return {
-        "fixture": {
-            "id": dados["id"],
-            "date": dados.get("data_hora", ""),
-            "status": {"short": dados.get("status", "NS")},
-            "venue": {"name": dados.get("estadio", "Estádio")},
-            "referee": dados.get("arbitro", "Não informado")
-        },
-        "teams": {
-            "home": {"id": dados["time_casa_id"], "name": dados.get("time_casa_nome", "Casa")},
-            "away": {"id": dados["time_fora_id"], "name": dados.get("time_fora_nome", "Fora")}
-        },
-        "goals": {
-            "home": dados.get("gols_casa", 0),
-            "away": dados.get("gols_fora", 0)
-        }
-    }
-
-def obter_eventos_jogo_sql(fixture_id):
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    garantir_coluna_fonte()
-    cursor.execute("""
-        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido
-        FROM eventos e
-        LEFT JOIN elenco el ON e.jogador_id = el.id
-        WHERE e.jogo_id = ?
-        ORDER BY e.tempo ASC
-    """, (fixture_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    eventos = []
-    for r in rows:
-        d = dict(r)
-        eventos.append({
-            "time": {"elapsed": d.get("tempo", 0)},
-            "type": d.get("tipo", ""),
-            "detail": d.get("detalhes", ""),
-            "player": {"name": d.get("jogador_nome") or d.get("jogador_apelido") or "Desconhecido"},
-            "team": {"name": ""},
-            "fonte": d.get("fonte", "api")
-        })
-    return eventos
 
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes, fonte="manual"):
     conn = conectar_banco()
@@ -292,50 +189,36 @@ def salvar_escalacao(jogo_id, titulares, reservas):
     conn.close()
 
 # ============================================================
-# FUNÇÃO MELHORADA PARA BUSCAR FOTO DE MEMBRO DO STAFF
+# FUNÇÃO PARA BUSCAR FOTO DE MEMBRO DO STAFF
 # ============================================================
 def caminho_foto_membro(membro):
-    """
-    Busca a foto do membro da comissão técnica.
-    Suporta caminhos relativos com subpastas e busca recursiva.
-    """
     foto = membro.get('foto', '')
     nome_base = None
 
     if foto:
-        # Se já for um caminho absoluto existente, retorna
         if os.path.isabs(foto) and os.path.exists(foto):
             return foto
-
-        # Tenta usar o caminho relativo a partir do script_dir
         script_dir = os.path.dirname(os.path.abspath(__file__))
         caminho_relativo = os.path.join(script_dir, foto)
         if os.path.exists(caminho_relativo):
             return os.path.abspath(caminho_relativo)
-
-        # Tenta a partir do diretório pai (projeto_web)
         parent_dir = os.path.dirname(script_dir)
         caminho_relativo_parent = os.path.join(parent_dir, foto)
         if os.path.exists(caminho_relativo_parent):
             return os.path.abspath(caminho_relativo_parent)
-
-        # Extrai o nome do arquivo para busca posterior
         nome_base = os.path.basename(foto)
     else:
-        # Se 'foto' estiver vazio, usa apelido ou nome
         nome_base = membro.get('apelido') or membro.get('nome')
 
     if not nome_base:
         return None
 
-    # Remove extensão se houver
     base, _ = os.path.splitext(nome_base)
     nome_clean = normalizar_texto(base).replace(' ', '_')
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
 
-    # Pastas raiz onde procurar (relativas ao projeto_web e também ao script_dir)
     pastas_raiz = [
         "assets/fotos_comissao",
         "assets/fotos_tecnicos",
@@ -348,7 +231,6 @@ def caminho_foto_membro(membro):
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
 
-    # Pastas absolutas (fornecidas pelo usuário)
     pastas_absolutas = [
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
@@ -356,7 +238,6 @@ def caminho_foto_membro(membro):
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
     ]
 
-    # Combina todas as pastas raiz (absolutas e relativas)
     pastas = pastas_absolutas + [
         os.path.join(parent_dir, p) for p in pastas_raiz
     ] + [
@@ -365,7 +246,6 @@ def caminho_foto_membro(membro):
 
     extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
-    # 1. Busca direta nas pastas (com e sem normalização)
     for pasta in pastas:
         if not os.path.isdir(pasta):
             continue
@@ -377,7 +257,6 @@ def caminho_foto_membro(membro):
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # Usa glob
         padrao = os.path.join(pasta, f"{base}.*")
         matches = glob.glob(padrao)
         if matches:
@@ -387,7 +266,6 @@ def caminho_foto_membro(membro):
         if matches:
             return os.path.abspath(matches[0])
 
-    # 2. Busca recursiva em pastas específicas (caso esteja em subpastas profundas)
     pastas_recursivas = [
         os.path.join(parent_dir, "assets/fotos_comissao"),
         os.path.join(parent_dir, "assets/fotos_tecnicos"),
@@ -404,7 +282,6 @@ def caminho_foto_membro(membro):
         if not os.path.isdir(pasta):
             continue
         for root, dirs, files in os.walk(pasta):
-            # Procura pelo nome exato (com extensões)
             for ext in extensoes:
                 arquivo = f"{base}{ext}"
                 if arquivo in files:
@@ -412,7 +289,6 @@ def caminho_foto_membro(membro):
                 arquivo_clean = f"{nome_clean}{ext}"
                 if arquivo_clean in files:
                     return os.path.abspath(os.path.join(root, arquivo_clean))
-            # Usa glob no nível da raiz da pasta atual
             matches = glob.glob(os.path.join(root, f"{base}.*"))
             if matches:
                 return os.path.abspath(matches[0])
@@ -473,6 +349,7 @@ def show():
     nome_time = config["nome_time"]
     elenco_func = config["elenco_func"]
     cartoes_key = config["cartoes_key"]
+    competicao_id = config.get("competicao_id")
 
     st.title(f"📊 Monitoramento ao Vivo - {categoria}")
     st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {config['liga_nome']}")
@@ -486,7 +363,15 @@ def show():
 
     inicializar_banco()
 
-    # Seleção de partida
+    # ============================================================
+    # CLIENTE FASTAPI
+    # ============================================================
+    FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
+    client = FastAPIMonitorClient(FASTAPI_URL)
+
+    # ============================================================
+    # SELECIONAR PARTIDA (via SQLite)
+    # ============================================================
     st.sidebar.header("Selecionar Partida")
     conn = conectar_banco()
     try:
@@ -605,13 +490,13 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # MONITORAMENTO AO VIVO
+    # MONITORAMENTO AO VIVO (VIA FASTAPI)
     # ============================================================
     st.subheader("🔴 Monitoramento Ao Vivo")
 
     if eh_hoje:
         with st.spinner("Verificando jogo ao vivo..."):
-            fixture_id = verificar_jogo_ao_vivo_sql(team_id)
+            fixture_id = client.get_live_fixture(team_id)
             if fixture_id:
                 st.session_state.fixture_id = fixture_id
                 st.session_state.monitoramento_ativo = True
@@ -623,16 +508,21 @@ def show():
             fixture_id = st.session_state.fixture_id
             st.success(f"✅ Jogo ao vivo detectado! ID: {fixture_id}")
 
-            detalhes = obter_detalhes_jogo_sql(fixture_id)
+            try:
+                detalhes = client.get_fixture_details(fixture_id)
+            except Exception as e:
+                st.error(f"Erro ao buscar detalhes da partida: {e}")
+                detalhes = None
+
             if detalhes:
                 gols_casa_api = detalhes['goals']['home'] or 0
                 gols_fora_api = detalhes['goals']['away'] or 0
                 status_anterior = status
+                status_api = detalhes['fixture']['status']['short']
 
                 # Atualiza placar
                 if (gols_casa_api, gols_fora_api) != (gols_casa, gols_fora):
                     atualizar_placar_sqlite(jogo_selecionado_id, gols_casa_api, gols_fora_api)
-                    # Toca som de gol (se houve mudança)
                     if gols_casa_api > gols_casa:
                         time_marcador = jogo['time_casa_id']
                         play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
@@ -642,7 +532,6 @@ def show():
                     st.rerun()
 
                 # Atualiza status
-                status_api = detalhes['fixture']['status']['short']
                 if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
                     if status_api in ['1H', '2H']:
@@ -653,8 +542,13 @@ def show():
 
                 st.info(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
-            # Busca eventos da API
-            eventos_api = obter_eventos_jogo_sql(fixture_id)
+            # Busca eventos da FastAPI
+            try:
+                eventos_api = client.get_fixture_events(fixture_id)
+            except Exception as e:
+                st.error(f"Erro ao buscar eventos: {e}")
+                eventos_api = []
+
             if eventos_api:
                 conn = conectar_banco()
                 cursor = conn.cursor()
@@ -679,7 +573,6 @@ def show():
                             VALUES (?, ?, ?, ?, ?, 'api')
                         ''', (jogo_selecionado_id, ev['time']['elapsed'], ev['type'], jogador_id, ev.get('detail', '')))
                         novos_eventos += 1
-                        # Sons
                         tipo = ev['type'].lower()
                         if tipo == 'goal':
                             if time_jogador_id == team_id:
@@ -696,7 +589,7 @@ def show():
                     st.info(f"{novos_eventos} novo(s) evento(s) sincronizado(s) da API.")
                     st.rerun()
             else:
-                st.info("📡 Nenhum evento da API disponível.")
+                st.info("📡 Nenhum evento disponível via FastAPI.")
 
             if st.button("⏹️ Parar Monitoramento", width='stretch'):
                 st.session_state.monitoramento_ativo = False
@@ -704,17 +597,17 @@ def show():
                 st.rerun()
         else:
             st.warning("⏳ Nenhum jogo ao vivo encontrado no momento.")
-            st.info("Use o registro manual abaixo apenas se a API não estiver retornando dados.")
+            st.info("Use o registro manual abaixo apenas se a FastAPI não estiver retornando dados.")
     else:
         st.info(f"📅 O jogo está marcado para {data_jogo}. O monitoramento ao vivo estará disponível no dia da partida.")
 
     st.markdown("---")
 
     # ============================================================
-    # REGISTRO MANUAL DE EVENTOS
+    # REGISTRO MANUAL DE EVENTOS (FALLBACK)
     # ============================================================
     st.subheader("📝 Registro Manual de Eventos (Fallback)")
-    st.caption("Use esta seção apenas se a API não estiver fornecendo os dados corretamente.")
+    st.caption("Use esta seção apenas se a FastAPI não estiver fornecendo os dados corretamente.")
 
     if status in ['1H', '2H', 'HT', 'ET', 'P']:
         with st.form("evento_manual_form", clear_on_submit=True):
@@ -762,7 +655,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # LISTA DE ÚLTIMOS EVENTOS (SANITIZADO)
+    # LISTA DE ÚLTIMOS EVENTOS (DO BANCO LOCAL)
     # ============================================================
     conn = conectar_banco()
     try:
@@ -791,12 +684,11 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # ESCALAÇÃO - COM CAMPO DE TEXTO PARA FORMAÇÃO
+    # ESCALAÇÃO
     # ============================================================
     st.subheader("📋 Escalação")
 
     with st.expander("✏️ Definir Escalação", expanded=False):
-        # --- CAMPO DE TEXTO PARA DIGITAR A FORMAÇÃO ---
         st.markdown("**Digite a formação desejada (ex: 4-4-2, 4-3-3, 3-5-2, etc.)**")
         formacao_escolhida = st.text_input(
             "Formação",
@@ -825,7 +717,6 @@ def show():
                 else:
                     st.warning("Digite uma formação válida.")
 
-        # --- RESTANTE DA ESCALAÇÃO (jogadores, automático, etc.) ---
         # Recarregar formação atualizada
         conn = conectar_banco()
         cursor = conn.cursor()
@@ -921,7 +812,7 @@ def show():
                             st.success("Escalação salva!")
                             st.rerun()
 
-    # Exibe a escalação atual (sanitizado)
+    # Exibe a escalação atual
     conn = conectar_banco()
     try:
         df_lineup = pd.read_sql_query(f"""
@@ -962,11 +853,9 @@ def show():
     # STAFF TÉCNICO (COM DEPURAÇÃO)
     # ============================================================
     st.subheader("👔 Staff Técnico")
-    staff_casa = obter_staff_completo(jogo['time_casa_id'])
-    staff_fora = obter_staff_completo(jogo['time_fora_id'])
+    staff_casa = obter_staff_completo(jogo['time_casa_id'], competicao_id)
+    staff_fora = obter_staff_completo(jogo['time_fora_id'], competicao_id)
 
-    # =================== DEPURAÇÃO ===================
-    # Esta seção exibe informações detalhadas para diagnosticar problemas de fotos
     st.write("🔍 **DEPURAÇÃO - Staff Técnico**")
     st.write(f"Time Casa ID: {jogo['time_casa_id']} | {time_casa}")
     st.write(f"Time Fora ID: {jogo['time_fora_id']} | {time_fora}")
@@ -990,7 +879,6 @@ def show():
             st.success("✅ Existe")
         else:
             st.error("❌ Não encontrado")
-            # Tenta exibir o caminho absoluto baseado no projeto_web
             if membro.get('foto'):
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 parent_dir = os.path.dirname(script_dir)
@@ -998,11 +886,10 @@ def show():
                 caminho_teste2 = os.path.join(parent_dir, membro.get('foto'))
                 st.write(f"   Teste script_dir: {caminho_teste1} -> existe? {os.path.exists(caminho_teste1)}")
                 st.write(f"   Teste parent_dir: {caminho_teste2} -> existe? {os.path.exists(caminho_teste2)}")
-    # =================== FIM DEPURAÇÃO ===================
 
     st.markdown("---")
 
-    # Exibição normal das fotos (agora com a função melhorada)
+    # Exibição normal das fotos
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**{time_casa}**")

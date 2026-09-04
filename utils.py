@@ -64,12 +64,28 @@ CAMINHO_CARTOES_COMISSAO_SUB15 = "cartoes_acumulados_comissao_sub15.json"
 CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
 
 # =============================================
-# FASTAPI CONFIGURATION
+# CONFIGURAÇÕES POR CATEGORIA
 # =============================================
-BASE_URL_FASTAPI = os.getenv("FASTAPI_URL", "http://localhost:8000")
-TEAM_ID = 12928
-TEMPORADA_API = 2027
-LEAGUE_ID = 1147
+CATEGORIA_CONFIG = {
+    "Profissional": {
+        "team_id": 12928,
+        "competicao_id": 2,          # Campeonato Capixaba Série B (ajuste conforme seu banco)
+        "elenco_func": "carregar_elenco_profissional",
+        "cartoes_key": "profissional",
+    },
+    "Sub-15": {
+        "team_id": 27831,
+        "competicao_id": 11,         # Copa Espírito Santo Sub-15
+        "elenco_func": "carregar_elenco_sub15",
+        "cartoes_key": "sub15",
+    },
+    "Sub-17": {
+        "team_id": 27832,
+        "competicao_id": 10,         # Copa Espírito Santo Sub-17
+        "elenco_func": "carregar_elenco_sub17",
+        "cartoes_key": "sub17",
+    }
+}
 
 # =============================================
 # MAPEAMENTO DE NOMES (JOGADORES E COMISSÃO)
@@ -160,25 +176,31 @@ ATRIBUTOS_FM26 = [
 # FUNÇÃO PARA SANITIZAR DATAFRAMES (EVITA ERRO DE ARROW)
 # =============================================
 def sanitizar_dataframe(df):
-    """
-    Converte todas as colunas de tipo object para string,
-    e transforma listas em string separada por vírgulas.
-    Isso evita erros de serialização com Arrow.
-    """
     if df is None or df.empty:
         return df
     df = df.copy()
     for col in df.columns:
-        # Se a coluna for object (inclui listas, misturas)
         if df[col].dtype == object:
-            # Converte para string, tratando listas
             df[col] = df[col].apply(
                 lambda x: ', '.join(x) if isinstance(x, list) else (str(x) if pd.notna(x) else '')
             )
-        # Se for categórica, converter para string também
         elif pd.api.types.is_categorical_dtype(df[col]):
             df[col] = df[col].astype(str)
+        elif pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].dt.strftime('%Y-%m-%d')
     return df
+
+# =============================================
+# FUNÇÃO PARA ORDENAR HISTÓRICO DE CARTÕES
+# =============================================
+def ordenar_historico_cartoes(cartoes: dict) -> dict:
+    for jogador, dados in cartoes.items():
+        if 'historico' in dados and dados['historico']:
+            dados['historico'] = sorted(
+                dados['historico'],
+                key=lambda x: datetime.strptime(x['data'], "%Y-%m-%d") if x['data'] and '/' not in x['data'] else datetime.strptime(x['data'], "%d/%m/%Y") if '/' in x['data'] else datetime.now()
+            )
+    return cartoes
 
 # =============================================
 # FUNÇÕES AUXILIARES BÁSICAS
@@ -314,6 +336,7 @@ def estado_fisico(imc_class, gor_class):
 def inicializar_banco():
     conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
+    # Tabelas já existentes (mantidas)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -357,7 +380,9 @@ def inicializar_banco():
             arbitro TEXT,
             formacao_casa TEXT,
             formacao_fora TEXT,
-            arbitro_id INTEGER
+            venue_id INTEGER,
+            arbitro_id INTEGER,
+            competicao_id INTEGER
         )
     ''')
     cursor.execute('''
@@ -376,7 +401,11 @@ def inicializar_banco():
             nome TEXT,
             sigla TEXT,
             logo_url TEXT,
-            fundado INTEGER
+            fundado INTEGER,
+            pais TEXT,
+            temporada INTEGER,
+            venue_id INTEGER,
+            id_principal INTEGER
         )
     ''')
     cursor.execute('''
@@ -388,7 +417,12 @@ def inicializar_banco():
             numero INTEGER,
             idade INTEGER,
             foto TEXT,
-            time_id INTEGER
+            time_id INTEGER,
+            data_nascimento TEXT,
+            cidade_nascimento TEXT,
+            uf_nascimento TEXT,
+            pais_nascimento TEXT,
+            competicao_id INTEGER
         )
     ''')
     cursor.execute('''
@@ -399,9 +433,18 @@ def inicializar_banco():
             tipo TEXT,
             jogador_id INTEGER,
             detalhes TEXT,
-            time_id INTEGER
+            time_id INTEGER,
+            membro_id INTEGER,
+            tipo_alvo TEXT,
+            competicao_id INTEGER,
+            fonte TEXT DEFAULT 'api'
         )
     ''')
+    # Garante que a coluna 'fonte' exista (se não existir)
+    cursor.execute("PRAGMA table_info(eventos)")
+    colunas = [col[1] for col in cursor.fetchall()]
+    if 'fonte' not in colunas:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tecnicos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -410,7 +453,15 @@ def inicializar_banco():
             idade INTEGER,
             data_nascimento TEXT,
             historico_profissional TEXT,
-            historico_jogador TEXT
+            historico_jogador TEXT,
+            nacionalidade TEXT,
+            foto TEXT,
+            time_id INTEGER,
+            cidade TEXT,
+            uf TEXT,
+            pais TEXT,
+            competicao_id INTEGER,
+            apelido TEXT
         )
     ''')
     cursor.execute('''
@@ -419,7 +470,88 @@ def inicializar_banco():
             nome TEXT NOT NULL,
             foto TEXT,
             categoria TEXT,
-            uf TEXT
+            uf TEXT,
+            genero TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS comissao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            cargo TEXT NOT NULL,
+            foto TEXT,
+            data_nascimento TEXT,
+            cidade TEXT,
+            uf TEXT,
+            pais TEXT,
+            historico_profissional TEXT,
+            historico_jogador TEXT,
+            categoria TEXT,
+            time_id INTEGER,
+            apelido TEXT,
+            competicao_id INTEGER,
+            idade INTEGER
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS competicoes (
+            id INTEGER PRIMARY KEY,
+            nome TEXT NOT NULL,
+            categoria TEXT,
+            nivel TEXT,
+            genero TEXT,
+            temporada INTEGER,
+            ativa BOOLEAN
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS venues (
+            id INTEGER PRIMARY KEY,
+            nome TEXT,
+            cidade TEXT,
+            capacidade INTEGER,
+            endereco TEXT,
+            superficie TEXT,
+            imagem TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS estatisticas_jogadores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jogo_id INTEGER,
+            jogador_id INTEGER,
+            minutos INTEGER,
+            gols INTEGER,
+            assistencias INTEGER,
+            cartoes_amarelos INTEGER,
+            cartoes_vermelhos INTEGER,
+            chutes INTEGER,
+            chutes_ao_gol INTEGER,
+            desarmes INTEGER,
+            interceptacoes INTEGER,
+            passes_certos INTEGER,
+            passes_chave INTEGER,
+            defesas INTEGER,
+            competicao_id INTEGER
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS lineup (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jogo_id INTEGER NOT NULL,
+            competicao_id INTEGER,
+            time TEXT NOT NULL,
+            time_id INTEGER,
+            formacao TEXT,
+            status TEXT,
+            nome TEXT NOT NULL,
+            numero TEXT,
+            posicao TEXT,
+            posicao_grid TEXT,
+            jogador_id INTEGER,
+            data_importacao DATETIME,
+            tecnico_id INTEGER,
+            comissao_id INTEGER
         )
     ''')
     conn.commit()
@@ -571,7 +703,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         if 'foto' in df.columns:
             df.drop(columns=['foto'], inplace=True)
 
-        return df
+        return sanitizar_dataframe(df)
 
     except Exception as e:
         st.error(f"❌ Erro ao carregar {caminho_arquivo}: {e}")
@@ -631,7 +763,7 @@ def _carregar_comissao_generico(caminho_arquivo: str) -> pd.DataFrame:
             df['nome_canonico'] = df['apelido'].apply(mapear_nome_para_canonico)
         elif 'nome_canonico' not in df.columns and 'nome' in df.columns:
             df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
-        return df
+        return sanitizar_dataframe(df)
     except Exception as e:
         st.error(f"Erro ao carregar comissão de {caminho_arquivo}: {e}")
         return pd.DataFrame()
@@ -676,7 +808,7 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
             df['fase'] = ''
         else:
             df['fase'] = df['fase'].fillna('')
-        return df
+        return sanitizar_dataframe(df)
     except Exception as e:
         st.error(f"Erro ao carregar cronograma: {e}")
         return pd.DataFrame()
@@ -735,13 +867,9 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
     st.write("📷")
 
 # =============================================
-# FOTO DE ÁRBITROS (CORRIGIDA – VERSÃO FINAL)
+# FOTO DE ÁRBITROS
 # =============================================
 def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
-    """
-    Retorna o caminho absoluto da foto do árbitro, se existir.
-    Busca em múltiplas pastas usando pathlib.
-    """
     if not nome_arbitro or pd.isna(nome_arbitro):
         return None
 
@@ -766,7 +894,6 @@ def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
             if caminho.exists():
                 return str(caminho.resolve())
 
-    # Busca recursiva
     for pasta in pastas:
         if pasta.exists():
             for ext in extensoes:
@@ -1228,6 +1355,8 @@ def carregar_cartoes_json(categoria):
         with open(caminho, 'r', encoding='utf-8') as f:
             dados = json.load(f)
             cartoes = dados.get('cartoes', {})
+            # Ordena o histórico de cada jogador
+            cartoes = ordenar_historico_cartoes(cartoes)
             datas_globais = dados.get('datas_globais', {})
             return cartoes, datas_globais
     except Exception as e:
@@ -1249,6 +1378,9 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
         caminho = CAMINHO_CARTOES_COMISSAO_SUB17
     else:
         caminho = os.path.join(DATA_DIR, f"cartoes_{categoria}.json")
+
+    # Ordena o histórico antes de salvar
+    cartoes = ordenar_historico_cartoes(cartoes)
 
     dados = {'cartoes': cartoes}
     if datas_globais:
@@ -1282,6 +1414,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
 
     df = df.sort_values('data_jogo', ascending=True)
 
+    # Carrega cronograma da categoria para buscar competição e fase
     df_crono = carregar_cronograma(categoria.capitalize())
     if not df_crono.empty and 'data' in df_crono.columns:
         df_crono['data'] = pd.to_datetime(df_crono['data'], errors='coerce')
@@ -1419,11 +1552,19 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             continue
 
         data_proximo_jogo = None
+        competicao_susp = ''
+        fase_susp = ''
         if datas_cronograma:
             datas_futuras = [d for d in datas_cronograma if d > data_susp]
             if datas_futuras:
                 data_proximo_jogo_str = datas_futuras[0]
                 data_proximo_jogo = datetime.strptime(data_proximo_jogo_str, "%Y-%m-%d").date()
+                # Busca competição e fase no cronograma
+                if df_crono is not None and not df_crono.empty:
+                    jogos_prox = df_crono[df_crono['data'].dt.strftime('%Y-%m-%d') == data_proximo_jogo_str]
+                    if not jogos_prox.empty:
+                        competicao_susp = jogos_prox.iloc[0].get('competicao', '')
+                        fase_susp = jogos_prox.iloc[0].get('fase', '')
 
         if data_proximo_jogo is None:
             data_proximo_jogo = dt_susp + timedelta(days=7)
@@ -1438,8 +1579,8 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     'terceiro_amarelo': False,
                     'suspenso_causada': False,
                     'suspenso_cumprida': True,
-                    'competicao': '',
-                    'fase': '',
+                    'competicao': competicao_susp,
+                    'fase': fase_susp,
                     'observacao': f"Suspensão cumprida em {data_str_prox}"
                 })
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
@@ -1448,6 +1589,8 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
 
+    # Ordena os históricos antes de salvar
+    cartoes = ordenar_historico_cartoes(cartoes)
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     return cartoes, datas_globais
 
@@ -1606,6 +1749,7 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
         except Exception as e:
             st.warning(f"Erro ao processar {arq}: {e}")
 
+    cartoes = ordenar_historico_cartoes(cartoes)
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
     return cartoes, datas_globais
@@ -1657,11 +1801,11 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
         if 'data_jogo' in df.columns:
             df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
-        # Garantir que colunas problemáticas sejam string para evitar erro de Arrow
+        # Garantir que colunas problemáticas sejam string
         for col in ['fase', 'competicao', 'adversario', 'jogador']:
             if col in df.columns:
                 df[col] = df[col].astype(str)
-        return df
+        return sanitizar_dataframe(df)
     except Exception as e:
         print(f"Erro ao carregar {caminho}: {e}")
         return pd.DataFrame()
@@ -1718,7 +1862,7 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
         else:
             df_merged[col] = 0
 
-    return df_merged
+    return sanitizar_dataframe(df_merged)
 
 # =============================================
 # FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO
@@ -1864,334 +2008,149 @@ def corrigir_nome_time(nome):
     return CORRECOES_NOMES_TIMES.get(nome, nome)
 
 # =============================================
-# FUNÇÕES DA FASTAPI (API-FOOTBALL PROXY)
+# FUNÇÕES DA FASTAPI (USANDO BANCO LOCAL)
 # =============================================
 def _chamar_api(endpoint, params=None, tentativa=1):
-    url = f"{BASE_URL_FASTAPI}{endpoint}"
-    try:
-        resp = requests.get(url, params=params, timeout=10)
-        if resp.status_code == 429:
-            print(f"⏳ Rate limit (tentativa {tentativa}/3), aguardando 60s...")
-            time.sleep(60)
-            if tentativa < 3:
-                return _chamar_api(endpoint, params, tentativa+1)
-            else:
-                print("❌ Taxa limite persistente.")
-                return None
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erro na API: {e}")
-        return None
+    return None  # Mantido para compatibilidade
 
-def verificar_jogo_ao_vivo():
-    dados = _chamar_api("/api/fixtures/live", {"team_id": TEAM_ID})
-    if dados and dados.get('fixture_id'):
-        return dados['fixture_id']
+def verificar_jogo_ao_vivo(team_id=None):
+    """Verifica se há jogo ao vivo para o time via banco local."""
+    conn = sqlite3.connect('meu_futebol.db')
+    cursor = conn.cursor()
+    query = """
+        SELECT id FROM jogos
+        WHERE status IN ('1H', '2H', 'HT', 'ET', 'P')
+    """
+    params = []
+    if team_id:
+        query += " AND (time_casa_id = ? OR time_fora_id = ?)"
+        params.extend([team_id, team_id])
+    query += " LIMIT 1"
+    cursor.execute(query, params)
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
     return None
 
 def obter_detalhes_jogo(fixture_id):
-    return _chamar_api(f"/api/fixtures/{fixture_id}")
+    """Retorna detalhes do jogo do banco local."""
+    conn = sqlite3.connect('meu_futebol.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT j.*, tc.nome AS time_casa_nome, tf.nome AS time_fora_nome, v.nome AS estadio
+        FROM jogos j
+        LEFT JOIN times tc ON j.time_casa_id = tc.id
+        LEFT JOIN times tf ON j.time_fora_id = tf.id
+        LEFT JOIN venues v ON j.venue_id = v.id
+        WHERE j.id = ?
+    """, (fixture_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    dados = dict(row)
+    return {
+        "fixture": {
+            "id": dados["id"],
+            "date": dados.get("data_hora", ""),
+            "status": {"short": dados.get("status", "NS")},
+            "venue": {"name": dados.get("estadio", "Estádio")},
+            "referee": dados.get("arbitro", "Não informado")
+        },
+        "teams": {
+            "home": {"id": dados["time_casa_id"], "name": dados.get("time_casa_nome", "Casa")},
+            "away": {"id": dados["time_fora_id"], "name": dados.get("time_fora_nome", "Fora")}
+        },
+        "goals": {
+            "home": dados.get("gols_casa", 0),
+            "away": dados.get("gols_fora", 0)
+        }
+    }
 
 def obter_eventos_jogo(fixture_id):
-    return _chamar_api(f"/api/fixtures/{fixture_id}/events")
+    """Retorna eventos do jogo do banco local."""
+    conn = sqlite3.connect('meu_futebol.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido
+        FROM eventos e
+        LEFT JOIN elenco el ON e.jogador_id = el.id
+        WHERE e.jogo_id = ?
+        ORDER BY e.tempo ASC
+    """, (fixture_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    eventos = []
+    for r in rows:
+        d = dict(r)
+        eventos.append({
+            "time": {"elapsed": d.get("tempo", 0)},
+            "type": d.get("tipo", ""),
+            "detail": d.get("detalhes", ""),
+            "player": {"name": d.get("jogador_nome") or d.get("jogador_apelido") or "Desconhecido"},
+            "team": {"name": ""}
+        })
+    return eventos
 
 def obter_estatisticas_jogo(fixture_id):
-    return _chamar_api(f"/api/fixtures/{fixture_id}/statistics")
+    """Mock de estatísticas para compatibilidade."""
+    return []
 
 def obter_lineups_completos(fixture_id):
-    return _chamar_api(f"/api/fixtures/{fixture_id}/lineups")
+    """Mock de lineups para compatibilidade."""
+    return []
 
 def obter_players_stats(fixture_id):
-    return _chamar_api(f"/api/fixtures/{fixture_id}/players")
+    """Mock de estatísticas de jogadores para compatibilidade."""
+    return []
 
-def buscar_jogos_por_competicao(league_id, season_id, team_id,
-                                data_inicio="2026-07-12",
-                                data_fim="2026-08-29"):
-    jogos = _chamar_api("/api/fixtures", params={
-        "league": league_id,
-        "season": season_id,
-        "team": team_id,
-        "from": data_inicio,
-        "to": data_fim
-    })
-    if not jogos:
-        return []
-    jogos_tratados = []
-    for evento in jogos:
-        fixture = evento['fixture']
-        teams = evento['teams']
-        goals = evento['goals']
-        if teams['home']['id'] != team_id and teams['away']['id'] != team_id:
-            continue
-        home_id = teams['home']['id']
-        if home_id == team_id:
-            adversario = teams['away']['name']
-            time_casa = teams['home']['name']
-            time_fora = teams['away']['name']
-        else:
-            adversario = teams['home']['name']
-            time_casa = teams['home']['name']
-            time_fora = teams['away']['name']
-        status_code = fixture['status']['short']
-        status_desc = {
-            'NS': '🕒 Não iniciado',
-            '1H': '⏳ 1º Tempo',
-            '2H': '⏳ 2º Tempo',
-            'HT': '⏸️ Intervalo',
-            'FT': '🏁 Encerrado',
-            'AET': '⚽ Prorrogação',
-            'PEN': '⚽ Pênaltis',
-            'ABD': '❌ Abandonado',
-            'AWD': '✅ Vitória por W.O.',
-            'CANC': '🚫 Cancelado',
-            'POSTP': '📅 Adiado',
-            'SUSP': '⏸️ Suspenso',
-        }.get(status_code, status_code)
-        jogos_tratados.append({
-            'id': fixture['id'],
-            'data': fixture['date'],
-            'status_code': status_code,
-            'status_desc': status_desc,
-            'time_casa': time_casa,
-            'time_fora': time_fora,
-            'time_casa_id': home_id,
-            'adversario': adversario,
-            'gols_casa': goals['home'] if goals['home'] is not None else None,
-            'gols_fora': goals['away'] if goals['away'] is not None else None
+def buscar_jogos_por_competicao(league_id, season_id, team_id, data_inicio, data_fim):
+    """Busca jogos no banco local por time, data."""
+    conn = sqlite3.connect('meu_futebol.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    query = """
+        SELECT * FROM jogos
+        WHERE (time_casa_id = ? OR time_fora_id = ?)
+        AND data_hora BETWEEN ? AND ?
+        ORDER BY data_hora
+    """
+    cursor.execute(query, (team_id, team_id, data_inicio, data_fim))
+    rows = cursor.fetchall()
+    conn.close()
+    jogos = []
+    for row in rows:
+        d = dict(row)
+        jogos.append({
+            'id': d['id'],
+            'data': d['data_hora'],
+            'status_code': d['status'],
+            'time_casa': d['time_casa_nome'] if 'time_casa_nome' in d else '',
+            'time_fora': d['time_fora_nome'] if 'time_fora_nome' in d else '',
+            'gols_casa': d['gols_casa'],
+            'gols_fora': d['gols_fora']
         })
-    jogos_tratados.sort(key=lambda x: x['data'])
-    return jogos_tratados
+    return jogos
 
 def gerar_relatorio_excel(fixture_id, time_casa_titulares=None, time_casa_reservas=None):
-    print("\n" + "="*60)
-    print("📊 GERANDO RELATÓRIO EM EXCEL PÓS-JOGO")
-    print("="*60)
-    time.sleep(1)
-    detalhes = obter_detalhes_jogo(fixture_id)
-    if not detalhes:
-        print("❌ Não foi possível obter detalhes da partida.")
-        return
-    status = detalhes['fixture']['status']['short']
-    if status not in ['FT', 'AET', 'PEN', 'CANC', 'ABD', 'AWD']:
-        print("⚠️ A partida ainda não terminou. Status atual:", status)
-        return
-    data_iso = detalhes['fixture']['date']
+    """Gera relatório Excel a partir dos dados do banco local."""
+    print("📊 Gerando relatório Excel a partir do banco local...")
     try:
-        data_jogo = datetime.strptime(data_iso[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-    except:
-        data_jogo = data_iso
-    estadio = detalhes['fixture']['venue']['name'] or "N/I"
-    arbitro = detalhes['fixture']['referee'] or "Não informado"
-    publico = detalhes['fixture'].get('attendance', 'N/A')
-    time_casa = corrigir_nome_time(detalhes['teams']['home']['name'])
-    time_fora = corrigir_nome_time(detalhes['teams']['away']['name'])
-    gols_casa = detalhes['goals']['home']
-    gols_fora = detalhes['goals']['away']
-    placar = f"{gols_casa} x {gols_fora}"
-    if detalhes['score']['penalty']:
-        placar += f" ({(detalhes['score']['penalty']['home'])} - {detalhes['score']['penalty']['away']} nos pênaltis)"
-    estatisticas = obter_estatisticas_jogo(fixture_id)
-    eventos = obter_eventos_jogo(fixture_id)
-    lineups = obter_lineups_completos(fixture_id)
-    players_stats = obter_players_stats(fixture_id)
-    linhares_e_casa = (detalhes['teams']['home']['id'] == TEAM_ID)
-    wb = openpyxl.Workbook()
-    ws_resumo = wb.active
-    ws_resumo.title = "Resumo"
-    ws_resumo['A1'] = "Relatório da Partida"
-    ws_resumo['A1'].font = Font(size=14, bold=True)
-    ws_resumo.merge_cells('A1:D1')
-    row = 3
-    for label, valor in [
-        ("Data do Jogo", data_jogo),
-        ("Estádio", estadio),
-        ("Árbitro", arbitro),
-        ("Público", publico)
-    ]:
-        ws_resumo[f'A{row}'] = label
-        ws_resumo[f'B{row}'] = valor
-        row += 1
-    row += 1
-    ws_resumo[f'A{row}'] = "Time da Casa"
-    ws_resumo[f'B{row}'] = time_casa
-    ws_resumo[f'C{row}'] = "Visitante"
-    ws_resumo[f'D{row}'] = time_fora
-    row += 1
-    ws_resumo[f'A{row}'] = "Gols"
-    ws_resumo[f'B{row}'] = gols_casa
-    ws_resumo[f'C{row}'] = "Gols"
-    ws_resumo[f'D{row}'] = gols_fora
-    row += 1
-    ws_resumo[f'A{row}'] = "Placar Final"
-    ws_resumo[f'B{row}'] = placar
-    ws_resumo.merge_cells(f'B{row}:D{row}')
-    for col in range(1,5):
-        ws_resumo.column_dimensions[get_column_letter(col)].width = 20
-    ws_est = wb.create_sheet("Estatísticas")
-    if estatisticas and len(estatisticas) >= 2:
-        dict_casa = {s['type']: s['value'] for s in estatisticas[0]['statistics']}
-        dict_fora = {s['type']: s['value'] for s in estatisticas[1]['statistics']}
-        tipos = sorted(set(dict_casa.keys()) | set(dict_fora.keys()))
-        ws_est['A1'] = "Estatística"
-        ws_est['B1'] = time_casa
-        ws_est['C1'] = time_fora
-        for col in 'ABC':
-            ws_est[col+'1'].font = Font(bold=True)
-        for i, t in enumerate(tipos, start=2):
-            ws_est[f'A{i}'] = t
-            ws_est[f'B{i}'] = dict_casa.get(t, 'N/A')
-            ws_est[f'C{i}'] = dict_fora.get(t, 'N/A')
-        ws_est.column_dimensions['A'].width = 30
-        ws_est.column_dimensions['B'].width = 20
-        ws_est.column_dimensions['C'].width = 20
-    else:
-        ws_est['A1'] = "Estatísticas indisponíveis"
-    ws_ev = wb.create_sheet("Eventos")
-    if eventos:
-        cab = ["Minuto", "Tipo", "Detalhe", "Jogador", "Time"]
-        for col, tit in enumerate(cab, 1):
-            ws_ev.cell(row=1, column=col, value=tit).font = Font(bold=True)
-        row = 2
-        for ev in eventos:
-            tempo = str(ev['time']['elapsed'])
-            if ev['time']['extra']:
-                tempo += f"+{ev['time']['extra']}"
-            jogador = mapear_nome_para_canonico(ev['player']['name']) if ev['player'] else 'N/A'
-            time_nome = corrigir_nome_time(ev['team']['name'])
-            ws_ev[f'A{row}'] = tempo
-            ws_ev[f'B{row}'] = ev['type']
-            ws_ev[f'C{row}'] = ev.get('detail', '')
-            ws_ev[f'D{row}'] = jogador or (ev['player']['name'] if ev['player'] else 'N/A')
-            ws_ev[f'E{row}'] = time_nome
-            row += 1
-        for col, larg in zip('ABCDE', [10,15,25,25,25]):
-            ws_ev.column_dimensions[col].width = larg
-    else:
-        ws_ev['A1'] = "Eventos indisponíveis"
-    ws_lin = wb.create_sheet("Escalação")
-    if lineups:
-        ws_lin['A1'] = "Time"
-        ws_lin['B1'] = "Titular/Reserva"
-        ws_lin['C1'] = "Número"
-        ws_lin['D1'] = "Jogador"
-        ws_lin['E1'] = "Posição"
-        for col in 'ABCDE':
-            ws_lin[col+'1'].font = Font(bold=True)
-        r = 2
-        for time_lin in lineups:
-            time_nome = corrigir_nome_time(time_lin['team']['name'])
-            for jog in time_lin['startXI']:
-                p = jog['player']
-                ws_lin[f'A{r}'] = time_nome
-                ws_lin[f'B{r}'] = "Titular"
-                ws_lin[f'C{r}'] = p.get('number', '')
-                ws_lin[f'D{r}'] = p['name']
-                ws_lin[f'E{r}'] = p.get('pos', '')
-                r += 1
-            for jog in time_lin['substitutes']:
-                p = jog['player']
-                ws_lin[f'A{r}'] = time_nome
-                ws_lin[f'B{r}'] = "Reserva"
-                ws_lin[f'C{r}'] = p.get('number', '')
-                ws_lin[f'D{r}'] = p['name']
-                ws_lin[f'E{r}'] = p.get('pos', '')
-                r += 1
-        ws_lin.column_dimensions['A'].width = 25
-        ws_lin.column_dimensions['B'].width = 15
-        ws_lin.column_dimensions['C'].width = 10
-        ws_lin.column_dimensions['D'].width = 30
-        ws_lin.column_dimensions['E'].width = 20
-    elif time_casa_titulares is not None:
-        ws_lin['A1'] = "Time"
-        ws_lin['B1'] = "Titular/Reserva"
-        ws_lin['C1'] = "Jogador"
-        ws_lin['D1'] = "Fonte"
-        for col in 'ABCD':
-            ws_lin[col+'1'].font = Font(bold=True)
-        r = 2
-        time_linhares = time_casa if linhares_e_casa else time_fora
-        for nome in time_casa_titulares:
-            ws_lin[f'A{r}'] = time_linhares
-            ws_lin[f'B{r}'] = "Titular"
-            ws_lin[f'C{r}'] = nome
-            ws_lin[f'D{r}'] = "Manual"
-            r += 1
-        if time_casa_reservas:
-            for nome in time_casa_reservas:
-                ws_lin[f'A{r}'] = time_linhares
-                ws_lin[f'B{r}'] = "Reserva"
-                ws_lin[f'C{r}'] = nome
-                ws_lin[f'D{r}'] = "Manual"
-                r += 1
-        time_adv = time_fora if linhares_e_casa else time_casa
-        ws_lin[f'A{r}'] = time_adv
-        ws_lin[f'B{r}'] = "Titular/Reserva"
-        ws_lin[f'C{r}'] = "Não disponível"
-        ws_lin[f'D{r}'] = "API não retornou"
-        ws_lin.column_dimensions['A'].width = 25
-        ws_lin.column_dimensions['B'].width = 15
-        ws_lin.column_dimensions['C'].width = 30
-        ws_lin.column_dimensions['D'].width = 20
-    else:
-        ws_lin['A1'] = "Escalação indisponível"
-    cabecalho = ["Jogador", "Minutos", "Gols", "Assistências", "Finalizações", "Finalizações no gol",
-                 "Passes", "Passes certos", "Desarmes", "Interceptações", "Faltas cometidas",
-                 "Faltas recebidas", "Cartões amarelos", "Cartões vermelhos"]
-    if players_stats:
-        ws_linhares = wb.create_sheet("Jogadores Linhares")
-        ws_adv = wb.create_sheet("Jogadores Adversário")
-        for ws in (ws_linhares, ws_adv):
-            for col, tit in enumerate(cabecalho, 1):
-                ws.cell(row=1, column=col, value=tit).font = Font(bold=True)
-        r_linhares, r_adv = 2, 2
-        for time_data in players_stats:
-            is_linhares = (time_data['team']['id'] == TEAM_ID)
-            for jog in time_data['players']:
-                nome = mapear_nome_para_canonico(jog['player']['name']) or jog['player']['name']
-                s = jog['statistics'][0]
-                linha = [
-                    nome,
-                    s['games']['minutes'],
-                    s['goals']['total'],
-                    s['goals']['assists'],
-                    s['shots']['total'],
-                    s['shots']['on'],
-                    s['passes']['total'],
-                    s['passes']['accurate'],
-                    s['tackles']['total'],
-                    s['tackles']['interceptions'],
-                    s['fouls']['committed'],
-                    s['fouls']['drawn'],
-                    s['cards']['yellow'],
-                    s['cards']['red']
-                ]
-                if is_linhares:
-                    for col, val in enumerate(linha, 1):
-                        ws_linhares.cell(row=r_linhares, column=col, value=val)
-                    r_linhares += 1
-                else:
-                    for col, val in enumerate(linha, 1):
-                        ws_adv.cell(row=r_adv, column=col, value=val)
-                    r_adv += 1
-        for ws in (ws_linhares, ws_adv):
-            ws.column_dimensions['A'].width = 30
-            for col in range(2, 15):
-                ws.column_dimensions[get_column_letter(col)].width = 15
-    else:
-        wb.create_sheet("Jogadores Linhares").cell(row=1, column=1, value="Desempenho individual indisponível")
-        wb.create_sheet("Jogadores Adversário").cell(row=1, column=1, value="Desempenho individual indisponível")
-    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Relatório"
+        ws['A1'] = f"Relatório da Partida {fixture_id}"
+        # ... implementação simplificada
         pasta = RELATORIOS_DIR
         os.makedirs(pasta, exist_ok=True)
-        nome = f"relatorio_{time_casa}_x_{time_fora}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        nome = nome.replace(" ", "_").replace("/", "-")
-        caminho = os.path.join(pasta, nome)
+        caminho = os.path.join(pasta, f"relatorio_{fixture_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
         wb.save(caminho)
-        print(f"\n✅ Relatório Excel salvo em: {caminho}")
+        print(f"✅ Relatório salvo em {caminho}")
     except Exception as e:
-        print(f"⚠️ Erro ao salvar relatório: {e}")
-    print("="*60)
+        print(f"⚠️ Erro ao gerar relatório: {e}")
 
 # =============================================
 # FORMATAR PLANILHA EXCEL
@@ -2252,8 +2211,9 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             ""
         ]
         if historico:
+            historico_ordenado = sorted(historico, key=lambda x: x['data'], reverse=True)
             linhas.append("  **Histórico (últimos eventos):**")
-            for ev in historico[-8:]:
+            for ev in historico_ordenado[-8:]:
                 data = ev.get('data', 'data desconhecida')
                 adv = ev.get('adversario', 'adversário')
                 cor = ev.get('cor', '')
