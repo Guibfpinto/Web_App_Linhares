@@ -197,12 +197,11 @@ st.set_page_config(
 # CSS COM FUNDO BASE64 E OPACIDADE 0.40
 # ======================================================================
 def get_base64_image(image_path):
-    """Lê a imagem e retorna a string base64."""
     with open(image_path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-bg_path = "data/background.png"  # caminho relativo à raiz do projeto
+bg_path = "data/background.png"
 
 if os.path.exists(bg_path):
     b64_bg = get_base64_image(bg_path)
@@ -218,41 +217,48 @@ if os.path.exists(bg_path):
             background-color: #1a1a1a;
         }}
 
-        /* Container principal com opacidade 0.80 (80% opaco, 20% transparente) */
+        /* Container principal com opacidade 0.60 (60% opaco, 40% transparente) */
         .main > div {{
-            background-color: rgba(0, 0, 0, 0.80) !important;
-            padding: 2rem 2rem 2rem 2rem;
+            background-color: rgba(0, 0, 0, 0.60) !important;
+            padding: 2rem;
             border-radius: 12px;
             color: white !important;
         }}
 
-        /* Remover cabeçalho, menu, rodapé e sidebar */
-        header {{
-            display: none !important;
+        /* Expanders com opacidade similar para manter consistência */
+        .streamlit-expanderHeader {{
+            background-color: rgba(0, 0, 0, 0.60) !important;
+            color: white !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
         }}
-        #MainMenu {{
-            display: none !important;
+        .streamlit-expanderHeader:hover {{
+            background-color: rgba(0, 0, 0, 0.70) !important;
         }}
-        footer {{
-            display: none !important;
-        }}
-        [data-testid="stSidebar"] {{
-            display: none !important;
+        .streamlit-expanderContent {{
+            background-color: rgba(0, 0, 0, 0.50) !important;
+            color: white !important;
+            border-radius: 0 0 6px 6px !important;
+            border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
         }}
 
-        /* Container principal ocupa toda a largura */
+        /* Demais estilos (remover header, menu, footer, sidebar) */
+        header {{ display: none !important; }}
+        #MainMenu {{ display: none !important; }}
+        footer {{ display: none !important; }}
+        [data-testid="stSidebar"] {{ display: none !important; }}
+
         .main .block-container {{
             padding-top: 0 !important;
             padding-bottom: 0 !important;
             max-width: 100% !important;
         }}
 
-        /* Força cor branca em todos os textos */
-        .main, .main * {{
-            color: white !important;
-        }}
+        .main, .main * {{ color: white !important; }}
 
-        /* Botões com fundo translúcido e texto branco */
+        /* Botões, inputs, tabelas, etc. mantidos */
         .stButton button {{
             background-color: rgba(255, 255, 255, 0.15) !important;
             color: white !important;
@@ -262,11 +268,9 @@ if os.path.exists(bg_path):
         }}
         .stButton button:hover {{
             background-color: rgba(255, 255, 255, 0.25) !important;
-            color: white !important;
             border-color: rgba(255, 255, 255, 0.5) !important;
         }}
 
-        /* Inputs, selects e áreas de texto */
         .stTextInput input, .stSelectbox select, .stNumberInput input,
         .stDateInput input, .stTextArea textarea {{
             background-color: rgba(255, 255, 255, 0.12) !important;
@@ -285,13 +289,11 @@ if os.path.exists(bg_path):
             box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
         }}
 
-        /* Selectbox dropdown */
         .stSelectbox div[data-baseweb="select"] {{
             background-color: rgba(0, 0, 0, 0.8) !important;
             color: white !important;
         }}
 
-        /* Tabelas (DataFrames) */
         .dataframe, .stDataFrame {{
             background-color: rgba(0, 0, 0, 0.5) !important;
             color: white !important;
@@ -306,43 +308,17 @@ if os.path.exists(bg_path):
             border-color: rgba(255, 255, 255, 0.1) !important;
         }}
 
-        /* Alertas */
         .stAlert {{
             background-color: rgba(0, 0, 0, 0.65) !important;
             color: white !important;
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
             border-radius: 6px !important;
         }}
-        .stAlert .stAlertContent {{
-            color: white !important;
-        }}
-        .stAlert .stAlertIcon {{
+        .stAlert .stAlertContent, .stAlert .stAlertIcon {{
             color: white !important;
         }}
 
-        /* Expanders */
-        .streamlit-expanderHeader {{
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            color: white !important;
-            border-radius: 6px !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }}
-        .streamlit-expanderHeader:hover {{
-            background-color: rgba(255, 255, 255, 0.1) !important;
-        }}
-        .streamlit-expanderContent {{
-            background-color: rgba(0, 0, 0, 0.3) !important;
-            color: white !important;
-            border-radius: 0 0 6px 6px !important;
-            border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }}
-
-        /* Tabs */
-        .stTabs [data-baseweb="tab-list"] {{
-            gap: 8px;
-        }}
+        .stTabs [data-baseweb="tab-list"] {{ gap: 8px; }}
         .stTabs [data-baseweb="tab"] {{
             background-color: rgba(255, 255, 255, 0.05) !important;
             color: white !important;
@@ -364,26 +340,15 @@ if os.path.exists(bg_path):
             border-top: none !important;
         }}
 
-        /* Scrollbar personalizada */
-        ::-webkit-scrollbar {{
-            width: 8px;
-        }}
-        ::-webkit-scrollbar-track {{
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 4px;
-        }}
-        ::-webkit-scrollbar-thumb {{
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }}
-        ::-webkit-scrollbar-thumb:hover {{
-            background: rgba(255, 255, 255, 0.3);
-        }}
+        ::-webkit-scrollbar {{ width: 8px; }}
+        ::-webkit-scrollbar-track {{ background: rgba(0, 0, 0, 0.3); border-radius: 4px; }}
+        ::-webkit-scrollbar-thumb {{ background: rgba(255, 255, 255, 0.2); border-radius: 4px; }}
+        ::-webkit-scrollbar-thumb:hover {{ background: rgba(255, 255, 255, 0.3); }}
     </style>
     """, unsafe_allow_html=True)
 else:
-    # Fallback caso a imagem não seja encontrada
-    st.warning("Imagem de fundo (data/background.png) não encontrada. Usando fundo escuro.")
+    # Fallback
+    st.warning("Imagem de fundo não encontrada.")
     st.markdown("""
     <style>
         .stApp { background-color: #1a1a1a; }
@@ -391,9 +356,9 @@ else:
         header, #MainMenu, footer, [data-testid="stSidebar"] { display: none !important; }
         .main .block-container { padding-top: 0; padding-bottom: 0; max-width: 100%; }
         .main, .main * { color: white !important; }
-        /* ... restante dos estilos básicos ... */
     </style>
     """, unsafe_allow_html=True)
+
 
 # ======================================================================
 # FUNÇÃO UNIFICADA PARA BUSCAR FOTO (JOGADORES E COMISSÃO)
