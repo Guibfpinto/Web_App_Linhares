@@ -194,7 +194,7 @@ st.set_page_config(
 )
 
 # ======================================================================
-# CSS ÚNICO - FUNDO, OPACIDADE 0.70, SEM SIDEBAR/HEADER/FOOTER, TEXTO BRANCO
+# CSS ÚNICO - FUNDO, OPACIDADE 0.40, SEM SIDEBAR/HEADER/FOOTER, TEXTO BRANCO
 # ======================================================================
 st.markdown("""
 <style>
@@ -208,9 +208,9 @@ st.markdown("""
         background-color: #1a1a1a;
     }
 
-    /* Container principal com opacidade 0.70 */
+    /* Container principal com opacidade 0.40 */
     .main > div {
-        background-color: rgba(0, 0, 0, 0.70) !important;
+        background-color: rgba(0, 0, 0, 0.40) !important;
         padding: 2rem;
         border-radius: 12px;
         color: white !important;
