@@ -668,13 +668,11 @@ def show():
     # ============================================================
     # LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
     # ============================================================
-    conn = conectar_banco()
     df_eventos = pd.read_sql_query(f"""
         SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
-               t.nome AS time_nome, e.fonte
+            e.fonte
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
-        LEFT JOIN times t ON e.time_id = t.id
         WHERE e.jogo_id = {jogo_selecionado_id}
         ORDER BY e.tempo DESC LIMIT 20
     """, conn)
