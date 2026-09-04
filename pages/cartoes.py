@@ -9,7 +9,8 @@ from utils import (
     inicializar_cartoes_por_csvs,
     inicializar_cartoes_comissao,
     mapear_nome_para_canonico,
-    verificar_e_reinicializar_cartoes
+    verificar_e_reinicializar_cartoes,
+    sanitizar_dataframe,  # <-- NOVA IMPORTAÇÃO
 )
 
 def show():
@@ -51,8 +52,6 @@ def show():
     # ============================================================
     # CARREGA O JSON (SEM CACHE - usando @st.cache_data com ttl=0)
     # ============================================================
-    # Para garantir que sempre leia do disco, vamos usar uma função que não usa cache
-    # ou usar st.cache_data(ttl=0) para forçar recarregamento
     @st.cache_data(ttl=0)
     def carregar_json_sem_cache(chave):
         cartoes, datas = carregar_cartoes_json(chave)
@@ -146,12 +145,15 @@ def show():
         })
 
     df = pd.DataFrame(dados_tabela)
+    # Sanitiza o DataFrame antes de exibir
+    df = sanitizar_dataframe(df)
+
     st.subheader(f"Resumo de Cartões – {categoria}")
     if competicao_selecionada != "Todas":
         st.caption(f"Filtrado por competição: **{competicao_selecionada}**")
     if fase_selecionada != "Todas":
         st.caption(f"Filtrado por fase: **{fase_selecionada}**")
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width='stretch')  # <-- use_container_width substituído
 
     # ============================================================
     # DETALHES INDIVIDUAIS
@@ -174,8 +176,11 @@ def show():
             for col in colunas_exibir:
                 if col not in df_hist.columns:
                     df_hist[col] = ''
+            # Sanitiza o DataFrame do histórico
+            df_hist_exib = sanitizar_dataframe(df_hist[colunas_exibir])
+
             st.subheader(f"Histórico de {jogador_selecionado}")
-            st.dataframe(df_hist[colunas_exibir], use_container_width=True)
+            st.dataframe(df_hist_exib, width='stretch')  # <-- use_container_width substituído
 
             with st.expander("Ver texto formatado"):
                 st.text(formatar_cartoes({jogador_selecionado: dados_jogador}, jogador_selecionado))

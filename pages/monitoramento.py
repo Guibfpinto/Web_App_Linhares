@@ -20,6 +20,7 @@ from utils import (
     obter_caminho_foto,
     obter_caminho_foto_arbitro,
     normalizar_texto,
+    sanitizar_dataframe,  # <-- IMPORTADO
 )
 
 # ============================================================
@@ -697,7 +698,7 @@ def show():
             else:
                 st.info("📡 Nenhum evento da API disponível.")
 
-            if st.button("⏹️ Parar Monitoramento", use_container_width=True):
+            if st.button("⏹️ Parar Monitoramento", width='stretch'):
                 st.session_state.monitoramento_ativo = False
                 st.session_state.fixture_id = None
                 st.rerun()
@@ -739,7 +740,7 @@ def show():
             with col3:
                 tempo = st.number_input("Minuto", 0, 120, 0, step=1)
             detalhes = st.text_input("Detalhes (opcional)")
-            if st.form_submit_button("Registrar Evento Manualmente", use_container_width=True):
+            if st.form_submit_button("Registrar Evento Manualmente", width='stretch'):
                 if tipo == 'Gol' and jogador_id != 0:
                     if time_jogador == jogo['time_casa_id']:
                         atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
@@ -761,7 +762,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # LISTA DE ÚLTIMOS EVENTOS
+    # LISTA DE ÚLTIMOS EVENTOS (SANITIZADO)
     # ============================================================
     conn = conectar_banco()
     try:
@@ -778,7 +779,8 @@ def show():
 
     if not df_eventos.empty:
         st.write("**📋 Últimos eventos:**")
-        for _, ev in df_eventos.iterrows():
+        df_eventos_exib = sanitizar_dataframe(df_eventos)
+        for _, ev in df_eventos_exib.iterrows():
             jogador = ev['jogador_nome'] if ev['jogador_nome'] else ev['jogador_apelido'] or 'Desconhecido'
             fonte = ev.get('fonte', 'api')
             icone = "🟢" if fonte == 'api' else "🟡"
@@ -804,9 +806,8 @@ def show():
         )
         col_btn, _ = st.columns([1, 4])
         with col_btn:
-            if st.button("Atualizar Formação", use_container_width=True):
+            if st.button("Atualizar Formação", width='stretch'):
                 if formacao_escolhida.strip():
-                    # Verifica se a formação é válida (opcional)
                     try:
                         _, _, _, posicoes = interpretar_formacao(formacao_escolhida.strip())
                         if not posicoes:
@@ -887,14 +888,14 @@ def show():
 
                 col_auto, col_salvar = st.columns(2)
                 with col_auto:
-                    if st.button("⚽ Gerar Automático", use_container_width=True):
+                    if st.button("⚽ Gerar Automático", width='stretch'):
                         titulares, reservas = montar_time_automatico(df_elenco, formacao_casa_atual, cartoes)
                         if titulares:
                             salvar_escalacao(jogo_selecionado_id, titulares, reservas)
                             st.success("Escalação automática salva!")
                             st.rerun()
                 with col_salvar:
-                    if st.button("💾 Salvar Manual", use_container_width=True):
+                    if st.button("💾 Salvar Manual", width='stretch'):
                         if len(titulares_selecionados) < len(posicoes):
                             st.error("Preencha todos os titulares.")
                         else:
@@ -920,7 +921,7 @@ def show():
                             st.success("Escalação salva!")
                             st.rerun()
 
-    # Exibe a escalação atual
+    # Exibe a escalação atual (sanitizado)
     conn = conectar_banco()
     try:
         df_lineup = pd.read_sql_query(f"""
@@ -933,6 +934,7 @@ def show():
         conn.close()
 
     if not df_lineup.empty:
+        df_lineup = sanitizar_dataframe(df_lineup)
         st.info("Escalação atual:")
         col1, col2 = st.columns(2)
         with col1:

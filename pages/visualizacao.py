@@ -4,11 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from mplsoccer import Pitch
-from utils import carregar_elenco_profissional, carregar_elenco_sub15, carregar_elenco_sub17
+from utils import carregar_elenco_profissional, carregar_elenco_sub15, carregar_elenco_sub17, sanitizar_dataframe
 
-# ============================================================
-# FUNÇÕES DE CARREGAMENTO DE ELENCO
-# ============================================================
 def get_elenco(categoria):
     if categoria == "Profissional":
         return carregar_elenco_profissional()
@@ -18,18 +15,12 @@ def get_elenco(categoria):
         return carregar_elenco_sub17()
     return None
 
-# ============================================================
-# FUNÇÃO PARA DETECTAR COLUNAS
-# ============================================================
 def detectar_coluna(df, possiveis, fallback=None):
     for col in df.columns:
         if col.lower() in [p.lower() for p in possiveis]:
             return col
     return fallback
 
-# ============================================================
-# MAPEAMENTO DE POSIÇÕES PARA ZONAS (0-100)
-# ============================================================
 ZONAS = {
     'goleiro': (50, 5, 8, 5),
     'zagueiro': (30, 25, 20, 10),
@@ -53,9 +44,6 @@ def obter_zona(posicao):
             return zona
     return (50, 50, 30, 30)
 
-# ============================================================
-# GERAR POSIÇÕES SIMULADAS
-# ============================================================
 def gerar_posicoes_simuladas(df_elenco, num_amostras=30):
     if df_elenco.empty:
         return pd.DataFrame(columns=['Nome', 'Posicao', 'x', 'y'])
@@ -71,7 +59,6 @@ def gerar_posicoes_simuladas(df_elenco, num_amostras=30):
     for _, row in df_elenco.iterrows():
         nome = str(row[col_nome]) if col_nome in df_elenco else 'Jogador'
         pos_original = str(row[col_pos]) if col_pos in df_elenco else 'Atacante'
-        # Pega a primeira posição antes da barra
         pos_principal = pos_original.split('/')[0].strip()
         x_center, y_center, sx, sy = obter_zona(pos_principal)
         for _ in range(num_amostras):
@@ -85,9 +72,6 @@ def gerar_posicoes_simuladas(df_elenco, num_amostras=30):
             })
     return pd.DataFrame(dados)
 
-# ============================================================
-# DESENHAR HEATMAP
-# ============================================================
 def desenhar_heatmap(df_posicoes, titulo, jogador_filtro=None, pitch_type='statsbomb'):
     if df_posicoes.empty:
         return None
@@ -126,9 +110,6 @@ def desenhar_heatmap(df_posicoes, titulo, jogador_filtro=None, pitch_type='stats
     ax.set_title(titulo, fontsize=16, color='white')
     return fig
 
-# ============================================================
-# PÁGINA PRINCIPAL
-# ============================================================
 def show():
     categoria = st.session_state.get("categoria_visualizacao", "Profissional")
     st.title(f"🎥 Visualização Tática - {categoria}")
@@ -139,16 +120,17 @@ def show():
         st.warning(f"Elenco não disponível para {categoria}.")
         if df_elenco is not None:
             st.write("Colunas disponíveis:", df_elenco.columns.tolist())
-            st.dataframe(df_elenco.head())
+            df_exib = sanitizar_dataframe(df_elenco.head())
+            st.dataframe(df_exib, width='stretch')
         return
 
     st.write(f"**{len(df_elenco)} jogadores** carregados para {categoria}.")
 
     with st.expander("🔍 Diagnóstico: dados carregados"):
         st.write("Colunas:", df_elenco.columns.tolist())
-        st.dataframe(df_elenco.head(5))
+        df_exib = sanitizar_dataframe(df_elenco.head(5))
+        st.dataframe(df_exib, width='stretch')
 
-    # Distribuição de posições (primeira posição)
     col_pos = detectar_coluna(df_elenco, ['posicao', 'posição', 'position'])
     if col_pos:
         pos_principais = df_elenco[col_pos].apply(lambda x: x.split('/')[0].strip() if pd.notna(x) else 'Desconhecido')
@@ -162,7 +144,6 @@ def show():
         ax1.tick_params(axis='x', rotation=45)
         st.pyplot(fig1)
 
-    # Heatmap
     st.subheader("🔥 Mapa de Calor (Heatmap) em Campo")
     with st.spinner("Gerando posições simuladas..."):
         df_posicoes = gerar_posicoes_simuladas(df_elenco, num_amostras=30)
@@ -186,7 +167,6 @@ def show():
         if fig_heat:
             st.pyplot(fig_heat)
 
-    # Posições médias
     st.subheader("📍 Posições médias dos jogadores")
     if not df_posicoes.empty:
         pos_media = df_posicoes.groupby('Nome').agg({'x': 'mean', 'y': 'mean'}).reset_index()

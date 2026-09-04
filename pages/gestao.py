@@ -13,6 +13,7 @@ from utils import (
     obter_historico_lesoes_texto,
     adicionar_lesao,
     adicionar_lesao_com_data_fim,
+    sanitizar_dataframe,
 )
 
 # ============================================================
@@ -28,7 +29,6 @@ def get_elenco(categoria):
     return None
 
 def get_csv_path(categoria, nome_arquivo):
-    """Retorna o caminho do CSV com sufixo da categoria."""
     base = "dados"
     os.makedirs(base, exist_ok=True)
     return os.path.join(base, f"{nome_arquivo}_{categoria.lower()}.csv")
@@ -38,22 +38,18 @@ def carregar_dados_csv(categoria, nome_arquivo, colunas_padrao):
     if os.path.exists(caminho):
         try:
             df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
-            # Garante que todas as colunas existam
             for col in colunas_padrao:
                 if col not in df.columns:
                     df[col] = ''
-            return df
+            return sanitizar_dataframe(df)
         except Exception:
-            return pd.DataFrame(columns=colunas_padrao)
-    return pd.DataFrame(columns=colunas_padrao)
+            return sanitizar_dataframe(pd.DataFrame(columns=colunas_padrao))
+    return sanitizar_dataframe(pd.DataFrame(columns=colunas_padrao))
 
 def salvar_dados_csv(df, categoria, nome_arquivo):
     caminho = get_csv_path(categoria, nome_arquivo)
     df.to_csv(caminho, sep=';', index=False, encoding='utf-8-sig')
 
-# ============================================================
-# PÁGINA PRINCIPAL
-# ============================================================
 def show():
     categoria = st.session_state.get("categoria_gestao", "Profissional")
     st.title(f"⚙️ Gestão - {categoria}")
@@ -62,10 +58,8 @@ def show():
     df_atletas = get_elenco(categoria)
     if df_atletas is None or df_atletas.empty:
         st.warning(f"Nenhum atleta cadastrado para {categoria}.")
-        # Ainda permite gerenciar dados mesmo sem atletas (útil para testes)
         lista_atletas = []
     else:
-        # Lista de atletas para os formulários
         if 'apelido' in df_atletas.columns:
             lista_atletas = df_atletas['apelido'].dropna().tolist()
         elif 'nome_completo' in df_atletas.columns:
@@ -75,20 +69,18 @@ def show():
 
     tabs = st.tabs(["Atletas", "Treinos", "Well-being", "Lesões", "Jogos", "GPS"])
 
-    # ============================================================
     # ABA 1: ATLETAS
-    # ============================================================
     with tabs[0]:
         st.subheader("Atletas")
         if df_atletas is not None and not df_atletas.empty:
             cols_exibicao = [c for c in ['nome_completo', 'apelido', 'Posicao_Principal', 'Idade', 'Estado_Fisico'] if c in df_atletas.columns]
-            st.dataframe(df_atletas[cols_exibicao] if cols_exibicao else df_atletas, use_container_width=True)
+            df_exib = df_atletas[cols_exibicao] if cols_exibicao else df_atletas
+            df_exib = sanitizar_dataframe(df_exib)
+            st.dataframe(df_exib, width='stretch')
         else:
             st.info(f"Nenhum atleta cadastrado para {categoria}.")
 
-    # ============================================================
     # ABA 2: TREINOS
-    # ============================================================
     with tabs[1]:
         st.subheader("Treinos")
         cols_tr = ['data', 'tipo', 'descricao', 'pse_alvo', 'atleta']
@@ -115,11 +107,10 @@ def show():
                     st.success("Treino salvo com sucesso!")
                     st.rerun()
 
-        st.dataframe(df_tr, use_container_width=True)
+        df_tr = sanitizar_dataframe(df_tr)
+        st.dataframe(df_tr, width='stretch')
 
-    # ============================================================
     # ABA 3: WELL-BEING
-    # ============================================================
     with tabs[2]:
         st.subheader("Well-being")
         cols_wb = ['atleta', 'data', 'sono', 'fadiga', 'dor', 'estresse']
@@ -150,11 +141,10 @@ def show():
                     st.success("Well-being salvo com sucesso!")
                     st.rerun()
 
-        st.dataframe(df_wb, use_container_width=True)
+        df_wb = sanitizar_dataframe(df_wb)
+        st.dataframe(df_wb, width='stretch')
 
-    # ============================================================
     # ABA 4: LESÕES
-    # ============================================================
     with tabs[3]:
         st.subheader("Lesões / Departamento Médico")
         cols_les = ['atleta', 'lesao', 'data_inicio', 'data_fim', 'status']
@@ -170,7 +160,6 @@ def show():
                 status = st.selectbox("Status", ["Tratamento", "Transição", "Liberado"])
 
                 if st.form_submit_button("Salvar Lesão"):
-                    # Verifica se já existe lesão ativa para o atleta
                     df_existente = df_les[df_les['atleta'] == atleta]
                     ativa = df_existente[df_existente['data_fim'].isna() | (df_existente['data_fim'] == '')]
                     if not ativa.empty:
@@ -188,9 +177,9 @@ def show():
                         st.success("Lesão salva com sucesso!")
                         st.rerun()
 
-        st.dataframe(df_les, use_container_width=True)
+        df_les = sanitizar_dataframe(df_les)
+        st.dataframe(df_les, width='stretch')
 
-        # Botão para encerrar lesão ativa
         if not df_les.empty:
             atletas_com_lesao = df_les[df_les['data_fim'].isna() | (df_les['data_fim'] == '')]['atleta'].unique()
             if len(atletas_com_lesao) > 0:
@@ -198,7 +187,6 @@ def show():
                     atleta_encerrar = st.selectbox("Selecione o atleta para encerrar a lesão", atletas_com_lesao)
                     data_encerramento = st.date_input("Data de encerramento")
                     if st.button("Encerrar Lesão"):
-                        # Atualiza o CSV
                         idx = df_les[(df_les['atleta'] == atleta_encerrar) & (df_les['data_fim'].isna() | (df_les['data_fim'] == ''))].index
                         if not idx.empty:
                             df_les.loc[idx, 'data_fim'] = str(data_encerramento)
@@ -207,9 +195,7 @@ def show():
                             st.success(f"Lesão de {atleta_encerrar} encerrada em {data_encerramento}.")
                             st.rerun()
 
-    # ============================================================
     # ABA 5: JOGOS
-    # ============================================================
     with tabs[4]:
         st.subheader("Jogos")
         cols_jogos = ['atleta', 'data', 'minutos', 'gols', 'assists']
@@ -236,11 +222,10 @@ def show():
                     st.success("Desempenho salvo com sucesso!")
                     st.rerun()
 
-        st.dataframe(df_jogos, use_container_width=True)
+        df_jogos = sanitizar_dataframe(df_jogos)
+        st.dataframe(df_jogos, width='stretch')
 
-    # ============================================================
     # ABA 6: GPS
-    # ============================================================
     with tabs[5]:
         st.subheader("Métricas de GPS")
         cols_gps = ['atleta', 'data', 'distancia_total', 'velocidade_max', 'sprints']
@@ -268,7 +253,8 @@ def show():
                     st.success("Dados GPS salvos com sucesso!")
                     st.rerun()
 
-        st.dataframe(df_gps, use_container_width=True)
+        df_gps = sanitizar_dataframe(df_gps)
+        st.dataframe(df_gps, width='stretch')
 
     st.markdown("---")
     st.caption(f"Todos os dados são armazenados em CSVs separados por categoria ({categoria}).")

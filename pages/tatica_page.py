@@ -13,11 +13,9 @@ from utils import (
     mapear_nome_para_canonico,
     exportar_escalacao_excel,
     exportar_escalacao_pdf,
+    sanitizar_dataframe,
 )
 
-# ============================================================
-# FUNÇÕES AUXILIARES
-# ============================================================
 def get_elenco(categoria):
     if categoria == "Profissional":
         return carregar_elenco_profissional()
@@ -78,9 +76,6 @@ def montar_time_completo(df, formacao, cartoes, incluir_lesionados=False):
         })
     return titulares, reservas
 
-# ============================================================
-# PÁGINA PRINCIPAL
-# ============================================================
 def show():
     categoria = st.session_state.get("categoria_tatica", "Profissional")
     st.title(f"📐 Escalação Tática - {categoria}")
@@ -99,7 +94,7 @@ def show():
     with col2:
         incluir_lesionados = st.checkbox("Incluir lesionados na escalação", value=False)
 
-    if st.button("⚽ Gerar Escalação", use_container_width=True):
+    if st.button("⚽ Gerar Escalação", width='stretch'):
         titulares, reservas = montar_time_completo(df_elenco, formacao, cartoes, incluir_lesionados)
         if titulares is None:
             st.error("Formação inválida.")
@@ -128,11 +123,9 @@ def show():
             else:
                 st.write(f"{i}. N/D")
 
-        # Exportação
         col_exp1, col_exp2 = st.columns(2)
         with col_exp1:
-            if st.button("📊 Exportar Escalação (Excel)", use_container_width=True):
-                # Cria DataFrame para exportar
+            if st.button("📊 Exportar Escalação (Excel)", width='stretch'):
                 df_exp = pd.DataFrame([{
                     'Posição': j['posicao_exibida'],
                     'Jogador': j['nome'],
@@ -147,8 +140,7 @@ def show():
                 else:
                     st.error("Erro ao exportar Excel")
         with col_exp2:
-            if st.button("📄 Exportar Escalação (PDF)", use_container_width=True):
-                # Cria DataFrame para exportar
+            if st.button("📄 Exportar Escalação (PDF)", width='stretch'):
                 df_exp = pd.DataFrame([{
                     'Posição': j['posicao_exibida'],
                     'Jogador': j['nome'],
