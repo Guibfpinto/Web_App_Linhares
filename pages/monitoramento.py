@@ -312,6 +312,12 @@ def caminho_foto_membro(membro):
         if os.path.exists(caminho_relativo):
             return os.path.abspath(caminho_relativo)
 
+        # Tenta a partir do diretório pai (projeto_web)
+        parent_dir = os.path.dirname(script_dir)
+        caminho_relativo_parent = os.path.join(parent_dir, foto)
+        if os.path.exists(caminho_relativo_parent):
+            return os.path.abspath(caminho_relativo_parent)
+
         # Extrai o nome do arquivo para busca posterior
         nome_base = os.path.basename(foto)
     else:
@@ -326,15 +332,16 @@ def caminho_foto_membro(membro):
     nome_clean = normalizar_texto(base).replace(' ', '_')
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
 
-    # Pastas raiz onde procurar (relativas ao script_dir)
+    # Pastas raiz onde procurar (relativas ao projeto_web e também ao script_dir)
     pastas_raiz = [
         "assets/fotos_comissao",
         "assets/fotos_tecnicos",
         "fotos",
         "assets/fotos_jogadores",
-        "Fotos_Tecnicos",          # adicionado
-        "fotos_comissao",          # adicionado
+        "Fotos_Tecnicos",
+        "fotos_comissao",
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
@@ -349,7 +356,11 @@ def caminho_foto_membro(membro):
     ]
 
     # Combina todas as pastas raiz (absolutas e relativas)
-    pastas = pastas_absolutas + [os.path.join(script_dir, p) for p in pastas_raiz]
+    pastas = pastas_absolutas + [
+        os.path.join(parent_dir, p) for p in pastas_raiz
+    ] + [
+        os.path.join(script_dir, p) for p in pastas_raiz
+    ]
 
     extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
@@ -375,14 +386,18 @@ def caminho_foto_membro(membro):
         if matches:
             return os.path.abspath(matches[0])
 
-    # 2. Busca recursiva em pastas específicas (caso esteja em subpastas)
+    # 2. Busca recursiva em pastas específicas (caso esteja em subpastas profundas)
     pastas_recursivas = [
+        os.path.join(parent_dir, "assets/fotos_comissao"),
+        os.path.join(parent_dir, "assets/fotos_tecnicos"),
+        os.path.join(parent_dir, "fotos"),
+        os.path.join(parent_dir, "Fotos_Tecnicos"),
+        os.path.join(parent_dir, "fotos_comissao"),
         os.path.join(script_dir, "assets/fotos_comissao"),
         os.path.join(script_dir, "assets/fotos_tecnicos"),
         os.path.join(script_dir, "fotos"),
         os.path.join(script_dir, "Fotos_Tecnicos"),
         os.path.join(script_dir, "fotos_comissao"),
-        # Adicione outras pastas se necessário
     ]
     for pasta in pastas_recursivas:
         if not os.path.isdir(pasta):
@@ -917,12 +932,50 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # STAFF TÉCNICO
+    # STAFF TÉCNICO (COM DEPURAÇÃO)
     # ============================================================
     st.subheader("👔 Staff Técnico")
     staff_casa = obter_staff_completo(jogo['time_casa_id'])
     staff_fora = obter_staff_completo(jogo['time_fora_id'])
 
+    # =================== DEPURAÇÃO ===================
+    # Esta seção exibe informações detalhadas para diagnosticar problemas de fotos
+    st.write("🔍 **DEPURAÇÃO - Staff Técnico**")
+    st.write(f"Time Casa ID: {jogo['time_casa_id']} | {time_casa}")
+    st.write(f"Time Fora ID: {jogo['time_fora_id']} | {time_fora}")
+
+    st.write("--- **Staff do Casa** ---")
+    for idx, membro in enumerate(staff_casa):
+        st.write(f"{idx+1}. Nome: {membro.get('nome')} | Apelido: {membro.get('apelido')} | Foto DB: '{membro.get('foto')}'")
+        caminho = caminho_foto_membro(membro)
+        st.write(f"   → Caminho encontrado: {caminho}")
+        if caminho and os.path.exists(caminho):
+            st.success("✅ Existe")
+        else:
+            st.error("❌ Não encontrado")
+
+    st.write("--- **Staff do Fora** ---")
+    for idx, membro in enumerate(staff_fora):
+        st.write(f"{idx+1}. Nome: {membro.get('nome')} | Apelido: {membro.get('apelido')} | Foto DB: '{membro.get('foto')}'")
+        caminho = caminho_foto_membro(membro)
+        st.write(f"   → Caminho encontrado: {caminho}")
+        if caminho and os.path.exists(caminho):
+            st.success("✅ Existe")
+        else:
+            st.error("❌ Não encontrado")
+            # Tenta exibir o caminho absoluto baseado no projeto_web
+            if membro.get('foto'):
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                parent_dir = os.path.dirname(script_dir)
+                caminho_teste1 = os.path.join(script_dir, membro.get('foto'))
+                caminho_teste2 = os.path.join(parent_dir, membro.get('foto'))
+                st.write(f"   Teste script_dir: {caminho_teste1} -> existe? {os.path.exists(caminho_teste1)}")
+                st.write(f"   Teste parent_dir: {caminho_teste2} -> existe? {os.path.exists(caminho_teste2)}")
+    # =================== FIM DEPURAÇÃO ===================
+
+    st.markdown("---")
+
+    # Exibição normal das fotos (agora com a função melhorada)
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**{time_casa}**")
