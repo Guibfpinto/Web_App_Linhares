@@ -33,6 +33,7 @@ from utils import (
     jogador_suspenso,
     mapear_nome_para_canonico,
     obter_caminho_foto,
+    obter_caminho_foto_arbitro,
     obter_historico_clubes,
     obter_lesao_atual,
     obter_historico_lesoes_texto,
@@ -67,6 +68,7 @@ from utils import (
     formatar_cartoes,
     inicializar_banco,
     carregar_cronograma,
+    normalizar_texto,
 )
 
 # ======================================================================
@@ -183,200 +185,282 @@ TRADUCAO_ATRIBUTOS = {
 }
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO
+# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO (UNIFICADO)
 # ======================================================================
-st.set_page_config(layout="wide", page_title=f"{NOME_TIME} - Temporada {TEMPORADA}", page_icon="⚽")
+st.set_page_config(
+    layout="wide",
+    page_title=f"{NOME_TIME} - Temporada {TEMPORADA}",
+    page_icon="⚽"
+)
 
+# ======================================================================
+# CSS ÚNICO - FUNDO, OPACIDADE 0.70, SEM SIDEBAR/HEADER/FOOTER, TEXTO BRANCO
+# ======================================================================
 st.markdown("""
 <style>
-    div[data-testid="stAlert"] { color: black !important; }
-    div[data-testid="stAlert"] .stAlert { color: black !important; }
-    .stAlert { color: black !important; }
-
+    /* Fundo da página com imagem background.png */
     .stApp {
-        background-color: #000000 !important;
-        border-radius: 10px;
-        margin: 10px;
-        padding: 10px;
+        background-image: url('background.png');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        background-color: #1a1a1a;
     }
 
-    h1, h2, h3, h4, h5, h6 {
-        color: #cc0000 !important;
+    /* Container principal com opacidade 0.70 */
+    .main > div {
+        background-color: rgba(0, 0, 0, 0.70) !important;
+        padding: 2rem;
+        border-radius: 12px;
+        color: white !important;
     }
-    .stMarkdown, .stText, .stSubheader, .stCaption {
-        color: #cc0000 !important;
+
+    /* Remover cabeçalho, menu, rodapé e sidebar */
+    header {
+        display: none !important;
     }
-    div.stText, div.stMarkdown, .stText, .stMarkdown {
-        color: #cc0000 !important;
+    #MainMenu {
+        display: none !important;
     }
-    .stSelectbox label, .stTextInput label, .stNumberInput label,
-    .stDateInput label, .stTextArea label {
-        color: #cc0000 !important;
-        font-weight: 500 !important;
+    footer {
+        display: none !important;
     }
-    [data-testid="stMetric"] .stMetricValue {
-        color: #cc0000 !important;
+    [data-testid="stSidebar"] {
+        display: none !important;
     }
-    [data-testid="stMetric"] label {
-        color: #cc0000 !important;
+
+    /* Container principal ocupa toda a largura */
+    .main .block-container {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        max-width: 100% !important;
     }
-    .streamlit-expanderHeader {
-        color: #cc0000 !important;
-        background-color: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        border-radius: 5px !important;
+
+    /* Força cor branca em todos os textos */
+    .main, .main * {
+        color: white !important;
     }
-    .streamlit-expanderContent {
-        color: #cc0000 !important;
-        background-color: #111111 !important;
-        border: 1px solid #333 !important;
-        border-top: none !important;
-        border-radius: 0 0 5px 5px !important;
-        padding: 10px !important;
-    }
+
+    /* Botões com fundo translúcido e texto branco */
     .stButton button {
-        color: #cc0000 !important;
-        background-color: #222222 !important;
-        border: 1px solid #444 !important;
-        border-radius: 4px !important;
-        transition: all 0.2s ease !important;
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 6px;
+        transition: all 0.2s ease;
     }
     .stButton button:hover {
-        background-color: #333333 !important;
-        border-color: #666 !important;
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        color: white !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
     }
-    .stButton button:active {
-        background-color: #111111 !important;
-    }
-    .stRadio label, .stCheckbox label {
-        color: #cc0000 !important;
-    }
-    .stRadio div[role="radiogroup"] > label {
-        background-color: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        border-radius: 4px !important;
-        padding: 5px 10px !important;
-        margin: 2px !important;
-        color: #cc0000 !important;
-    }
-    .stRadio div[role="radiogroup"] > label:hover {
-        background-color: #2a2a2a !important;
-    }
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stTextInput input, .stNumberInput input,
+
+    /* Inputs, selects e áreas de texto */
+    .stTextInput input, .stSelectbox select, .stNumberInput input,
     .stDateInput input, .stTextArea textarea {
-        background-color: #222222 !important;
-        color: #cc0000 !important;
-        border: 1px solid #444 !important;
-        border-radius: 4px !important;
+        background-color: rgba(255, 255, 255, 0.12) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 4px;
     }
-    .stSelectbox div[data-baseweb="select"] > div:hover,
-    .stTextInput input:hover, .stNumberInput input:hover,
-    .stDateInput input:hover, .stDateInput input:hover,
-    .stTextArea textarea:hover {
-        border-color: #666 !important;
+    .stTextInput input::placeholder, .stTextArea textarea::placeholder {
+        color: #cccccc !important;
     }
-    .stSelectbox div[data-baseweb="select"] > div:focus-within,
-    .stTextInput input:focus, .stNumberInput input:focus,
-    .stDateInput input:focus, .stTextArea textarea:focus {
-        border-color: #1e88e5 !important;
-        box-shadow: 0 0 0 2px rgba(30,136,229,0.3) !important;
+    .stTextInput input:focus, .stSelectbox select:focus,
+    .stNumberInput input:focus, .stDateInput input:focus,
+    .stTextArea textarea:focus {
+        border-color: rgba(255, 255, 255, 0.6) !important;
+        background-color: rgba(255, 255, 255, 0.18) !important;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
     }
-    [data-testid="stMetric"] {
-        background-color: #1a1a1a !important;
-        border: 1px solid #333 !important;
-        border-radius: 5px !important;
-        padding: 10px !important;
+
+    /* Selectbox dropdown */
+    .stSelectbox div[data-baseweb="select"] {
+        background-color: rgba(0, 0, 0, 0.8) !important;
+        color: white !important;
     }
-    .stDataFrame {
-        background-color: #111111 !important;
-        border: 1px solid #333 !important;
-        border-radius: 5px !important;
+
+    /* Tabelas (DataFrames) */
+    .dataframe, .stDataFrame {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        color: white !important;
     }
-    .stDataFrame table {
-        color: #cc0000 !important;
+    .dataframe thead th, .stDataFrame thead th {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: white !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
     }
-    .stDataFrame thead tr th {
-        background-color: #1a1a1a !important;
-        color: #cc0000 !important;
-        border-bottom: 2px solid #444 !important;
+    .dataframe tbody td, .stDataFrame tbody td {
+        color: white !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
     }
-    .stDataFrame tbody tr {
-        border-bottom: 1px solid #2a2a2a !important;
+
+    /* Alertas */
+    .stAlert {
+        background-color: rgba(0, 0, 0, 0.65) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 6px !important;
     }
-    .stDataFrame tbody tr:hover {
-        background-color: #2a2a2a !important;
+    .stAlert .stAlertContent {
+        color: white !important;
     }
-    .dataframe {
-        background-color: #111111 !important;
-        color: #cc0000 !important;
+    .stAlert .stAlertIcon {
+        color: white !important;
     }
-    .dataframe thead th {
-        background-color: #1a1a1a !important;
-        color: #cc0000 !important;
+
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: white !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
-    .dataframe tbody td {
-        border-color: #2a2a2a !important;
+    .streamlit-expanderHeader:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
     }
-    hr {
-        border-color: #444 !important;
+    .streamlit-expanderContent {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        color: white !important;
+        border-radius: 0 0 6px 6px !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
-    .stFileUploader > div {
-        background-color: #1a1a1a !important;
-        border: 2px dashed #444 !important;
-        border-radius: 5px !important;
-        color: #aaa !important;
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
     }
-    .stFileUploader > div:hover {
-        border-color: #666 !important;
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: white !important;
+        border-radius: 4px 4px 0 0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-bottom: none !important;
+        padding: 8px 16px !important;
     }
-    .css-1d391kg, .css-1kyxreq {
-        background-color: rgba(0,0,0,0.9) !important;
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
     }
-    .sidebar .stSelectbox label, .sidebar .stTextInput label {
-        color: #cc0000 !important;
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        color: white !important;
+        padding: 16px !important;
+        border-radius: 0 0 6px 6px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-top: none !important;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
 
-def set_background(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            img_base64 = base64.b64encode(f.read()).decode()
-        ext = os.path.splitext(image_path)[1].lower()
-        mime = "image/png" if ext == ".png" else "image/jpeg"
-        bg_css = f"""
-        <style>
-        [data-testid="stAppViewContainer"] {{
-            background-image: url("data:{mime};base64,{img_base64}");
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-        }}
-        [data-testid="stHeader"] {{ background: rgba(0,0,0,0); }}
-        .stApp {{ background-color: #000000; border-radius: 10px; margin: 10px; padding: 10px; }}
-        [data-testid="stSidebar"] {{ background-color: rgba(0,0,0,0.9); }}
-        </style>
-        """
-        st.markdown(bg_css, unsafe_allow_html=True)
+# ======================================================================
+# FUNÇÃO UNIFICADA PARA BUSCAR FOTO (JOGADORES E COMISSÃO)
+# ======================================================================
+def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
+    """
+    Busca a foto de um jogador ou membro da comissão usando a lógica mais robusta.
+    - Se tipo='jogador', usa obter_caminho_foto.
+    - Se tipo='comissao', usa lógica similar à do monitoramento (busca em subpastas, fallback para nome/apelido).
+    """
+    if tipo == 'jogador':
+        return obter_caminho_foto(row, categoria)
     else:
-        bg_css = """
-        <style>
-        [data-testid="stAppViewContainer"] {
-            background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
-            background-attachment: fixed;
-        }
-        [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-        .stApp { background-color: #000000; border-radius: 10px; margin: 10px; padding: 10px; }
-        [data-testid="stSidebar"] { background-color: rgba(0,0,0,0.9); }
-        </style>
-        """
-        st.markdown(bg_css, unsafe_allow_html=True)
+        # Lógica para comissão (similar à função caminho_foto_membro do monitoramento)
+        foto = row.get('foto', '')
+        if not foto:
+            nome_base = row.get('apelido') or row.get('nome')
+            if not nome_base:
+                return None
+        else:
+            nome_base = os.path.basename(foto)
+        if not nome_base:
+            return None
 
-bg_image = os.path.join(DATA_DIR, "background.png")
-set_background(bg_image)
+        base, _ = os.path.splitext(nome_base)
+        nome_clean = normalizar_texto(base).replace(' ', '_')
 
-st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = script_dir  # app.py está na raiz, então script_dir já é o projeto
+
+        pastas_raiz = [
+            "assets/fotos_comissao",
+            "assets/fotos_tecnicos",
+            "fotos",
+            "assets/fotos_jogadores",
+            "Fotos_Tecnicos",
+            "fotos_comissao",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
+        ]
+
+        pastas = [os.path.join(parent_dir, p) for p in pastas_raiz]
+        extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
+
+        for pasta in pastas:
+            if not os.path.isdir(pasta):
+                continue
+            for ext in extensoes:
+                caminho = os.path.join(pasta, f"{base}{ext}")
+                if os.path.exists(caminho):
+                    return os.path.abspath(caminho)
+                caminho = os.path.join(pasta, f"{nome_clean}{ext}")
+                if os.path.exists(caminho):
+                    return os.path.abspath(caminho)
+            # Glob
+            import glob
+            matches = glob.glob(os.path.join(pasta, f"{base}.*"))
+            if matches:
+                return os.path.abspath(matches[0])
+            matches = glob.glob(os.path.join(pasta, f"{nome_clean}.*"))
+            if matches:
+                return os.path.abspath(matches[0])
+
+        # Busca recursiva
+        pastas_recursivas = [
+            os.path.join(parent_dir, "assets/fotos_comissao"),
+            os.path.join(parent_dir, "assets/fotos_tecnicos"),
+            os.path.join(parent_dir, "fotos"),
+            os.path.join(parent_dir, "Fotos_Tecnicos"),
+            os.path.join(parent_dir, "fotos_comissao"),
+        ]
+        for pasta in pastas_recursivas:
+            if not os.path.isdir(pasta):
+                continue
+            for root, dirs, files in os.walk(pasta):
+                for ext in extensoes:
+                    arquivo = f"{base}{ext}"
+                    if arquivo in files:
+                        return os.path.abspath(os.path.join(root, arquivo))
+                    arquivo_clean = f"{nome_clean}{ext}"
+                    if arquivo_clean in files:
+                        return os.path.abspath(os.path.join(root, arquivo_clean))
+                matches = glob.glob(os.path.join(root, f"{base}.*"))
+                if matches:
+                    return os.path.abspath(matches[0])
+                matches = glob.glob(os.path.join(root, f"{nome_clean}.*"))
+                if matches:
+                    return os.path.abspath(matches[0])
+        return None
 
 # ======================================================================
 # INICIALIZAÇÃO DE ESTADO
@@ -453,20 +537,19 @@ def get_estatisticas_partidas(categoria):
     return carregar_estatisticas_partidas(categoria)
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (CORRIGIDA PARA 'foto')
+# FUNÇÃO DETALHES COMISSÃO (USANDO A FUNÇÃO UNIFICADA)
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Busca a foto pelo apelido (ou nome)
-            caminho_foto = obter_caminho_foto(row, categoria)
+            # Usa a função unificada para comissão
+            caminho_foto = buscar_foto_unificada(row, categoria, tipo='comissao')
             if caminho_foto and os.path.exists(caminho_foto):
                 try:
                     st.image(caminho_foto, width=150)
                 except Exception as e:
                     st.write("📷 Sem foto (erro ao carregar)")
-                    st.error(f"Erro: {e}")
             else:
                 st.write("📷 Sem foto")
         with col2:
@@ -523,34 +606,26 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.info("Nenhum atributo detalhado disponível para este membro.")
 
 # ======================================================================
-# FUNÇÃO DETALHES JOGADOR (CORRIGIDA PARA 'foto')
+# FUNÇÃO DETALHES JOGADOR (USANDO A FUNÇÃO UNIFICADA)
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
-    """
-    Exibe os detalhes completos de um jogador em um expander.
-    Usa nome_completo ou apelido como fallback.
-    """
-    # Determina o nome para exibição
     nome_exibicao = row.get('nome_completo') or row.get('apelido') or 'Jogador'
 
     with st.expander(f"📋 DETALHES COMPLETOS - {nome_exibicao}", expanded=True):
         col1, col2 = st.columns([1, 2])
 
-        # ===== COLUNA 1: FOTO =====
         with col1:
-            caminho_foto = obter_caminho_foto(row, categoria)
+            # Usa a função unificada para jogador
+            caminho_foto = buscar_foto_unificada(row, categoria, tipo='jogador')
             if caminho_foto and os.path.exists(caminho_foto):
                 try:
                     st.image(caminho_foto, width=150)
                 except Exception as e:
                     st.write("📷 Sem foto (erro ao carregar)")
-                    st.error(f"Erro: {e}")
             else:
                 st.write("📷 Sem foto")
 
-        # ===== COLUNA 2: DADOS BÁSICOS =====
         with col2:
-            # Nome (usa nome_completo ou apelido)
             st.write(f"**Nome:** {row.get('nome_completo', row.get('apelido', 'N/I'))}")
             st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
 
@@ -605,16 +680,13 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
 
         st.divider()
 
-        # ===== HISTÓRICO DE CLUBES =====
         st.subheader("📜 Histórico de Clubes")
         st.text(obter_historico_clubes(row))
 
-        # ===== HISTÓRICO DE LESÕES =====
         st.subheader("🩺 Histórico de Lesões")
         texto_lesoes = obter_historico_lesoes_texto(row, categoria)
         st.text(texto_lesoes)
 
-        # ===== ESTATÍSTICAS DA TEMPORADA =====
         st.subheader("📊 Estatísticas da Temporada (oGol)")
         estatisticas_ogol = {
             'jogos_temporada': 'Jogos na temporada',
@@ -635,7 +707,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                     valor_str = valor_str[:-2]
             st.write(f"**{label}:** {valor_str}")
 
-        # ===== ATRIBUTOS FM26 =====
         st.subheader("🎮 Atributos FM26 (todos os 60)")
         cols_atributos = st.columns(2)
         for i, attr in enumerate(ATRIBUTOS_FM26):
@@ -645,7 +716,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             with cols_atributos[i % 2]:
                 st.write(f"**{nome_attr}:** {valor_str}")
 
-        # ===== HISTÓRICO DE CARTÕES =====
         st.subheader("🟨 Histórico de Cartões")
         nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
         if nome_canonico and nome_canonico in cartoes:
@@ -712,11 +782,6 @@ if not st.session_state.authenticated:
     login()
     st.stop()
 
-st.sidebar.success(f"👤 Logado como: {st.session_state.usuario}")
-if st.sidebar.button("Sair"):
-    st.session_state.authenticated = False
-    st.rerun()
-
 # ======================================================================
 # CARREGAMENTO DE DADOS (CACHE) – TODAS AS CATEGORIAS
 # ======================================================================
@@ -765,7 +830,7 @@ def carregar_dfs():
         resultado["Comissão Sub-15"] = carregar_comissao_sub15()
         resultado["Comissão Sub-17"] = carregar_comissao_sub17()
 
-        # Estatísticas de partidas (para cada categoria)
+        # Estatísticas de partidas
         from utils import carregar_estatisticas_partidas
         df_stats_prof = carregar_estatisticas_partidas("Profissional")
         df_stats_sub15 = carregar_estatisticas_partidas("Sub-15")
@@ -808,6 +873,17 @@ def get_df_cartoes(categoria):
     return dados.get(df_key), dados.get(cart_key, {})
 
 # ======================================================================
+# MENU SUPERIOR (NÃO HÁ SIDEBAR, USAMOS TABS PARA NAVEGAÇÃO)
+# ======================================================================
+st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
+st.caption(f"👤 Logado como: {st.session_state.usuario}")
+
+# Botão de logout
+if st.button("Sair"):
+    st.session_state.authenticated = False
+    st.rerun()
+
+# ======================================================================
 # ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
@@ -824,15 +900,13 @@ tabs = st.tabs([
 ])
 
 # ======================================================================
-# ABA 1: ANÁLISE DE ELENCO (com seletor de categoria)
+# ABA 1: ANÁLISE DE ELENCO
 # ======================================================================
 with tabs[0]:
     st.header("Análise de Jogadores")
     cat_analise = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"])
     df_analise, cartoes_analise = get_df_cartoes(cat_analise)
     if df_analise is not None and not df_analise.empty:
-        st.write("Colunas disponíveis:", df_analise.columns.tolist())
-        st.write("Primeiras linhas:", df_analise.head())
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total", len(df_analise))
@@ -865,14 +939,13 @@ with tabs[0]:
             st.dataframe(df_analise[[c for c in cols if c in df_analise.columns]])
 
         elif opcao_analise == "Detalhes do jogador":
-            # Detecção automática da coluna de nomes
             col_nome = None
             for possivel in ['nome_completo', 'Nome', 'nome', 'jogador', 'Jogador', 'apelido']:
                 if possivel in df_analise.columns:
                     col_nome = possivel
                     break
             if col_nome is None:
-                st.error("Não foi possível identificar a coluna de nomes no elenco. Colunas disponíveis: " + ", ".join(df_analise.columns))
+                st.error("Não foi possível identificar a coluna de nomes.")
             else:
                 jogador_sel = st.selectbox("Selecione", df_analise[col_nome].tolist())
                 row = df_analise[df_analise[col_nome] == jogador_sel].iloc[0]
@@ -958,7 +1031,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ======================================================================
-# ABA 2: COMISSÃO TÉCNICA (com seletor de categoria)
+# ABA 2: COMISSÃO TÉCNICA
 # ======================================================================
 with tabs[1]:
     st.header("Comissão Técnica")
@@ -1037,7 +1110,7 @@ with tabs[1]:
         st.info("Nenhum dado de comissão disponível.")
 
 # ======================================================================
-# ABA 3: MONITORAMENTO AO VIVO (com seletor de categoria)
+# ABA 3: MONITORAMENTO AO VIVO
 # ======================================================================
 with tabs[2]:
     cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
@@ -1051,7 +1124,7 @@ with tabs[2]:
         st.error(f"Erro ao executar monitoramento: {e}")
 
 # ======================================================================
-# ABA 4: CARTÕES (já adaptado em pages/cartoes.py)
+# ABA 4: CARTÕES
 # ======================================================================
 with tabs[3]:
     try:
@@ -1061,7 +1134,7 @@ with tabs[3]:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO (USANDO A NOVA PÁGINA COM JSON)
+# ABA 5: PRÓXIMO JOGO
 # ======================================================================
 with tabs[4]:
     try:
@@ -1073,7 +1146,7 @@ with tabs[4]:
         st.error(f"Erro ao executar próximo jogo: {e}")
 
 # ======================================================================
-# ABA 6: ESCALAÇÃO TÁTICA (com seletor de categoria)
+# ABA 6: ESCALAÇÃO TÁTICA
 # ======================================================================
 with tabs[5]:
     st.header("📐 Escalação Tática")
@@ -1136,7 +1209,7 @@ with tabs[5]:
                         st.write(f"• {j['nome']} ({j['apelido']})")
 
 # ======================================================================
-# ABA 7: GESTÃO (com seletor de categoria)
+# ABA 7: GESTÃO
 # ======================================================================
 with tabs[6]:
     st.header("⚙️ Gestão")
@@ -1151,7 +1224,7 @@ with tabs[6]:
         st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS (com seletor de categoria)
+# ABA 8: RELATÓRIOS
 # ======================================================================
 with tabs[7]:
     st.header("📄 Relatórios")
@@ -1172,7 +1245,7 @@ with tabs[7]:
         st.warning(f"Nenhum dado disponível para {cat_rel}.")
 
 # ======================================================================
-# ABA 9: EXPORTAR (já com seletor de categoria)
+# ABA 9: EXPORTAR
 # ======================================================================
 with tabs[8]:
     st.header("📤 Exportar Dados")
@@ -1203,7 +1276,7 @@ with tabs[8]:
         st.warning("Nenhum dado disponível")
 
 # ======================================================================
-# ABA 10: VISUALIZAÇÃO TÁTICA (com seletor de categoria)
+# ABA 10: VISUALIZAÇÃO TÁTICA
 # ======================================================================
 with tabs[9]:
     st.header("🎥 Visualização Tática")
