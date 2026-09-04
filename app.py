@@ -209,13 +209,38 @@ if os.path.exists(bg_path):
     <style>
         /* Fundo da página */
         .stApp {{
+            position: relative;
+            background-color: #1a1a1a !important;
+        }}
+
+        /* Imagem de fundo */
+        .stApp::before {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+
             background-image: url("data:image/png;base64,{b64_bg}");
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             background-attachment: fixed;
-            background-color: #1a1a1a;
+
+            /* 0.40 preto por cima = imagem com aproximadamente 0.60 */
+            opacity: 0.60;
+
+            z-index: 0;
+            pointer-events: none;
         }}
+
+        /* Mantém todo o conteúdo acima do fundo */
+        .stApp > * {{
+            position: relative;
+            z-index: 1;
+        }}
+
 
         /* Container principal com opacidade 0.60 */
         .main > div {{
