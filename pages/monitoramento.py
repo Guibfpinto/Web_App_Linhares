@@ -789,24 +789,49 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # ESCALAÇÃO
+    # ESCALAÇÃO - COM CAMPO DE TEXTO PARA FORMAÇÃO
     # ============================================================
     st.subheader("📋 Escalação")
 
     with st.expander("✏️ Definir Escalação", expanded=False):
-        formacao_opcoes = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2', '4-1-2-1-2', '3-4-3']
-        formacao_escolhida = st.selectbox(
-            f"Formação do {time_casa}",
-            formacao_opcoes,
-            index=formacao_opcoes.index(formacao_casa) if formacao_casa in formacao_opcoes else 0
+        # --- CAMPO DE TEXTO PARA DIGITAR A FORMAÇÃO ---
+        st.markdown("**Digite a formação desejada (ex: 4-4-2, 4-3-3, 3-5-2, etc.)**")
+        formacao_escolhida = st.text_input(
+            "Formação",
+            value=formacao_casa if formacao_casa else "",
+            placeholder="Ex: 4-4-2",
+            key="formacao_input"
         )
-        if formacao_escolhida != formacao_casa:
-            conn = conectar_banco()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE jogos SET formacao_casa = ? WHERE id = ?", (formacao_escolhida, jogo_selecionado_id))
-            conn.commit()
-            conn.close()
-            st.rerun()
+        col_btn, _ = st.columns([1, 4])
+        with col_btn:
+            if st.button("Atualizar Formação", use_container_width=True):
+                if formacao_escolhida.strip():
+                    # Verifica se a formação é válida (opcional)
+                    try:
+                        _, _, _, posicoes = interpretar_formacao(formacao_escolhida.strip())
+                        if not posicoes:
+                            st.error("Formação inválida. Use o formato X-Y-Z (ex: 4-4-2).")
+                        else:
+                            conn = conectar_banco()
+                            cursor = conn.cursor()
+                            cursor.execute("UPDATE jogos SET formacao_casa = ? WHERE id = ?", (formacao_escolhida.strip(), jogo_selecionado_id))
+                            conn.commit()
+                            conn.close()
+                            st.success("Formação atualizada com sucesso!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao interpretar formação: {e}")
+                else:
+                    st.warning("Digite uma formação válida.")
+
+        # --- RESTANTE DA ESCALAÇÃO (jogadores, automático, etc.) ---
+        # Recarregar formação atualizada
+        conn = conectar_banco()
+        cursor = conn.cursor()
+        cursor.execute("SELECT formacao_casa FROM jogos WHERE id = ?", (jogo_selecionado_id,))
+        row = cursor.fetchone()
+        conn.close()
+        formacao_casa_atual = row['formacao_casa'] if row else formacao_casa
 
         jogadores_disponiveis = df_elenco.copy()
         if 'lesionado' in jogadores_disponiveis.columns:
@@ -822,9 +847,9 @@ def show():
         else:
             st.write(f"**Jogadores disponíveis:** {len(jogadores_disponiveis)}")
 
-            defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_escolhida)
+            defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_casa_atual)
             if not posicoes:
-                st.error("Formação inválida.")
+                st.error("Formação inválida. Defina uma formação válida antes de escalar.")
             else:
                 titulares_selecionados = {}
                 st.write("**Titulares:**")
@@ -863,7 +888,7 @@ def show():
                 col_auto, col_salvar = st.columns(2)
                 with col_auto:
                     if st.button("⚽ Gerar Automático", use_container_width=True):
-                        titulares, reservas = montar_time_automatico(df_elenco, formacao_escolhida, cartoes)
+                        titulares, reservas = montar_time_automatico(df_elenco, formacao_casa_atual, cartoes)
                         if titulares:
                             salvar_escalacao(jogo_selecionado_id, titulares, reservas)
                             st.success("Escalação automática salva!")
