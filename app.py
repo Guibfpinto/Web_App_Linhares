@@ -69,8 +69,19 @@ from utils import (
     inicializar_banco,
     carregar_cronograma,
     normalizar_texto,
-    sanitizar_dataframe,  # nova função exportada
+    sanitizar_dataframe,
 )
+
+# ======================================================================
+# IMPORTAÇÕES DAS PÁGINAS
+# ======================================================================
+import pages.monitoramento as monitoramento
+import pages.cartoes as cartoes
+import pages.proximo_jogo as proximo_jogo
+import pages.tatica_page as tatica_page
+import pages.gestao as gestao
+import pages.visualizacao as visualizacao
+import pages.relatorios as relatorios  # <-- NOVA IMPORTAÇÃO
 
 # ======================================================================
 # DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
@@ -229,7 +240,6 @@ if os.path.exists(bg_path):
             background-repeat: no-repeat;
             background-attachment: fixed;
 
-            /* 0.40 preto por cima = imagem com aproximadamente 0.60 */
             opacity: 0.60;
 
             z-index: 0;
@@ -241,7 +251,6 @@ if os.path.exists(bg_path):
             position: relative;
             z-index: 1;
         }}
-
 
         /* Container principal com opacidade 0.60 */
         .main > div {{
@@ -266,7 +275,7 @@ if os.path.exists(bg_path):
             color: white !important;
         }}
 
-        /* Botões, inputs, etc. (mantido) */
+        /* Botões, inputs, etc. */
         .stButton button {{
             background-color: rgba(255, 255, 255, 0.15) !important;
             color: white !important;
@@ -337,7 +346,7 @@ if os.path.exists(bg_path):
             background-color: rgba(255, 255, 255, 0.15) !important;
         }}
         .streamlit-expanderContent {{
-            background-color: rgba(0, 0, 0, 0.85) !important;  /* muito mais opaco */
+            background-color: rgba(0, 0, 0, 0.85) !important;
             color: white !important;
             border-radius: 0 0 6px 6px !important;
             border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -603,7 +612,6 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = pd.DataFrame(historico)
-                # Sanitiza para evitar erro de Arrow
                 df_hist = sanitizar_dataframe(df_hist)
                 st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
             else:
@@ -746,7 +754,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = pd.DataFrame(historico)
-                # Sanitiza para evitar erro de Arrow
                 df_hist = sanitizar_dataframe(df_hist)
                 st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
             else:
@@ -1155,7 +1162,6 @@ with tabs[1]:
 with tabs[2]:
     cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
     try:
-        import pages.monitoramento as monitoramento
         st.session_state.categoria_monitoramento = cat_monitor
         monitoramento.show()
     except ImportError as e:
@@ -1168,7 +1174,6 @@ with tabs[2]:
 # ======================================================================
 with tabs[3]:
     try:
-        import pages.cartoes as cartoes
         cartoes.show()
     except ImportError as e:
         st.error(f"Erro ao carregar página de cartões: {e}")
@@ -1178,7 +1183,6 @@ with tabs[3]:
 # ======================================================================
 with tabs[4]:
     try:
-        import pages.proximo_jogo as proximo_jogo
         proximo_jogo.show()
     except ImportError as e:
         st.error(f"Erro ao carregar página de próximo jogo: {e}")
@@ -1197,7 +1201,6 @@ with tabs[5]:
         st.warning(f"Elenco não disponível para {cat_tatica}.")
     else:
         try:
-            import pages.tatica_page as tatica_page
             st.session_state.categoria_tatica = cat_tatica
             tatica_page.show()
         except ImportError:
@@ -1252,10 +1255,8 @@ with tabs[5]:
 # ABA 7: GESTÃO
 # ======================================================================
 with tabs[6]:
-    st.header("⚙️ Gestão")
     cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
     try:
-        import pages.gestao as gestao
         st.session_state.categoria_gestao = cat_gestao
         gestao.show()
     except ImportError as e:
@@ -1264,25 +1265,15 @@ with tabs[6]:
         st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS
+# ABA 8: RELATÓRIOS (NOVA VERSÃO COMPLETA)
 # ======================================================================
 with tabs[7]:
-    st.header("📄 Relatórios")
-    cat_rel = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="rel_categoria")
-    df_rel, _ = get_df_cartoes(cat_rel)
-    if df_rel is not None and not df_rel.empty:
-        texto = gerar_relatorio_completo_texto(df_rel, cat_rel)
-        st.text_area("Relatório", texto, height=300)
-        
-        if st.button("Exportar Relatório (TXT)"):
-            st.download_button(
-                label="Baixar TXT",
-                data=texto,
-                file_name=f"relatorio_{cat_rel}_{datetime.now().strftime('%Y%m%d')}.txt",
-                mime="text/plain"
-            )
-    else:
-        st.warning(f"Nenhum dado disponível para {cat_rel}.")
+    try:
+        relatorios.show()
+    except ImportError as e:
+        st.error(f"Erro ao carregar página de relatórios: {e}")
+    except Exception as e:
+        st.error(f"Erro ao executar relatórios: {e}")
 
 # ======================================================================
 # ABA 9: EXPORTAR
@@ -1324,7 +1315,6 @@ with tabs[9]:
     df_viz, _ = get_df_cartoes(cat_viz)
     if df_viz is not None and not df_viz.empty:
         try:
-            import pages.visualizacao as visualizacao
             st.session_state.categoria_visualizacao = cat_viz
             visualizacao.show()
         except ImportError:

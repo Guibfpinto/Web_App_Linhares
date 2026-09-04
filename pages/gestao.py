@@ -14,6 +14,7 @@ from utils import (
     adicionar_lesao,
     adicionar_lesao_com_data_fim,
     sanitizar_dataframe,
+    exportar_para_excel,
 )
 
 # ============================================================
@@ -50,6 +51,9 @@ def salvar_dados_csv(df, categoria, nome_arquivo):
     caminho = get_csv_path(categoria, nome_arquivo)
     df.to_csv(caminho, sep=';', index=False, encoding='utf-8-sig')
 
+# ============================================================
+# PÁGINA PRINCIPAL
+# ============================================================
 def show():
     categoria = st.session_state.get("categoria_gestao", "Profissional")
     st.title(f"⚙️ Gestão - {categoria}")
@@ -67,9 +71,11 @@ def show():
         else:
             lista_atletas = []
 
-    tabs = st.tabs(["Atletas", "Treinos", "Well-being", "Lesões", "Jogos", "GPS"])
+    tabs = st.tabs(["Atletas", "Treinos", "Well-being", "Lesões", "Jogos", "GPS", "📊 Relatório de Gestão"])
 
-    # ABA 1: ATLETAS
+    # ============================================================
+    # ABA 0: ATLETAS
+    # ============================================================
     with tabs[0]:
         st.subheader("Atletas")
         if df_atletas is not None and not df_atletas.empty:
@@ -80,7 +86,9 @@ def show():
         else:
             st.info(f"Nenhum atleta cadastrado para {categoria}.")
 
-    # ABA 2: TREINOS
+    # ============================================================
+    # ABA 1: TREINOS
+    # ============================================================
     with tabs[1]:
         st.subheader("Treinos")
         cols_tr = ['data', 'tipo', 'descricao', 'pse_alvo', 'atleta']
@@ -110,7 +118,9 @@ def show():
         df_tr = sanitizar_dataframe(df_tr)
         st.dataframe(df_tr, width='stretch')
 
-    # ABA 3: WELL-BEING
+    # ============================================================
+    # ABA 2: WELL-BEING
+    # ============================================================
     with tabs[2]:
         st.subheader("Well-being")
         cols_wb = ['atleta', 'data', 'sono', 'fadiga', 'dor', 'estresse']
@@ -144,7 +154,9 @@ def show():
         df_wb = sanitizar_dataframe(df_wb)
         st.dataframe(df_wb, width='stretch')
 
-    # ABA 4: LESÕES
+    # ============================================================
+    # ABA 3: LESÕES
+    # ============================================================
     with tabs[3]:
         st.subheader("Lesões / Departamento Médico")
         cols_les = ['atleta', 'lesao', 'data_inicio', 'data_fim', 'status']
@@ -195,7 +207,9 @@ def show():
                             st.success(f"Lesão de {atleta_encerrar} encerrada em {data_encerramento}.")
                             st.rerun()
 
-    # ABA 5: JOGOS
+    # ============================================================
+    # ABA 4: JOGOS
+    # ============================================================
     with tabs[4]:
         st.subheader("Jogos")
         cols_jogos = ['atleta', 'data', 'minutos', 'gols', 'assists']
@@ -225,7 +239,9 @@ def show():
         df_jogos = sanitizar_dataframe(df_jogos)
         st.dataframe(df_jogos, width='stretch')
 
-    # ABA 6: GPS
+    # ============================================================
+    # ABA 5: GPS
+    # ============================================================
     with tabs[5]:
         st.subheader("Métricas de GPS")
         cols_gps = ['atleta', 'data', 'distancia_total', 'velocidade_max', 'sprints']
@@ -255,6 +271,114 @@ def show():
 
         df_gps = sanitizar_dataframe(df_gps)
         st.dataframe(df_gps, width='stretch')
+
+    # ============================================================
+    # ABA 6: RELATÓRIO DE GESTÃO
+    # ============================================================
+    with tabs[6]:
+        st.subheader("📊 Relatório de Gestão")
+        st.caption("Este relatório consolida todos os dados cadastrados nas abas anteriores.")
+
+        # Carrega todos os dados
+        df_tr = carregar_dados_csv(categoria, 'treinos', ['data', 'tipo', 'descricao', 'pse_alvo', 'atleta'])
+        df_wb = carregar_dados_csv(categoria, 'wellbeing', ['atleta', 'data', 'sono', 'fadiga', 'dor', 'estresse'])
+        df_les = carregar_dados_csv(categoria, 'lesoes', ['atleta', 'lesao', 'data_inicio', 'data_fim', 'status'])
+        df_jogos = carregar_dados_csv(categoria, 'jogos', ['atleta', 'data', 'minutos', 'gols', 'assists'])
+        df_gps = carregar_dados_csv(categoria, 'gps', ['atleta', 'data', 'distancia_total', 'velocidade_max', 'sprints'])
+
+        # Estatísticas rápidas
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total de Treinos", len(df_tr))
+            st.metric("Total de Avaliações WB", len(df_wb))
+        with col2:
+            st.metric("Total de Lesões Registradas", len(df_les))
+            st.metric("Total de Jogos Registrados", len(df_jogos))
+        with col3:
+            st.metric("Total de Sessões GPS", len(df_gps))
+
+        st.markdown("---")
+
+        # Resumo por atleta (opcional)
+        if not df_tr.empty:
+            st.subheader("📋 Resumo por Atleta (Treinos)")
+            resumo_treinos = df_tr.groupby('atleta').agg({
+                'pse_alvo': 'mean',
+                'data': 'count'
+            }).rename(columns={'data': 'total_treinos', 'pse_alvo': 'media_pse'}).round(2)
+            st.dataframe(sanitizar_dataframe(resumo_treinos), width='stretch')
+
+        if not df_wb.empty:
+            st.subheader("📊 Médias de Well-being por Atleta")
+            resumo_wb = df_wb.groupby('atleta').agg({
+                'sono': 'mean',
+                'fadiga': 'mean',
+                'dor': 'mean',
+                'estresse': 'mean'
+            }).round(2)
+            st.dataframe(sanitizar_dataframe(resumo_wb), width='stretch')
+
+        if not df_les.empty:
+            st.subheader("🩺 Lesões Ativas")
+            lesoes_ativas = df_les[df_les['data_fim'].isna() | (df_les['data_fim'] == '')]
+            if not lesoes_ativas.empty:
+                st.dataframe(sanitizar_dataframe(lesoes_ativas[['atleta', 'lesao', 'data_inicio', 'status']]), width='stretch')
+            else:
+                st.success("Nenhuma lesão ativa no momento.")
+
+        if not df_jogos.empty:
+            st.subheader("⚽ Desempenho em Jogos (Top 5 por Gols)")
+            top_gols = df_jogos.nlargest(5, 'gols')[['atleta', 'gols', 'assists', 'minutos']]
+            st.dataframe(sanitizar_dataframe(top_gols), width='stretch')
+
+        if not df_gps.empty:
+            st.subheader("🏃 Métricas GPS (Top 5 por Distância)")
+            top_dist = df_gps.nlargest(5, 'distancia_total')[['atleta', 'distancia_total', 'velocidade_max', 'sprints']]
+            st.dataframe(sanitizar_dataframe(top_dist), width='stretch')
+
+        # ===== EXPORTAÇÃO =====
+        st.markdown("---")
+        st.subheader("📤 Exportar Relatório de Gestão")
+
+        if st.button("📥 Gerar e Baixar Excel", key="btn_gestao_excel"):
+            with st.spinner("Gerando relatório..."):
+                # Cria um dicionário de DataFrames para múltiplas abas
+                with pd.ExcelWriter(f"relatorio_gestao_{categoria}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", engine='openpyxl') as writer:
+                    if not df_tr.empty:
+                        df_tr.to_excel(writer, sheet_name='Treinos', index=False)
+                    if not df_wb.empty:
+                        df_wb.to_excel(writer, sheet_name='Wellbeing', index=False)
+                    if not df_les.empty:
+                        df_les.to_excel(writer, sheet_name='Lesoes', index=False)
+                    if not df_jogos.empty:
+                        df_jogos.to_excel(writer, sheet_name='Jogos', index=False)
+                    if not df_gps.empty:
+                        df_gps.to_excel(writer, sheet_name='GPS', index=False)
+                    # Adiciona resumos
+                    if not df_tr.empty:
+                        resumo_treinos.to_excel(writer, sheet_name='Resumo_Treinos')
+                    if not df_wb.empty:
+                        resumo_wb.to_excel(writer, sheet_name='Resumo_WB')
+                    if not df_les.empty:
+                        lesoes_ativas.to_excel(writer, sheet_name='Lesoes_Ativas')
+                    if not df_jogos.empty:
+                        top_gols.to_excel(writer, sheet_name='Top_Gols')
+                    if not df_gps.empty:
+                        top_dist.to_excel(writer, sheet_name='Top_GPS')
+
+                # Download
+                caminho_excel = f"relatorio_gestao_{categoria}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                with open(caminho_excel, "rb") as f:
+                    st.download_button(
+                        label="Baixar Excel",
+                        data=f,
+                        file_name=caminho_excel,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                try:
+                    os.remove(caminho_excel)
+                except:
+                    pass
 
     st.markdown("---")
     st.caption(f"Todos os dados são armazenados em CSVs separados por categoria ({categoria}).")
