@@ -300,39 +300,55 @@ def obter_staff_completo(time_id, competicao_id=None):
     return tecnicos + comissao
 
 # ============================================================
-# FUNÇÃO DE CAMINHO PARA FOTOS DO STAFF
+# FUNÇÃO DE CAMINHO PARA FOTOS DO STAFF (CORRIGIDA)
 # ============================================================
-PASTA_FOTOS_COMISSAO = "assets/fotos_comissao/"
-PASTA_FOTOS_TECNICOS = "assets/fotos_tecnicos/"
-
 def caminho_foto_membro(membro):
-    """Busca a foto de um membro da comissão ou técnico."""
-    foto = membro.get('foto', '')
-    if not foto:
+    """
+    Busca a foto de um membro da comissão ou técnico.
+    Usa a mesma lógica de obter_caminho_foto, adaptada para staff.
+    """
+    # 1. Tenta usar a coluna 'foto' (se existir)
+    foto = membro.get('foto')
+    if foto and pd.notna(foto) and str(foto).strip():
+        caminho = str(foto).strip()
+        if os.path.exists(caminho):
+            return os.path.abspath(caminho)
+
+    # 2. Obtém o nome (prioriza apelido, depois nome)
+    nome = membro.get('apelido') or membro.get('nome')
+    if not nome:
         return None
 
-    if foto.startswith('C:') or '\\' in foto:
-        nome_arquivo = os.path.basename(foto)
-    else:
-        nome_arquivo = foto
+    nome_clean = normalizar_texto(nome).replace(' ', '_')
+    extensoes = ['.png', '.jpg', '.jpeg']
 
     pastas = [
-        PASTA_FOTOS_COMISSAO,
-        PASTA_FOTOS_TECNICOS,
-        "assets/fotos/",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
+        "assets/fotos_comissao/",
+        "assets/fotos_tecnicos/",
         "fotos/",
+        "assets/fotos/",
     ]
 
     for pasta in pastas:
-        caminho = os.path.join(pasta, nome_arquivo)
-        if os.path.exists(caminho):
-            return caminho
+        for ext in extensoes:
+            caminho = os.path.join(pasta, f"{nome}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
+            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
+            if os.path.exists(caminho):
+                return os.path.abspath(caminho)
 
     for pasta in pastas:
         if os.path.exists(pasta):
             for root, dirs, files in os.walk(pasta):
-                if nome_arquivo in files:
-                    return os.path.join(root, nome_arquivo)
+                for ext in extensoes:
+                    if f"{nome}{ext}" in files:
+                        return os.path.join(root, f"{nome}{ext}")
+                    if f"{nome_clean}{ext}" in files:
+                        return os.path.join(root, f"{nome_clean}{ext}")
     return None
 
 # ============================================================
