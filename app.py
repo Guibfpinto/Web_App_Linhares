@@ -81,15 +81,17 @@ import pages.proximo_jogo as proximo_jogo
 import pages.tatica_page as tatica_page
 import pages.gestao as gestao
 import pages.visualizacao as visualizacao
-import pages.relatorios as relatorios  # <-- NOVA IMPORTAÇÃO
+import pages.relatorios as relatorios
 
 # ======================================================================
 # DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
 # ======================================================================
 TRADUCAO_ATRIBUTOS = {
-    # Gerais
+    # ===== GERAL =====
     'CA': 'CA (Habilidade Atual)',
     'PA': 'PA (Potencial)',
+    'ca': 'CA (Habilidade Atual)',
+    'pa': 'PA (Potencial)',
     'reputacao_mundial': 'Reputação Mundial',
     'reputacao_atual': 'Reputação Atual',
     'reputacao_local': 'Reputação Local',
@@ -99,14 +101,23 @@ TRADUCAO_ATRIBUTOS = {
     'gols_selecao': 'Gols pela Seleção',
     'jogos_sub21': 'Jogos Sub-21',
     'gols_sub21': 'Gols Sub-21',
-    
-    # Chairman
+    'pais': 'País',
+    'sigla_pais': 'Sigla País',
+    'conhecimento_valor': 'Conhecimento - Valor',
+    'nome_canonico': 'Nome Canonizado',
+    'cidade_uf': 'Cidade/UF',
+    'nation.id': 'ID País',
+    'knowledge_0_nationalteam.id': 'ID Seleção Conhecida',
+    'knowledge_0_value': 'Valor Conhecimento',
+    'id_ogol_comissao': 'ID oGol',
+
+    # ===== CHAIRMAN =====
     'chairmanattributes_business': 'Presidente - Negócios',
     'chairmanattributes_interference': 'Presidente - Interferência',
     'chairmanattributes_patience': 'Presidente - Paciência',
     'chairmanattributes_resources': 'Presidente - Recursos',
-    
-    # Coaching
+
+    # ===== COACHING =====
     'coachingattributes_attacking': 'Treinamento - Ataque',
     'coachingattributes_defending': 'Treinamento - Defesa',
     'coachingattributes_fitness': 'Treinamento - Condicionamento',
@@ -120,8 +131,8 @@ TRADUCAO_ATRIBUTOS = {
     'coachingattributes_dirtinessallowance': 'Treinamento - Tolerância a Rudes',
     'coachingattributes_versatility': 'Treinamento - Versatilidade',
     'coachingattributes_setpieces': 'Treinamento - Bolas Paradas',
-    
-    # Staff Mental
+
+    # ===== STAFF MENTAL =====
     'staffmentalattributes_adaptability': 'Adaptabilidade (Staff)',
     'staffmentalattributes_determination': 'Determinação (Staff)',
     'staffmentalattributes_judgingplayerability': 'Avaliação Habilidade Jogador',
@@ -132,14 +143,14 @@ TRADUCAO_ATRIBUTOS = {
     'staffmentalattributes_motivating': 'Motivação',
     'staffmentalattributes_physiotherapy': 'Fisioterapia',
     'staffmentalattributes_tacticalknowledge': 'Conhecimento Tático',
-    
-    # Non Tactical
+
+    # ===== NON TACTICAL =====
     'nontacticalattributes_buyingplayers': 'Compra de Jogadores',
     'nontacticalattributes_hardnessoftraining': 'Intensidade do Treino',
     'nontacticalattributes_mindgames': 'Jogos Mentais',
     'nontacticalattributes_squadrotation': 'Rotação do Elenco',
-    
-    # Roles
+
+    # ===== ROLES =====
     'rolesattributes_assistantmanager': 'Auxiliar Técnico',
     'rolesattributes_coach': 'Treinador',
     'rolesattributes_fitnesscoach': 'Preparador Físico',
@@ -155,8 +166,8 @@ TRADUCAO_ATRIBUTOS = {
     'rolesattributes_loanmanager': 'Gerente de Empréstimos',
     'rolesattributes_technicaldirector': 'Diretor Técnico',
     'rolesattributes_setpiececoach': 'Treinador de Bolas Paradas',
-    
-    # Tactical
+
+    # ===== TACTICAL =====
     'tacticalattributes_attacking': 'Tática - Ataque',
     'tacticalattributes_depth': 'Profundidade',
     'tacticalattributes_directness': 'Direção',
@@ -171,16 +182,16 @@ TRADUCAO_ATRIBUTOS = {
     'tacticalattributes_useofplaymaker': 'Uso do Armador',
     'tacticalattributes_useofsubstitutions': 'Uso de Substituições',
     'tacticalattributes_width': 'Largura',
-    
-    # Scouting
+
+    # ===== SCOUTING =====
     'scoutingattributes_judgingplayerdata': 'Avaliação Dados Jogador',
     'scoutingattributes_judgingteamdata': 'Avaliação Dados Time',
     'scoutingattributes_presentingdata': 'Apresentação de Dados',
-    
-    # Medical
+
+    # ===== MEDICAL =====
     'medicalattributes_sportsscience': 'Ciência do Esporte',
-    
-    # Personality
+
+    # ===== PERSONALITY =====
     'personalityattributes_adaptability': 'Adaptabilidade (Personalidade)',
     'personalityattributes_ambition': 'Ambição',
     'personalityattributes_loyalty': 'Lealdade',
@@ -189,11 +200,13 @@ TRADUCAO_ATRIBUTOS = {
     'personalityattributes_sportsmanship': 'Espírito Esportivo',
     'personalityattributes_temperament': 'Temperamento',
     'personalityattributes_controversy': 'Controvérsia',
-    
-    # Nation
-    'pais': 'País',
-    'sigla_pais': 'Sigla País',
-    'conhecimento_valor': 'Conhecimento - Valor',
+
+    # ===== ESTATÍSTICAS DA COMISSÃO =====
+    'jogos_temporada': 'Jogos na temporada',
+    'cartoes_amarelos_totais': 'Cartões amarelos (total)',
+    'cartoes_vermelhos_totais': 'Cartões vermelhos (total)',
+    'media_cartoes_amarelos': 'Média de amarelos',
+    'media_cartoes_vermelhos': 'Média de vermelhos',
 }
 
 # ======================================================================
@@ -413,13 +426,9 @@ else:
 # FUNÇÃO UNIFICADA PARA BUSCAR FOTO (JOGADORES E COMISSÃO)
 # ======================================================================
 def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
-    """
-    Busca a foto de um jogador ou membro da comissão usando a lógica mais robusta.
-    """
     if tipo == 'jogador':
         return obter_caminho_foto(row, categoria)
     else:
-        # Lógica para comissão (similar à função caminho_foto_membro do monitoramento)
         foto = row.get('foto', '')
         if not foto:
             nome_base = row.get('apelido') or row.get('nome')
@@ -434,7 +443,7 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
         nome_clean = normalizar_texto(base).replace(' ', '_')
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = script_dir  # app.py está na raiz
+        parent_dir = script_dir
 
         pastas_raiz = [
             "assets/fotos_comissao",
@@ -570,7 +579,7 @@ def get_estatisticas_partidas(categoria):
     return carregar_estatisticas_partidas(categoria)
 
 # ======================================================================
-# FUNÇÃO DETALHES COMISSÃO (USANDO A FUNÇÃO UNIFICADA)
+# FUNÇÃO DETALHES COMISSÃO (COM ESTATÍSTICAS SEPARADAS)
 # ======================================================================
 def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
@@ -596,7 +605,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             suspenso = "Sim" if jogador_suspenso(nome_canonico, cartoes) else "Não"
             st.write(f"**Suspenso:** {suspenso}")
         st.divider()
-        
+
         st.subheader("📜 Histórico")
         col_hist1, col_hist2 = st.columns(2)
         with col_hist1:
@@ -606,7 +615,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.write("**Histórico como Jogador:**")
             st.write(row.get('historico_jogador', 'Não informado'))
         st.divider()
-        
+
         st.subheader("🟨 Histórico de Cartões")
         if nome_canonico in cartoes:
             historico = cartoes[nome_canonico].get('historico', [])
@@ -619,12 +628,34 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         else:
             st.info("Nenhum cartão registrado.")
         st.divider()
-        
+
+        # ===== ESTATÍSTICAS DA TEMPORADA (separadas) =====
+        colunas_estatisticas = [
+            'jogos_temporada',
+            'cartoes_amarelos_totais',
+            'cartoes_vermelhos_totais',
+            'media_cartoes_amarelos',
+            'media_cartoes_vermelhos'
+        ]
+        tem_estatistica = any(col in row.index and pd.notna(row[col]) for col in colunas_estatisticas)
+        if tem_estatistica:
+            st.subheader("📊 Estatísticas da Temporada")
+            for col in colunas_estatisticas:
+                if col in row.index and pd.notna(row[col]):
+                    valor = row[col]
+                    nome_attr = TRADUCAO_ATRIBUTOS.get(col, col)
+                    st.write(f"• **{nome_attr}:** {valor}")
+            st.divider()
+
+        # ===== ATRIBUTOS DETALHADOS (exclui as estatísticas) =====
         st.subheader("📊 Atributos Detalhados")
-        colunas_excluir = ['nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento', 
-                           'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
-                           'idade', 'historico_jogador', 'historico_comissao', 
-                           'id_ogol_comissao', 'data_nascimento.1', 'apelido_norm']
+        colunas_excluir = [
+            'nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento',
+            'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
+            'idade', 'historico_jogador', 'historico_comissao',
+            'id_ogol_comissao', 'data_nascimento.1', 'apelido_norm',
+        ] + colunas_estatisticas
+
         colunas_atributos = [col for col in row.index if col not in colunas_excluir and not pd.isna(row[col])]
         if colunas_atributos:
             col1, col2 = st.columns(2)
@@ -1082,7 +1113,7 @@ with tabs[1]:
     st.header("Comissão Técnica")
     cat_com = st.selectbox("Categoria", ["Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"])
     df_com, cartoes_com = get_df_cartoes(cat_com)
-    
+
     if df_com is not None and not df_com.empty:
         busca = st.text_input("Buscar membro")
         if busca:
@@ -1094,12 +1125,12 @@ with tabs[1]:
             df_com_filtrado = df_com[mask]
         else:
             df_com_filtrado = df_com
-        
+
         cols_exibicao = [c for c in ['apelido', 'cargo', 'idade', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento'] if c in df_com_filtrado.columns]
         df_exib = df_com_filtrado[cols_exibicao] if cols_exibicao else df_com_filtrado
         df_exib = sanitizar_dataframe(df_exib)
         st.dataframe(df_exib, width='stretch')
-        
+
         if not df_com_filtrado.empty:
             if 'apelido' in df_com_filtrado.columns:
                 membro_opcoes = df_com_filtrado['apelido'].dropna().unique().tolist()
@@ -1107,7 +1138,7 @@ with tabs[1]:
                 membro_opcoes = df_com_filtrado['nome'].dropna().unique().tolist()
             else:
                 membro_opcoes = df_com_filtrado.index.tolist()
-            
+
             if membro_opcoes:
                 membro_selecionado = st.selectbox("Selecione um membro", membro_opcoes)
                 if membro_selecionado:
@@ -1117,9 +1148,9 @@ with tabs[1]:
                         row = df_com_filtrado[df_com_filtrado['nome'] == membro_selecionado].iloc[0]
                     else:
                         row = df_com_filtrado.iloc[0]
-                    
+
                     exibir_detalhes_comissao(row, cat_com, cartoes_com)
-                    
+
                     if st.button(f"🟨 Registrar cartão para {membro_selecionado}"):
                         with st.expander("Registrar cartão", expanded=True):
                             tipo = st.radio("Tipo", ["Amarelo", "Vermelho"], key="tipo_cartao_com")
@@ -1195,7 +1226,7 @@ with tabs[4]:
 with tabs[5]:
     st.header("📐 Escalação Tática")
     cat_tatica = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="tatica_categoria")
-    
+
     df_elenco, cartoes_tatica = get_df_cartoes(cat_tatica)
     if df_elenco is None or df_elenco.empty:
         st.warning(f"Elenco não disponível para {cat_tatica}.")
@@ -1205,7 +1236,7 @@ with tabs[5]:
             tatica_page.show()
         except ImportError:
             st.info("Página de tática não disponível. Usando versão simplificada.")
-            
+
             formacao = st.text_input("Formação (ex: 4-4-2)", value="4-4-2")
             if st.button("Gerar Escalação"):
                 defensores, meias, atacantes, posicoes = interpretar_formacao(formacao)
@@ -1243,7 +1274,7 @@ with tabs[5]:
                             'apelido': row['apelido'],
                             'row': row
                         })
-                    
+
                     st.subheader("Time Titular")
                     for j in titulares:
                         st.write(f"**{j['posicao_exibida']}:** {j['nome']} ({j['apelido']})")
