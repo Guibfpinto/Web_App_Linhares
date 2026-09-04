@@ -296,27 +296,27 @@ def salvar_escalacao(jogo_id, titulares, reservas):
 def caminho_foto_membro(membro):
     """
     Busca a foto do membro da comissão técnica.
-    Estratégias:
-    1. Se o campo 'foto' for um caminho absoluto existente, usa-o.
-    2. Se o campo 'foto' for um nome de arquivo, procura nas pastas.
-    3. Se o campo 'foto' estiver vazio, tenta usar o nome do membro.
-    4. Usa glob para achar arquivos com qualquer extensão.
+    Suporta caminhos relativos com subpastas e busca recursiva.
     """
-    # Primeiro, tenta usar o campo 'foto'
     foto = membro.get('foto', '')
     nome_base = None
 
     if foto:
-        # Se for caminho absoluto e existir, retorna
+        # Se já for um caminho absoluto existente, retorna
         if os.path.isabs(foto) and os.path.exists(foto):
             return foto
-        # Extrai o nome do arquivo
+
+        # Tenta usar o caminho relativo a partir do script_dir
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        caminho_relativo = os.path.join(script_dir, foto)
+        if os.path.exists(caminho_relativo):
+            return os.path.abspath(caminho_relativo)
+
+        # Extrai o nome do arquivo para busca posterior
         nome_base = os.path.basename(foto)
     else:
-        # Se o campo 'foto' estiver vazio, tenta usar o nome ou apelido do membro
-        nome_membro = membro.get('nome') or membro.get('apelido')
-        if nome_membro:
-            nome_base = nome_membro
+        # Se 'foto' estiver vazio, usa apelido ou nome
+        nome_base = membro.get('apelido') or membro.get('nome')
 
     if not nome_base:
         return None
@@ -325,15 +325,16 @@ def caminho_foto_membro(membro):
     base, _ = os.path.splitext(nome_base)
     nome_clean = normalizar_texto(base).replace(' ', '_')
 
-    # Diretório base do script
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Pastas relativas ao script_dir
-    pastas_relativas = [
+    # Pastas raiz onde procurar (relativas ao script_dir)
+    pastas_raiz = [
         "assets/fotos_comissao",
         "assets/fotos_tecnicos",
         "fotos",
         "assets/fotos_jogadores",
+        "Fotos_Tecnicos",          # adicionado
+        "fotos_comissao",          # adicionado
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
@@ -347,26 +348,24 @@ def caminho_foto_membro(membro):
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
     ]
 
-    # Combina todas as pastas
-    pastas = pastas_absolutas + [os.path.join(script_dir, p) for p in pastas_relativas]
+    # Combina todas as pastas raiz (absolutas e relativas)
+    pastas = pastas_absolutas + [os.path.join(script_dir, p) for p in pastas_raiz]
 
-    # Extensões comuns
     extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
+    # 1. Busca direta nas pastas (com e sem normalização)
     for pasta in pastas:
         if not os.path.isdir(pasta):
             continue
-        # Tenta com o nome original
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{base}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # Tenta com o nome normalizado
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # Tenta com glob (caso tenha outras extensões ou variações)
+        # Usa glob
         padrao = os.path.join(pasta, f"{base}.*")
         matches = glob.glob(padrao)
         if matches:
@@ -375,6 +374,35 @@ def caminho_foto_membro(membro):
         matches = glob.glob(padrao_clean)
         if matches:
             return os.path.abspath(matches[0])
+
+    # 2. Busca recursiva em pastas específicas (caso esteja em subpastas)
+    pastas_recursivas = [
+        os.path.join(script_dir, "assets/fotos_comissao"),
+        os.path.join(script_dir, "assets/fotos_tecnicos"),
+        os.path.join(script_dir, "fotos"),
+        os.path.join(script_dir, "Fotos_Tecnicos"),
+        os.path.join(script_dir, "fotos_comissao"),
+        # Adicione outras pastas se necessário
+    ]
+    for pasta in pastas_recursivas:
+        if not os.path.isdir(pasta):
+            continue
+        for root, dirs, files in os.walk(pasta):
+            # Procura pelo nome exato (com extensões)
+            for ext in extensoes:
+                arquivo = f"{base}{ext}"
+                if arquivo in files:
+                    return os.path.abspath(os.path.join(root, arquivo))
+                arquivo_clean = f"{nome_clean}{ext}"
+                if arquivo_clean in files:
+                    return os.path.abspath(os.path.join(root, arquivo_clean))
+            # Usa glob no nível da raiz da pasta atual
+            matches = glob.glob(os.path.join(root, f"{base}.*"))
+            if matches:
+                return os.path.abspath(matches[0])
+            matches = glob.glob(os.path.join(root, f"{nome_clean}.*"))
+            if matches:
+                return os.path.abspath(matches[0])
 
     return None
 
