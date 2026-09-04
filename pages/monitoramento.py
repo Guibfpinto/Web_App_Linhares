@@ -103,6 +103,17 @@ def conectar_banco():
     conn.row_factory = sqlite3.Row
     return conn
 
+def garantir_coluna_fonte():
+    """Verifica e cria a coluna 'fonte' na tabela eventos, se não existir."""
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(eventos)")
+    colunas = [col[1] for col in cursor.fetchall()]
+    if 'fonte' not in colunas:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
+        conn.commit()
+    conn.close()
+
 def verificar_jogo_ao_vivo_sql(team_id):
     conn = conectar_banco()
     cursor = conn.cursor()
@@ -154,20 +165,15 @@ def obter_detalhes_jogo_sql(fixture_id):
     }
 
 def obter_eventos_jogo_sql(fixture_id):
+    """Retorna eventos do jogo, sem depender da coluna time_id (que não existe)."""
     conn = conectar_banco()
     cursor = conn.cursor()
     # Garante que a coluna 'fonte' existe
-    cursor.execute("PRAGMA table_info(eventos)")
-    colunas = [col[1] for col in cursor.fetchall()]
-    if 'fonte' not in colunas:
-        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
-        conn.commit()
+    garantir_coluna_fonte()
     cursor.execute("""
-        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
-               t.nome AS time_nome
+        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
-        LEFT JOIN times t ON e.time_id = t.id
         WHERE e.jogo_id = ?
         ORDER BY e.tempo ASC
     """, (fixture_id,))
@@ -181,7 +187,7 @@ def obter_eventos_jogo_sql(fixture_id):
             "type": d.get("tipo", ""),
             "detail": d.get("detalhes", ""),
             "player": {"name": d.get("jogador_nome") or d.get("jogador_apelido") or "Desconhecido"},
-            "team": {"name": d.get("time_nome", "Time")},
+            "team": {"name": ""},  # sem time_id, não temos o nome do time
             "fonte": d.get("fonte", "api")
         })
     return eventos
@@ -189,12 +195,7 @@ def obter_eventos_jogo_sql(fixture_id):
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes, fonte="manual"):
     conn = conectar_banco()
     cursor = conn.cursor()
-    # Garante que a coluna 'fonte' existe
-    cursor.execute("PRAGMA table_info(eventos)")
-    colunas = [col[1] for col in cursor.fetchall()]
-    if 'fonte' not in colunas:
-        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
-        conn.commit()
+    garantir_coluna_fonte()
     cursor.execute('''
         INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes, fonte)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -294,31 +295,57 @@ def salvar_escalacao(jogo_id, titulares, reservas):
 # FUNÇÕES DE EXIBIÇÃO DE FOTOS (STAFF E ÁRBITRO)
 # ============================================================
 def caminho_foto_membro(membro):
+    """
+    Busca a foto do membro da comissão técnica em várias pastas,
+    usando caminhos absolutos relativos ao diretório do script.
+    """
     foto = membro.get('foto', '')
     if not foto:
         return None
-    if foto.startswith('C:') or '\\' in foto:
-        nome_arquivo = os.path.basename(foto)
-    else:
-        nome_arquivo = foto
-    nome_clean = normalizar_texto(nome_arquivo).replace(' ', '_')
-    extensoes = ['.png', '.jpg', '.jpeg']
-    pastas = [
-        "assets/fotos_comissao/",
-        "assets/fotos_tecnicos/",
-        "fotos/",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
+
+    # Se já for um caminho absoluto existente, retorna
+    if os.path.isabs(foto) and os.path.exists(foto):
+        return foto
+
+    # Extrai o nome do arquivo (sem caminho)
+    nome_arquivo = os.path.basename(foto)
+    if not nome_arquivo:
+        return None
+
+    # Remove extensão para tentar com várias
+    base, _ = os.path.splitext(nome_arquivo)
+    nome_clean = normalizar_texto(base).replace(' ', '_')
+
+    # Diretório base do script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Pastas relativas ao script_dir (incluindo as fornecidas pelo usuário)
+    pastas_relativas = [
+        "assets/fotos_comissao",
+        "assets/fotos_tecnicos",
+        "fotos",
+        "assets/fotos_jogadores",  # opcional
     ]
+
+    # Converte para caminhos absolutos
+    pastas = [os.path.join(script_dir, p) for p in pastas_relativas]
+
+    extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+
     for pasta in pastas:
+        if not os.path.isdir(pasta):
+            continue
+        # Tenta com o nome original
         for ext in extensoes:
-            caminho = os.path.join(pasta, f"{nome_arquivo}{ext}")
+            caminho = os.path.join(pasta, f"{base}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
+        # Tenta com o nome normalizado
+        for ext in extensoes:
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
+
     return None
 
 def obter_staff_completo(time_id, competicao_id=None):
@@ -360,6 +387,9 @@ def obter_arbitro_por_id(arbitro_id):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
+    # Garante que a coluna 'fonte' exista desde o início
+    garantir_coluna_fonte()
+
     categoria = st.session_state.get("categoria_monitoramento", "Profissional")
     config = CATEGORIA_CONFIG.get(categoria)
     if not config:
@@ -382,16 +412,6 @@ def show():
         return
 
     inicializar_banco()
-
-    # Garantir que a coluna 'fonte' exista na tabela eventos
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(eventos)")
-    colunas = [col[1] for col in cursor.fetchall()]
-    if 'fonte' not in colunas:
-        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
-        conn.commit()
-    conn.close()
 
     # Seleção de partida
     st.sidebar.header("Selecionar Partida")
@@ -516,7 +536,6 @@ def show():
     # ============================================================
     st.subheader("🔴 Monitoramento Ao Vivo")
 
-    # Verifica se há jogo ao vivo hoje
     if eh_hoje:
         with st.spinner("Verificando jogo ao vivo..."):
             fixture_id = verificar_jogo_ao_vivo_sql(team_id)
@@ -537,29 +556,25 @@ def show():
                 gols_fora_api = detalhes['goals']['away'] or 0
                 status_anterior = status
 
-                # Atualiza placar
                 if (gols_casa_api, gols_fora_api) != (gols_casa, gols_fora):
                     atualizar_placar_sqlite(jogo_selecionado_id, gols_casa_api, gols_fora_api)
-                    # Toca som de gol (se houve mudança)
                     if gols_casa_api > gols_casa:
                         play_sound('gol_linhares' if team_id == jogo['time_casa_id'] else 'gol_adversario')
                     elif gols_fora_api > gols_fora:
                         play_sound('gol_linhares' if team_id == jogo['time_fora_id'] else 'gol_adversario')
                     st.rerun()
 
-                # Atualiza status
                 status_api = detalhes['fixture']['status']['short']
                 if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
                     if status_api in ['1H', '2H']:
                         play_sound('inicio')
                     elif status_api in ['FT', 'AET', 'PEN']:
-                        play_sound('notificacao')  # fim de jogo (opcional)
+                        play_sound('notificacao')
                     st.rerun()
 
                 st.info(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
-            # Busca eventos da API
             eventos_api = obter_eventos_jogo_sql(fixture_id)
             if eventos_api:
                 conn = conectar_banco()
@@ -583,14 +598,10 @@ def show():
                             VALUES (?, ?, ?, ?, ?, 'api')
                         ''', (jogo_selecionado_id, ev['time']['elapsed'], ev['type'], jogador_id, ev.get('detail', '')))
                         novos_eventos += 1
-                        # Sons
                         tipo = ev['type'].lower()
                         if tipo == 'goal':
-                            time_nome = ev.get('team', {}).get('name', '')
-                            if time_nome == config['nome_time']:
-                                play_sound('gol_linhares')
-                            else:
-                                play_sound('gol_adversario')
+                            # Não temos time_nome, mas podemos tocar som genérico
+                            play_sound('gol_linhares')  # ou 'gol_adversario' dependendo do time
                         elif tipo == 'card':
                             play_sound('cartao')
                         else:
@@ -665,12 +676,14 @@ def show():
 
     st.markdown("---")
 
-# LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
+    # ============================================================
+    # LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
+    # ============================================================
     conn = conectar_banco()
     try:
         df_eventos = pd.read_sql_query(f"""
             SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
-                e.fonte
+                   e.fonte
             FROM eventos e
             LEFT JOIN elenco el ON e.jogador_id = el.id
             WHERE e.jogo_id = {jogo_selecionado_id}
@@ -800,13 +813,15 @@ def show():
 
     # Exibe a escalação atual
     conn = conectar_banco()
-    df_lineup = pd.read_sql_query(f"""
-        SELECT e.*, el.nome, el.apelido, el.foto, e.fonte
-        FROM eventos e
-        LEFT JOIN elenco el ON e.jogador_id = el.id
-        WHERE e.jogo_id = {jogo_selecionado_id} AND e.tipo = 'Lineup'
-    """, conn)
-    conn.close()
+    try:
+        df_lineup = pd.read_sql_query(f"""
+            SELECT e.*, el.nome, el.apelido, el.foto, e.fonte
+            FROM eventos e
+            LEFT JOIN elenco el ON e.jogador_id = el.id
+            WHERE e.jogo_id = {jogo_selecionado_id} AND e.tipo = 'Lineup'
+        """, conn)
+    finally:
+        conn.close()
 
     if not df_lineup.empty:
         st.info("Escalação atual:")
