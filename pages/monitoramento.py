@@ -21,7 +21,6 @@ from utils import (
     obter_caminho_foto_arbitro,
     normalizar_texto,
     sanitizar_dataframe,
-    # CATEGORIA_CONFIG removido daqui - usaremos a definição local
 )
 from fastapi_client import FastAPIMonitorClient
 
@@ -32,13 +31,13 @@ SOUNDS_DIR = "assets/sounds/"
 SOUND_FILES = {
     "gol_linhares": "gol_linhares.wav",
     "gol_adversario": "gol_adversario.wav",
-    "cartao": "falta.wav",
+    "cartao": "falta.wav",          # cartão amarelo/vermelho
     "inicio": "inicio_tempo.wav",
     "notificacao": "notificacao.wav",
+    "fim_jogo": "fim_jogo.wav",      # adicionado
 }
 
 def play_sound(sound_key):
-    """Toca um som baseado na chave."""
     filename = SOUND_FILES.get(sound_key)
     sound_path = os.path.join(SOUNDS_DIR, filename) if filename else None
     if sound_path and os.path.exists(sound_path):
@@ -52,6 +51,7 @@ def play_sound(sound_key):
         """
         st.components.v1.html(audio_html, height=0)
     else:
+        # Fallback: beep simples
         st.components.v1.html("""
             <script>
                 try {
@@ -70,7 +70,7 @@ def play_sound(sound_key):
         """, height=0)
 
 # ============================================================
-# CONFIGURAÇÕES DA CATEGORIA (DEFINIÇÃO LOCAL)
+# CONFIGURAÇÕES DA CATEGORIA (LOCAL)
 # ============================================================
 CATEGORIA_CONFIG = {
     "Profissional": {
@@ -100,7 +100,7 @@ CATEGORIA_CONFIG = {
 }
 
 # ============================================================
-# FUNÇÕES DE BANCO DE DADOS (SQLite) - Para fallback manual
+# FUNÇÕES DE BANCO DE DADOS (SQLite) - Fallback manual
 # ============================================================
 DB_PATH = "meu_futebol.db"
 
@@ -328,31 +328,45 @@ def caminho_foto_membro(membro):
 
     return None
 
+# ============================================================
+# FUNÇÃO OBTEM STAFF (CORRIGIDA)
+# ============================================================
 def obter_staff_completo(time_id, competicao_id=None):
     conn = conectar_banco()
     cursor = conn.cursor()
-    query = """
+    
+    # --- Comissão ---
+    query_com = """
         SELECT id, nome, apelido, cargo, foto, idade, data_nascimento
         FROM comissao
         WHERE time_id = ?
     """
-    params = [time_id]
+    params_com = [time_id]
     if competicao_id:
-        query += " AND competicao_id = ?"
-        params.append(competicao_id)
-    query += " ORDER BY nome"
-    cursor.execute(query, params)
+        query_com += " AND competicao_id = ?"
+        params_com.append(competicao_id)
+    query_com += " ORDER BY nome"
+    cursor.execute(query_com, params_com)
     comissao = [dict(row) for row in cursor.fetchall()]
-    cursor.execute("""
+    
+    # --- Técnicos ---
+    query_tec = """
         SELECT id, nome, apelido, foto, idade, data_nascimento,
                'Técnico' as cargo
         FROM tecnicos
         WHERE time_id = ?
-    """, params)
+    """
+    params_tec = [time_id]
+    if competicao_id:
+        query_tec += " AND competicao_id = ?"
+        params_tec.append(competicao_id)
+    cursor.execute(query_tec, params_tec)
     tecnicos = [dict(row) for row in cursor.fetchall()]
+    
     conn.close()
     return tecnicos + comissao
 
+# ============================================================
 def obter_arbitro_por_id(arbitro_id):
     if not arbitro_id:
         return None
@@ -394,15 +408,11 @@ def show():
 
     inicializar_banco()
 
-    # ============================================================
-    # CLIENTE FASTAPI
-    # ============================================================
+    # Cliente FastAPI
     FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
     client = FastAPIMonitorClient(FASTAPI_URL)
 
-    # ============================================================
-    # SELECIONAR PARTIDA (via SQLite)
-    # ============================================================
+    # Seleção de partida (via SQLite)
     st.sidebar.header("Selecionar Partida")
     conn = conectar_banco()
     try:
@@ -473,9 +483,7 @@ def show():
     hoje = date.today()
     eh_hoje = (data_jogo == hoje) if data_jogo else False
 
-    # ============================================================
-    # CABEÇALHO DO JOGO
-    # ============================================================
+    # Cabecalho
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
     col1, col2, col_arb = st.columns([2, 1, 2])
     with col1:
@@ -520,9 +528,7 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # MONITORAMENTO AO VIVO (VIA FASTAPI)
-    # ============================================================
+    # Monitoramento ao vivo
     st.subheader("🔴 Monitoramento Ao Vivo")
 
     if eh_hoje:
@@ -551,7 +557,6 @@ def show():
                 status_anterior = status
                 status_api = detalhes['fixture']['status']['short']
 
-                # Atualiza placar
                 if (gols_casa_api, gols_fora_api) != (gols_casa, gols_fora):
                     atualizar_placar_sqlite(jogo_selecionado_id, gols_casa_api, gols_fora_api)
                     if gols_casa_api > gols_casa:
@@ -562,18 +567,21 @@ def show():
                         play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                     st.rerun()
 
-                # Atualiza status
                 if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
+                    # Som de início de tempo
                     if status_api in ['1H', '2H']:
                         play_sound('inicio')
+                    # Som de fim de jogo (FT, AET, PEN)
                     elif status_api in ['FT', 'AET', 'PEN']:
+                        play_sound('fim_jogo')
+                    # Outros status (ex: notificação genérica)
+                    else:
                         play_sound('notificacao')
                     st.rerun()
 
                 st.info(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
-            # Busca eventos da FastAPI
             try:
                 eventos_api = client.get_fixture_events(fixture_id)
             except Exception as e:
@@ -611,7 +619,7 @@ def show():
                             else:
                                 play_sound('gol_adversario')
                         elif tipo == 'card':
-                            play_sound('cartao')
+                            play_sound('cartao')  # falta.wav
                         else:
                             play_sound('notificacao')
                 conn.commit()
@@ -634,9 +642,7 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # REGISTRO MANUAL DE EVENTOS (FALLBACK)
-    # ============================================================
+    # Registro manual
     st.subheader("📝 Registro Manual de Eventos (Fallback)")
     st.caption("Use esta seção apenas se a FastAPI não estiver fornecendo os dados corretamente.")
 
@@ -674,7 +680,7 @@ def show():
                         time_marcador = jogo['time_fora_id']
                     play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                 elif tipo == 'Cartão':
-                    play_sound('cartao')
+                    play_sound('cartao')  # falta.wav
                 else:
                     play_sound('notificacao')
                 salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, jogador_id, detalhes, fonte="manual")
@@ -685,9 +691,7 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # LISTA DE ÚLTIMOS EVENTOS (DO BANCO LOCAL)
-    # ============================================================
+    # Lista de eventos
     conn = conectar_banco()
     try:
         df_eventos = pd.read_sql_query(f"""
@@ -714,9 +718,7 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # ESCALAÇÃO
-    # ============================================================
+    # Escalação
     st.subheader("📋 Escalação")
 
     with st.expander("✏️ Definir Escalação", expanded=False):
@@ -748,7 +750,6 @@ def show():
                 else:
                     st.warning("Digite uma formação válida.")
 
-        # Recarregar formação atualizada
         conn = conectar_banco()
         cursor = conn.cursor()
         cursor.execute("SELECT formacao_casa FROM jogos WHERE id = ?", (jogo_selecionado_id,))
@@ -843,7 +844,6 @@ def show():
                             st.success("Escalação salva!")
                             st.rerun()
 
-    # Exibe a escalação atual
     conn = conectar_banco()
     try:
         df_lineup = pd.read_sql_query(f"""
@@ -880,9 +880,7 @@ def show():
 
     st.markdown("---")
 
-    # ============================================================
-    # STAFF TÉCNICO (COM DEPURAÇÃO)
-    # ============================================================
+    # Staff Técnico
     st.subheader("👔 Staff Técnico")
     staff_casa = obter_staff_completo(jogo['time_casa_id'], competicao_id)
     staff_fora = obter_staff_completo(jogo['time_fora_id'], competicao_id)
@@ -920,7 +918,6 @@ def show():
 
     st.markdown("---")
 
-    # Exibição normal das fotos
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**{time_casa}**")
