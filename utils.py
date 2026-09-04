@@ -69,19 +69,19 @@ CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
 CATEGORIA_CONFIG = {
     "Profissional": {
         "team_id": 12928,
-        "competicao_id": 2,          # Campeonato Capixaba Série B (ajuste conforme seu banco)
+        "competicao_id": 2,
         "elenco_func": "carregar_elenco_profissional",
         "cartoes_key": "profissional",
     },
     "Sub-15": {
         "team_id": 27831,
-        "competicao_id": 11,         # Copa Espírito Santo Sub-15
+        "competicao_id": 11,
         "elenco_func": "carregar_elenco_sub15",
         "cartoes_key": "sub15",
     },
     "Sub-17": {
         "team_id": 27832,
-        "competicao_id": 10,         # Copa Espírito Santo Sub-17
+        "competicao_id": 10,
         "elenco_func": "carregar_elenco_sub17",
         "cartoes_key": "sub17",
     }
@@ -194,6 +194,7 @@ def sanitizar_dataframe(df):
 # FUNÇÃO PARA ORDENAR HISTÓRICO DE CARTÕES
 # =============================================
 def ordenar_historico_cartoes(cartoes: dict) -> dict:
+    """Ordena o histórico de cartões de cada jogador por data (crescente)."""
     for jogador, dados in cartoes.items():
         if 'historico' in dados and dados['historico']:
             dados['historico'] = sorted(
@@ -336,7 +337,7 @@ def estado_fisico(imc_class, gor_class):
 def inicializar_banco():
     conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
-    # Tabelas já existentes (mantidas)
+    # Criação das tabelas (já existentes, mantidas)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS treinos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -376,8 +377,6 @@ def inicializar_banco():
             gols_fora INTEGER,
             status TEXT,
             data_hora TEXT,
-            estadio TEXT,
-            arbitro TEXT,
             formacao_casa TEXT,
             formacao_fora TEXT,
             venue_id INTEGER,
@@ -440,7 +439,7 @@ def inicializar_banco():
             fonte TEXT DEFAULT 'api'
         )
     ''')
-    # Garante que a coluna 'fonte' exista (se não existir)
+    # Garante a coluna 'fonte'
     cursor.execute("PRAGMA table_info(eventos)")
     colunas = [col[1] for col in cursor.fetchall()]
     if 'fonte' not in colunas:
@@ -1334,7 +1333,7 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
     return df
 
 # =============================================
-# CARTÕES (JSON) – COM LÓGICA DE FASES E RESET
+# CARTÕES (JSON) – COM LÓGICA DE FASES E RESET E ORDENAÇÃO
 # =============================================
 def carregar_cartoes_json(categoria):
     caminho = {
@@ -1347,7 +1346,6 @@ def carregar_cartoes_json(categoria):
     }.get(categoria)
 
     if not caminho or not os.path.exists(caminho):
-        from utils import inicializar_cartoes_por_csvs
         cartoes, datas = inicializar_cartoes_por_csvs(categoria, {})
         return cartoes, datas
 
@@ -2014,7 +2012,6 @@ def _chamar_api(endpoint, params=None, tentativa=1):
     return None  # Mantido para compatibilidade
 
 def verificar_jogo_ao_vivo(team_id=None):
-    """Verifica se há jogo ao vivo para o time via banco local."""
     conn = sqlite3.connect('meu_futebol.db')
     cursor = conn.cursor()
     query = """
@@ -2034,7 +2031,6 @@ def verificar_jogo_ao_vivo(team_id=None):
     return None
 
 def obter_detalhes_jogo(fixture_id):
-    """Retorna detalhes do jogo do banco local."""
     conn = sqlite3.connect('meu_futebol.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -2070,7 +2066,6 @@ def obter_detalhes_jogo(fixture_id):
     }
 
 def obter_eventos_jogo(fixture_id):
-    """Retorna eventos do jogo do banco local."""
     conn = sqlite3.connect('meu_futebol.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -2096,19 +2091,15 @@ def obter_eventos_jogo(fixture_id):
     return eventos
 
 def obter_estatisticas_jogo(fixture_id):
-    """Mock de estatísticas para compatibilidade."""
     return []
 
 def obter_lineups_completos(fixture_id):
-    """Mock de lineups para compatibilidade."""
     return []
 
 def obter_players_stats(fixture_id):
-    """Mock de estatísticas de jogadores para compatibilidade."""
     return []
 
 def buscar_jogos_por_competicao(league_id, season_id, team_id, data_inicio, data_fim):
-    """Busca jogos no banco local por time, data."""
     conn = sqlite3.connect('meu_futebol.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -2136,14 +2127,12 @@ def buscar_jogos_por_competicao(league_id, season_id, team_id, data_inicio, data
     return jogos
 
 def gerar_relatorio_excel(fixture_id, time_casa_titulares=None, time_casa_reservas=None):
-    """Gera relatório Excel a partir dos dados do banco local."""
     print("📊 Gerando relatório Excel a partir do banco local...")
     try:
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Relatório"
         ws['A1'] = f"Relatório da Partida {fixture_id}"
-        # ... implementação simplificada
         pasta = RELATORIOS_DIR
         os.makedirs(pasta, exist_ok=True)
         caminho = os.path.join(pasta, f"relatorio_{fixture_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
@@ -2211,6 +2200,7 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             ""
         ]
         if historico:
+            # Ordena por data (mais recente primeiro) para exibição
             historico_ordenado = sorted(historico, key=lambda x: x['data'], reverse=True)
             linhas.append("  **Histórico (últimos eventos):**")
             for ev in historico_ordenado[-8:]:
