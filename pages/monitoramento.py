@@ -304,7 +304,11 @@ def caminho_foto_membro(membro):
     """
     foto = membro.get('foto', '')
     if not foto:
-        return None
+        # Se não tiver foto, tenta usar o nome do membro
+        nome_membro = membro.get('nome') or membro.get('apelido')
+        if not nome_membro:
+            return None
+        foto = nome_membro
 
     # Se já for um caminho absoluto existente, retorna
     if os.path.isabs(foto) and os.path.exists(foto):
