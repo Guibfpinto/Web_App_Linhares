@@ -26,13 +26,15 @@ from utils import (
 # ============================================================
 SOUNDS_DIR = "assets/sounds/"
 SOUND_FILES = {
-    "gol_casa": "gol_linhares.wav",
-    "gol_fora": "gol_adversario.wav",
+    "gol_linhares": "gol_linhares.wav",
+    "gol_adversario": "gol_adversario.wav",
     "cartao": "falta.wav",
+    "inicio": "inicio_tempo.wav",
     "notificacao": "notificacao.wav",
 }
 
 def play_sound(sound_key):
+    """Toca um som baseado na chave: gol_linhares, gol_adversario, cartao, inicio, notificacao."""
     filename = SOUND_FILES.get(sound_key)
     sound_path = os.path.join(SOUNDS_DIR, filename) if filename else None
     if sound_path and os.path.exists(sound_path):
@@ -46,6 +48,7 @@ def play_sound(sound_key):
         """
         st.components.v1.html(audio_html, height=0)
     else:
+        # Fallback: beep simples
         st.components.v1.html("""
             <script>
                 try {
@@ -153,6 +156,12 @@ def obter_detalhes_jogo_sql(fixture_id):
 def obter_eventos_jogo_sql(fixture_id):
     conn = conectar_banco()
     cursor = conn.cursor()
+    # Garante que a coluna 'fonte' existe
+    cursor.execute("PRAGMA table_info(eventos)")
+    colunas = [col[1] for col in cursor.fetchall()]
+    if 'fonte' not in colunas:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
+        conn.commit()
     cursor.execute("""
         SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
                t.nome AS time_nome
@@ -180,10 +189,12 @@ def obter_eventos_jogo_sql(fixture_id):
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes, fonte="manual"):
     conn = conectar_banco()
     cursor = conn.cursor()
+    # Garante que a coluna 'fonte' existe
     cursor.execute("PRAGMA table_info(eventos)")
     colunas = [col[1] for col in cursor.fetchall()]
     if 'fonte' not in colunas:
         cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
+        conn.commit()
     cursor.execute('''
         INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes, fonte)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -497,7 +508,6 @@ def show():
 
     # Verifica se há jogo ao vivo hoje
     if eh_hoje:
-        # Tenta verificar jogo ao vivo
         with st.spinner("Verificando jogo ao vivo..."):
             fixture_id = verificar_jogo_ao_vivo_sql(team_id)
             if fixture_id:
@@ -507,25 +517,36 @@ def show():
                 st.session_state.monitoramento_ativo = False
 
         if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
-            # Monitoramento ativo
             st_autorefresh(interval=10000, key="monitor_auto")
             fixture_id = st.session_state.fixture_id
             st.success(f"✅ Jogo ao vivo detectado! ID: {fixture_id}")
 
-            # Busca dados ao vivo
             detalhes = obter_detalhes_jogo_sql(fixture_id)
             if detalhes:
-                # Atualiza placar
                 gols_casa_api = detalhes['goals']['home'] or 0
                 gols_fora_api = detalhes['goals']['away'] or 0
+                status_anterior = status
+
+                # Atualiza placar
                 if (gols_casa_api, gols_fora_api) != (gols_casa, gols_fora):
                     atualizar_placar_sqlite(jogo_selecionado_id, gols_casa_api, gols_fora_api)
+                    # Toca som de gol (se houve mudança)
+                    if gols_casa_api > gols_casa:
+                        play_sound('gol_linhares' if team_id == jogo['time_casa_id'] else 'gol_adversario')
+                    elif gols_fora_api > gols_fora:
+                        play_sound('gol_linhares' if team_id == jogo['time_fora_id'] else 'gol_adversario')
                     st.rerun()
+
                 # Atualiza status
                 status_api = detalhes['fixture']['status']['short']
-                if status_api != status:
+                if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
+                    if status_api in ['1H', '2H']:
+                        play_sound('inicio')
+                    elif status_api in ['FT', 'AET', 'PEN']:
+                        play_sound('notificacao')  # fim de jogo (opcional)
                     st.rerun()
+
                 st.info(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
             # Busca eventos da API
@@ -542,7 +563,6 @@ def show():
                         jogador = cursor.fetchone()
                         if jogador:
                             jogador_id = jogador['id']
-                    # Verifica se evento já existe (evita duplicidade)
                     cursor.execute("""
                         SELECT id FROM eventos
                         WHERE jogo_id = ? AND tempo = ? AND tipo = ? AND jogador_id = ? AND fonte = 'api'
@@ -558,9 +578,9 @@ def show():
                         if tipo == 'goal':
                             time_nome = ev.get('team', {}).get('name', '')
                             if time_nome == config['nome_time']:
-                                play_sound('gol_casa')
+                                play_sound('gol_linhares')
                             else:
-                                play_sound('gol_fora')
+                                play_sound('gol_adversario')
                         elif tipo == 'card':
                             play_sound('cartao')
                         else:
@@ -608,20 +628,21 @@ def show():
                 jogador_nome = st.selectbox("Jogador", opcoes_jogadores)
                 if jogador_nome != "Nenhum":
                     jogador_id = jogadores_df[jogadores_df['nome'] == jogador_nome]['id'].iloc[0]
+                    time_jogador = jogadores_df[jogadores_df['id'] == jogador_id]['time_id'].iloc[0]
                 else:
                     jogador_id = 0
+                    time_jogador = None
             with col3:
                 tempo = st.number_input("Minuto", 0, 120, 0, step=1)
             detalhes = st.text_input("Detalhes (opcional)")
             if st.form_submit_button("Registrar Evento Manualmente", use_container_width=True):
                 if tipo == 'Gol' and jogador_id != 0:
-                    # Atualiza placar
-                    time_jogador = jogadores_df[jogadores_df['id'] == jogador_id]['time_id'].iloc[0]
                     if time_jogador == jogo['time_casa_id']:
                         atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
+                        play_sound('gol_linhares' if team_id == jogo['time_casa_id'] else 'gol_adversario')
                     else:
                         atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
-                    play_sound('gol_casa' if time_jogador == jogo['time_casa_id'] else 'gol_fora')
+                        play_sound('gol_linhares' if team_id == jogo['time_fora_id'] else 'gol_adversario')
                 elif tipo == 'Cartão':
                     play_sound('cartao')
                 else:
