@@ -21,7 +21,7 @@ from utils import (
     obter_caminho_foto_arbitro,
     normalizar_texto,
     sanitizar_dataframe,
-    CATEGORIA_CONFIG,
+    # CATEGORIA_CONFIG removido daqui - usaremos a definição local
 )
 from fastapi_client import FastAPIMonitorClient
 
@@ -68,6 +68,36 @@ def play_sound(sound_key):
                 } catch(e) {}
             </script>
         """, height=0)
+
+# ============================================================
+# CONFIGURAÇÕES DA CATEGORIA (DEFINIÇÃO LOCAL)
+# ============================================================
+CATEGORIA_CONFIG = {
+    "Profissional": {
+        "team_id": 12928,
+        "nome_time": "Linhares FC",
+        "elenco_func": carregar_elenco_profissional,
+        "cartoes_key": "profissional",
+        "liga_nome": "Campeonato Capixaba Série B",
+        "competicao_id": 2
+    },
+    "Sub-15": {
+        "team_id": 27831,
+        "nome_time": "Linhares FC Sub-15",
+        "elenco_func": carregar_elenco_sub15,
+        "cartoes_key": "sub15",
+        "liga_nome": "Copa Espírito Santo Sub-15",
+        "competicao_id": 11
+    },
+    "Sub-17": {
+        "team_id": 27832,
+        "nome_time": "Linhares FC Sub-17",
+        "elenco_func": carregar_elenco_sub17,
+        "cartoes_key": "sub17",
+        "liga_nome": "Copa Espírito Santo Sub-17",
+        "competicao_id": 10
+    }
+}
 
 # ============================================================
 # FUNÇÕES DE BANCO DE DADOS (SQLite) - Para fallback manual
@@ -349,10 +379,11 @@ def show():
     nome_time = config["nome_time"]
     elenco_func = config["elenco_func"]
     cartoes_key = config["cartoes_key"]
+    liga_nome = config["liga_nome"]
     competicao_id = config.get("competicao_id")
 
     st.title(f"📊 Monitoramento ao Vivo - {categoria}")
-    st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {config['liga_nome']}")
+    st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {liga_nome}")
     st.markdown("---")
 
     df_elenco = elenco_func()
