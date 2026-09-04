@@ -12,18 +12,16 @@ from utils import (
     carregar_elenco_sub15,
     carregar_elenco_sub17,
     carregar_cartoes_json,
-    salvar_cartoes_json,
     interpretar_formacao,
     mapear_nome_para_canonico,
     inicializar_banco,
     jogador_suspenso,
     obter_caminho_foto,
     obter_caminho_foto_arbitro,
-    normalizar_texto,
 )
 
 # ============================================================
-# CONFIGURAÇÕES DE ÁUDIO
+# CONFIGURAÇÕES DE ÁUDIO (opcional, mantido)
 # ============================================================
 SOUNDS_DIR = "assets/sounds/"
 SOUND_FILES = {
@@ -49,25 +47,23 @@ def play_sound(sound_key):
         """
         st.components.v1.html(audio_html, height=0)
     else:
-        js_beep = """
-        <script>
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-                gainNode.gain.value = 0.1;
-                oscillator.start();
-                setTimeout(() => { oscillator.stop(); }, 300);
-            } catch(e) {
-                console.warn('Beep falhou:', e);
-            }
-        </script>
-        """
-        st.components.v1.html(js_beep, height=0)
+        # Beep fallback (simplificado)
+        st.components.v1.html("""
+            <script>
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+                    gainNode.gain.value = 0.1;
+                    oscillator.start();
+                    setTimeout(() => { oscillator.stop(); }, 300);
+                } catch(e) {}
+            </script>
+        """, height=0)
 
 # ============================================================
 # CONFIGURAÇÕES DA CATEGORIA
@@ -97,7 +93,7 @@ CATEGORIA_CONFIG = {
 }
 
 # ============================================================
-# FUNÇÕES DE ACESSO AO BANCO SQLITE (com row_factory)
+# FUNÇÕES DE BANCO DE DADOS (SQLite)
 # ============================================================
 DB_PATH = "meu_futebol.db"
 
@@ -153,15 +149,15 @@ def obter_detalhes_jogo_sql(fixture_id):
         "goals": {
             "home": dados.get("gols_casa", 0),
             "away": dados.get("gols_fora", 0)
-        },
-        "score": {"penalty": None}
+        }
     }
 
 def obter_eventos_jogo_sql(fixture_id):
     conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT e.*, el.nome AS jogador_nome, t.nome AS time_nome
+        SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido,
+               t.nome AS time_nome
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
         LEFT JOIN times t ON e.time_id = t.id
@@ -174,186 +170,14 @@ def obter_eventos_jogo_sql(fixture_id):
     for r in rows:
         d = dict(r)
         eventos.append({
-            "time": {"elapsed": d.get("tempo", 0), "extra": None},
+            "time": {"elapsed": d.get("tempo", 0)},
             "type": d.get("tipo", ""),
             "detail": d.get("detalhes", ""),
-            "player": {"name": d.get("jogador_nome", "Desconhecido")},
+            "player": {"name": d.get("jogador_nome") or d.get("jogador_apelido") or "Desconhecido"},
             "team": {"name": d.get("time_nome", "Time")}
         })
     return eventos
 
-def obter_estatisticas_jogo_sql(fixture_id):
-    # Mock – substitua por consulta real se tiver tabela de estatísticas
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("SELECT time_casa_id, time_fora_id FROM jogos WHERE id = ?", (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        return None
-    time_casa = row['time_casa_id']
-    time_fora = row['time_fora_id']
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_casa,))
-    nome_casa = cursor.fetchone()['nome'] if cursor.fetchone() else "Casa"
-    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_fora,))
-    nome_fora = cursor.fetchone()['nome'] if cursor.fetchone() else "Fora"
-    conn.close()
-    return [
-        {
-            "team": {"name": nome_casa},
-            "statistics": [
-                {"type": "Ball Possession", "value": "50%"},
-                {"type": "Total Shots", "value": "10"},
-                {"type": "Shots on Goal", "value": "4"},
-                {"type": "Passes", "value": "300"},
-                {"type": "Passes %", "value": "75%"},
-                {"type": "Fouls", "value": "12"},
-                {"type": "Yellow Cards", "value": "2"},
-                {"type": "Red Cards", "value": "0"}
-            ]
-        },
-        {
-            "team": {"name": nome_fora},
-            "statistics": [
-                {"type": "Ball Possession", "value": "50%"},
-                {"type": "Total Shots", "value": "8"},
-                {"type": "Shots on Goal", "value": "2"},
-                {"type": "Passes", "value": "250"},
-                {"type": "Passes %", "value": "70%"},
-                {"type": "Fouls", "value": "15"},
-                {"type": "Yellow Cards", "value": "3"},
-                {"type": "Red Cards", "value": "0"}
-            ]
-        }
-    ]
-
-# ============================================================
-# FUNÇÕES PARA COMISSÃO, TÉCNICOS E ARBITROS
-# ============================================================
-def obter_comissao_por_time(time_id, competicao_id=None):
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    query = """
-        SELECT id, nome, cargo, foto, data_nascimento, cidade, uf, pais,
-               historico_profissional, historico_jogador, apelido, idade
-        FROM comissao
-        WHERE time_id = ?
-    """
-    params = [time_id]
-    if competicao_id:
-        query += " AND competicao_id = ?"
-        params.append(competicao_id)
-    query += " ORDER BY nome"
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
-
-def obter_tecnicos_por_time(time_id, competicao_id=None):
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    query = """
-        SELECT id, nome, idade, nacionalidade, foto, time_id,
-               historico_jogador, historico_profissional,
-               data_nascimento, cidade, uf, pais, competicao_id, apelido
-        FROM tecnicos
-        WHERE time_id = ?
-    """
-    params = [time_id]
-    if competicao_id:
-        query += " AND competicao_id = ?"
-        params.append(competicao_id)
-    query += " ORDER BY nome"
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    tecnicos = []
-    for r in rows:
-        d = dict(r)
-        d['cargo'] = 'Técnico'
-        tecnicos.append(d)
-    return tecnicos
-
-def obter_arbitro_por_id(arbitro_id):
-    if not arbitro_id:
-        return None
-    conn = conectar_banco()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, nome, foto, categoria, uf, genero FROM arbitros WHERE id = ?", (arbitro_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
-
-def obter_staff_completo(time_id, competicao_id=None):
-    tecnicos = obter_tecnicos_por_time(time_id, competicao_id)
-    comissao = obter_comissao_por_time(time_id, competicao_id)
-    for t in tecnicos:
-        t['tipo'] = 'Técnico'
-        t.setdefault('cargo', 'Técnico')
-    for c in comissao:
-        c['tipo'] = 'Comissão'
-        c.setdefault('cargo', 'Membro')
-    return tecnicos + comissao
-
-# ============================================================
-# FUNÇÃO DE CAMINHO PARA FOTOS DO STAFF (CORRIGIDA)
-# ============================================================
-def caminho_foto_membro(membro):
-    """
-    Busca a foto de um membro da comissão ou técnico.
-    Usa a mesma lógica de obter_caminho_foto, adaptada para staff.
-    """
-    # 1. Tenta usar a coluna 'foto' (se existir)
-    foto = membro.get('foto')
-    if foto and pd.notna(foto) and str(foto).strip():
-        caminho = str(foto).strip()
-        if os.path.exists(caminho):
-            return os.path.abspath(caminho)
-
-    # 2. Obtém o nome (prioriza apelido, depois nome)
-    nome = membro.get('apelido') or membro.get('nome')
-    if not nome:
-        return None
-
-    nome_clean = normalizar_texto(nome).replace(' ', '_')
-    extensoes = ['.png', '.jpg', '.jpeg']
-
-    pastas = [
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
-        "assets/fotos_comissao/",
-        "assets/fotos_tecnicos/",
-        "fotos/",
-        "assets/fotos/",
-    ]
-
-    for pasta in pastas:
-        for ext in extensoes:
-            caminho = os.path.join(pasta, f"{nome}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
-            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
-
-    for pasta in pastas:
-        if os.path.exists(pasta):
-            for root, dirs, files in os.walk(pasta):
-                for ext in extensoes:
-                    if f"{nome}{ext}" in files:
-                        return os.path.join(root, f"{nome}{ext}")
-                    if f"{nome_clean}{ext}" in files:
-                        return os.path.join(root, f"{nome_clean}{ext}")
-    return None
-
-# ============================================================
-# FUNÇÕES DE ESCRITA (ATUALIZAÇÃO DO BANCO)
-# ============================================================
 def salvar_evento_sqlite(jogo_id, tempo, tipo, jogador_id, detalhes):
     conn = conectar_banco()
     cursor = conn.cursor()
@@ -386,9 +210,9 @@ def atualizar_arbitro_jogo(jogo_id, arbitro_id):
     conn.close()
 
 # ============================================================
-# FUNÇÃO AUXILIAR PARA MONTAR TIME
+# FUNÇÕES DE ESCALAÇÃO
 # ============================================================
-def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
+def montar_time_automatico(df, formacao_str, cartoes):
     if df.empty:
         return None, None
     defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_str)
@@ -403,8 +227,6 @@ def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
             candidatos = candidatos[candidatos['Posicao_Principal'] == 'Goleiro']
         else:
             candidatos = candidatos[~candidatos['Posicao_Principal'].isin(['Goleiro'])]
-        if not incluir_lesionados and 'lesionado' in candidatos.columns:
-            candidatos = candidatos[~candidatos['lesionado']]
         candidatos = candidatos[~candidatos['nome_completo'].isin(jogadores_usados)]
         candidatos = candidatos[~candidatos['nome_completo'].apply(lambda x: jogador_suspenso(mapear_nome_para_canonico(x), cartoes))]
         if not candidatos.empty:
@@ -426,8 +248,6 @@ def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
                 'row': None
             })
     reservas_df = df[~df['nome_completo'].isin(jogadores_usados)]
-    if not incluir_lesionados and 'lesionado' in reservas_df.columns:
-        reservas_df = reservas_df[~reservas_df['lesionado']]
     reservas_df = reservas_df.sort_values('Rating_Geral_FM26', ascending=False)
     for _, row in reservas_df.head(12).iterrows():
         reservas.append({
@@ -436,6 +256,87 @@ def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
             'row': row
         })
     return titulares, reservas
+
+def salvar_escalacao(jogo_id, titulares, reservas):
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    # Remove escalação antiga
+    cursor.execute("DELETE FROM eventos WHERE jogo_id = ? AND tipo = 'Lineup'", (jogo_id,))
+    for jog in titulares:
+        if jog['row'] is not None:
+            cursor.execute(
+                "INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?, 0, 'Lineup', ?, ?)",
+                (jogo_id, jog['row']['id'], f"Titular - {jog['posicao_exibida']}")
+            )
+    for jog in reservas:
+        if jog['row'] is not None:
+            cursor.execute(
+                "INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?, 0, 'Lineup', ?, 'Reserva')",
+                (jogo_id, jog['row']['id'])
+            )
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# FUNÇÕES DE EXIBIÇÃO DE FOTOS (STAFF E ÁRBITRO)
+# ============================================================
+def caminho_foto_membro(membro):
+    foto = membro.get('foto', '')
+    if not foto:
+        return None
+    if foto.startswith('C:') or '\\' in foto:
+        nome_arquivo = os.path.basename(foto)
+    else:
+        nome_arquivo = foto
+    pastas = [
+        "assets/fotos_comissao/",
+        "assets/fotos_tecnicos/",
+        "fotos/",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
+    ]
+    for pasta in pastas:
+        caminho = os.path.join(pasta, nome_arquivo)
+        if os.path.exists(caminho):
+            return os.path.abspath(caminho)
+    return None
+
+def obter_staff_completo(time_id, competicao_id=None):
+    # Busca técnicos e comissão do banco
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    query = """
+        SELECT id, nome, apelido, cargo, foto, idade, data_nascimento
+        FROM comissao
+        WHERE time_id = ?
+    """
+    params = [time_id]
+    if competicao_id:
+        query += " AND competicao_id = ?"
+        params.append(competicao_id)
+    query += " ORDER BY nome"
+    cursor.execute(query, params)
+    comissao = [dict(row) for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT id, nome, apelido, foto, idade, data_nascimento,
+               'Técnico' as cargo
+        FROM tecnicos
+        WHERE time_id = ?
+    """, params)
+    tecnicos = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return tecnicos + comissao
+
+def obter_arbitro_por_id(arbitro_id):
+    if not arbitro_id:
+        return None
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nome, foto, categoria FROM arbitros WHERE id = ?", (arbitro_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 # ============================================================
 # PÁGINA PRINCIPAL
@@ -456,6 +357,7 @@ def show():
     st.markdown(f"**Time:** {nome_time} (ID: {team_id}) | **Competição:** {config['liga_nome']}")
     st.markdown("---")
 
+    # Carrega elenco e cartões
     df_elenco = elenco_func()
     cartoes, _ = carregar_cartoes_json(cartoes_key)
     if df_elenco is None or df_elenco.empty:
@@ -464,14 +366,13 @@ def show():
 
     inicializar_banco()
 
+    # Seleção de partida
     st.sidebar.header("Selecionar Partida")
     conn = conectar_banco()
-
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora,
-                   j.status, j.data_hora, j.formacao_casa, j.formacao_fora,
-                   j.arbitro_id,
+                   j.status, j.data_hora, j.formacao_casa, j.arbitro_id,
                    v.nome AS estadio
             FROM jogos j
             LEFT JOIN venues v ON j.venue_id = v.id
@@ -486,26 +387,23 @@ def show():
 
     try:
         times_df = pd.read_sql_query("SELECT id, nome FROM times", conn)
-        arbitros_df = pd.read_sql_query("SELECT id, nome, categoria, foto FROM arbitros ORDER BY nome", conn)
+        arbitros_df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
     except Exception as e:
         st.error(f"Erro ao carregar times ou árbitros: {e}")
         conn.close()
         return
-
     conn.close()
 
     times_dict = dict(zip(times_df['id'], times_df['nome']))
-    arbitros_dict = dict(zip(arbitros_df['id'], arbitros_df['nome']))
-
     if df_jogos.empty:
         st.sidebar.warning(f"Nenhum jogo futuro ou em andamento do {nome_time}.")
         st.stop()
 
     opcoes = []
     for _, row in df_jogos.iterrows():
-        time_casa = times_dict.get(row['time_casa_id'], '?')
-        time_fora = times_dict.get(row['time_fora_id'], '?')
-        label = f"{time_casa} x {time_fora} ({row['data_hora'][:10]}) - {row['status']}"
+        tc = times_dict.get(row['time_casa_id'], '?')
+        tf = times_dict.get(row['time_fora_id'], '?')
+        label = f"{tc} x {tf} ({row['data_hora'][:10]}) - {row['status']}"
         opcoes.append((row['id'], label))
 
     jogo_selecionado_id = st.sidebar.selectbox(
@@ -515,6 +413,7 @@ def show():
         index=0
     )
 
+    # Carrega detalhes do jogo
     conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM jogos WHERE id = ?", (jogo_selecionado_id,))
@@ -532,11 +431,16 @@ def show():
     status = jogo.get('status', 'NS')
     data_hora = jogo.get('data_hora', '')
     arbitro_id_atual = jogo.get('arbitro_id')
+    formacao_casa = jogo.get('formacao_casa', '')
 
+    # Verifica se o jogo é hoje
     data_jogo = datetime.strptime(data_hora[:10], "%Y-%m-%d").date() if data_hora else None
     hoje = date.today()
     eh_hoje = (data_jogo == hoje) if data_jogo else False
 
+    # ============================================================
+    # CABEÇALHO DO JOGO
+    # ============================================================
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
     col1, col2, col_arb = st.columns([2, 1, 2])
     with col1:
@@ -549,10 +453,10 @@ def show():
         if arbitro:
             nome_arbitro = arbitro['nome']
             foto_arb = obter_caminho_foto_arbitro(nome_arbitro)
-            col_foto, col_texto = st.columns([1, 3])
+            col_foto, col_texto = st.columns([1, 4])
             with col_foto:
                 if foto_arb and os.path.exists(foto_arb):
-                    st.image(foto_arb, width=150)
+                    st.image(foto_arb, width=80)
                 else:
                     st.write("👤")
             with col_texto:
@@ -566,7 +470,6 @@ def show():
                 current_index = 0
                 if arbitro_id_atual in arbitros_df['id'].values:
                     current_index = arbitros_df[arbitros_df['id'] == arbitro_id_atual].index[0]
-
                 novo_arbitro = st.selectbox(
                     "Selecione o árbitro",
                     options=arbitros_df['id'].tolist(),
@@ -578,122 +481,225 @@ def show():
                     st.success("Árbitro associado com sucesso!")
                     st.rerun()
     else:
-        st.warning("Nenhum árbitro cadastrado. Cadastre árbitros na seção apropriada.")
+        st.warning("Nenhum árbitro cadastrado.")
 
     st.markdown("---")
 
-    conn = conectar_banco()
-    df_eventos = pd.read_sql_query(f"""
-        SELECT e.*, el.nome AS jogador_nome
-        FROM eventos e
-        LEFT JOIN elenco el ON e.jogador_id = el.id
-        WHERE e.jogo_id = {jogo_selecionado_id}
-        ORDER BY e.tempo DESC LIMIT 10
-    """, conn)
-    conn.close()
-    st.write("**📋 Últimos eventos:**")
-    if not df_eventos.empty:
-        for _, ev in df_eventos.iterrows():
-            jogador = ev['jogador_nome'] if ev['jogador_nome'] else 'Desconhecido'
-            st.write(f"- ⏱️ {ev['tempo']}' - {ev['tipo']} - {jogador} - {ev['detalhes']}")
-    else:
-        st.write("Nenhum evento registrado ainda.")
+    # ============================================================
+    # CONTROLE DE STATUS E EVENTOS (GOL, CARTÃO, SUBSTITUIÇÃO)
+    # ============================================================
+    col_status, col_events = st.columns([1, 2])
 
-    st.markdown("---")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.write("**Controle de Status**")
-        if status == 'NS' and st.button("▶️ Iniciar 1º Tempo", width='stretch'):
+    with col_status:
+        st.write("**Controle da Partida**")
+        if status == 'NS' and st.button("▶️ Iniciar", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, '1H')
             play_sound('inicio')
             st.rerun()
-        elif status == '1H' and st.button("⏸️ Intervalo", width='stretch'):
+        elif status == '1H' and st.button("⏸️ Intervalo", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, 'HT')
             st.rerun()
-        elif status == 'HT' and st.button("▶️ Iniciar 2º Tempo", width='stretch'):
+        elif status == 'HT' and st.button("▶️ 2º Tempo", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, '2H')
             play_sound('inicio')
             st.rerun()
-        elif status == '2H' and st.button("⏹️ Encerrar", width='stretch'):
+        elif status == '2H' and st.button("⏹️ Encerrar", use_container_width=True):
             atualizar_status_sqlite(jogo_selecionado_id, 'FT')
             play_sound('fim')
             st.success("Partida encerrada!")
             st.rerun()
         else:
-            st.info("Partida não iniciada ou já encerrada.")
+            st.info(f"Status atual: {status}")
 
-    with col2:
-        st.write("**Adicionar Gol**")
-        if status in ['1H', '2H', 'HT']:
-            if st.button(f"⚽ {time_casa}", width='stretch'):
-                atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
-                salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_casa}")
-                play_sound('gol_casa')
-                st.rerun()
-            if st.button(f"⚽ {time_fora}", width='stretch'):
-                atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
-                salvar_evento_sqlite(jogo_selecionado_id, 0, 'Goal', 0, f"Gol do {time_fora}")
-                play_sound('gol_fora')
-                st.rerun()
-        else:
-            st.info("Partida não em andamento.")
-
-    with col3:
+    with col_events:
         st.write("**Registrar Evento**")
         if status in ['1H', '2H', 'HT']:
-            with st.form("evento_form"):
-                tempo = st.number_input("Minuto", 0, 120, 0, step=1)
-                tipo = st.selectbox("Tipo", ['Goal', 'Card', 'subst', 'Var'])
-                conn = conectar_banco()
-                jogadores_df = pd.read_sql_query(f"""
-                    SELECT id, nome FROM elenco
-                    WHERE time_id IN ({jogo['time_casa_id']}, {jogo['time_fora_id']})
-                    ORDER BY nome
-                """, conn)
-                conn.close()
-                jogadores_opcoes = ["Nenhum"] + jogadores_df['nome'].tolist()
-                jogador_nome = st.selectbox("Jogador", jogadores_opcoes)
-                if jogador_nome != "Nenhum":
-                    jogador_id = jogadores_df[jogadores_df['nome'] == jogador_nome]['id'].iloc[0]
-                else:
-                    jogador_id = 0
-                detalhes = st.text_input("Detalhes")
-                submitted = st.form_submit_button("Adicionar Evento", width='stretch')
+            with st.form("evento_form", clear_on_submit=True):
+                col_tipo, col_jogador, col_tempo = st.columns(3)
+                with col_tipo:
+                    tipo = st.selectbox("Tipo", ['Gol', 'Cartão', 'Substituição'])
+                with col_jogador:
+                    # Lista jogadores do time da casa (e do adversário, se quiser)
+                    conn = conectar_banco()
+                    jogadores_df = pd.read_sql_query(f"""
+                        SELECT id, nome, apelido FROM elenco
+                        WHERE time_id IN ({jogo['time_casa_id']}, {jogo['time_fora_id']})
+                        ORDER BY nome
+                    """, conn)
+                    conn.close()
+                    opcoes_jogadores = ["Nenhum"] + jogadores_df['nome'].tolist()
+                    jogador_nome = st.selectbox("Jogador", opcoes_jogadores)
+                    if jogador_nome != "Nenhum":
+                        jogador_id = jogadores_df[jogadores_df['nome'] == jogador_nome]['id'].iloc[0]
+                    else:
+                        jogador_id = 0
+                with col_tempo:
+                    tempo = st.number_input("Minuto", 0, 120, 0, step=1)
+
+                detalhes = st.text_input("Detalhes (opcional)")
+
+                submitted = st.form_submit_button("Adicionar Evento", use_container_width=True)
                 if submitted:
-                    salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, jogador_id, detalhes)
-                    if tipo == 'Goal':
-                        play_sound('notificacao')
-                    elif tipo == 'Card':
+                    # Se for gol, atualiza placar
+                    if tipo == 'Gol' and jogador_nome != "Nenhum":
+                        # Determina se é gol do time da casa ou visitante
+                        # (simplificado: assume que é do time da casa se o jogador pertencer a ele)
+                        time_jogador = jogadores_df[jogadores_df['id'] == jogador_id]['time_id'].values[0]
+                        if time_jogador == jogo['time_casa_id']:
+                            atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
+                        else:
+                            atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
+                        play_sound('gol_casa' if time_jogador == jogo['time_casa_id'] else 'gol_fora')
+                    elif tipo == 'Cartão':
                         play_sound('cartao')
                     else:
                         play_sound('notificacao')
-                    st.success("Evento adicionado!")
+                    salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, jogador_id, detalhes)
+                    st.success("Evento registrado!")
                     st.rerun()
         else:
             st.info("Partida não em andamento.")
 
     st.markdown("---")
 
-    st.subheader("📋 Escalação e Formação")
-    with st.expander("✏️ Definir Formações", expanded=False):
-        with st.form("formacao_form"):
-            formacao_casa = jogo.get('formacao_casa', '')
-            formacao_fora = jogo.get('formacao_fora', '')
-            nova_casa = st.text_input(f"Formação {time_casa}", value=formacao_casa)
-            nova_fora = st.text_input(f"Formação {time_fora}", value=formacao_fora)
-            if st.form_submit_button("Salvar Formações", width='stretch'):
-                conn = conectar_banco()
-                cursor = conn.cursor()
-                cursor.execute("UPDATE jogos SET formacao_casa = ?, formacao_fora = ? WHERE id = ?", (nova_casa, nova_fora, jogo_selecionado_id))
-                conn.commit()
-                conn.close()
-                st.success("Formações atualizadas!")
-                st.rerun()
+    # ============================================================
+    # LISTA DE ÚLTIMOS EVENTOS
+    # ============================================================
+    conn = conectar_banco()
+    df_eventos = pd.read_sql_query(f"""
+        SELECT e.*, el.nome AS jogador_nome
+        FROM eventos e
+        LEFT JOIN elenco el ON e.jogador_id = el.id
+        WHERE e.jogo_id = {jogo_selecionado_id}
+        ORDER BY e.tempo DESC LIMIT 15
+    """, conn)
+    conn.close()
 
+    if not df_eventos.empty:
+        st.write("**📋 Últimos eventos:**")
+        for _, ev in df_eventos.iterrows():
+            jogador = ev['jogador_nome'] if ev['jogador_nome'] else 'Desconhecido'
+            st.write(f"- ⏱️ {ev['tempo']}' - {ev['tipo']} - {jogador} - {ev['detalhes']}")
+    else:
+        st.info("Nenhum evento registrado ainda.")
+
+    st.markdown("---")
+
+    # ============================================================
+    # ESCALAÇÃO MANUAL
+    # ============================================================
+    st.subheader("📋 Escalação")
+
+    with st.expander("✏️ Definir Escalação", expanded=False):
+        # Formação
+        formacao_opcoes = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '5-3-2', '4-1-2-1-2', '3-4-3']
+        formacao_escolhida = st.selectbox(
+            f"Formação do {time_casa}",
+            formacao_opcoes,
+            index=formacao_opcoes.index(formacao_casa) if formacao_casa in formacao_opcoes else 0
+        )
+        if formacao_escolhida != formacao_casa:
+            conn = conectar_banco()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE jogos SET formacao_casa = ? WHERE id = ?", (formacao_escolhida, jogo_selecionado_id))
+            conn.commit()
+            conn.close()
+            st.rerun()
+
+        # Jogadores disponíveis
+        jogadores_disponiveis = df_elenco.copy()
+        if 'lesionado' in jogadores_disponiveis.columns:
+            jogadores_disponiveis = jogadores_disponiveis[~jogadores_disponiveis['lesionado']]
+        jogadores_disponiveis = jogadores_disponiveis[
+            ~jogadores_disponiveis['nome_completo'].apply(
+                lambda x: jogador_suspenso(mapear_nome_para_canonico(x), cartoes)
+            )
+        ]
+
+        if jogadores_disponiveis.empty:
+            st.warning("Nenhum jogador disponível para escalar.")
+        else:
+            st.write(f"**Jogadores disponíveis:** {len(jogadores_disponiveis)}")
+
+            defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_escolhida)
+            if not posicoes:
+                st.error("Formação inválida.")
+            else:
+                titulares_selecionados = {}
+                st.write("**Titulares:**")
+                cols = st.columns(3)
+                for idx, (pos_exibida, pos_tipo) in enumerate(posicoes):
+                    with cols[idx % 3]:
+                        if pos_tipo == 'Goleiro':
+                            candidatos = jogadores_disponiveis[jogadores_disponiveis['Posicao_Principal'] == 'Goleiro']
+                        else:
+                            candidatos = jogadores_disponiveis[~jogadores_disponiveis['Posicao_Principal'].isin(['Goleiro'])]
+                        candidatos = candidatos[~candidatos['nome_completo'].isin(titulares_selecionados.values())]
+                        candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
+                        opcoes = [''] + candidatos['nome_completo'].tolist()
+                        selecionado = st.selectbox(
+                            pos_exibida,
+                            opcoes,
+                            key=f"titular_{pos_exibida}_{jogo_selecionado_id}"
+                        )
+                        if selecionado:
+                            titulares_selecionados[pos_exibida] = selecionado
+
+                # Reservas
+                st.write("**Reservas (máx. 12):**")
+                reservas_opcoes = jogadores_disponiveis[
+                    ~jogadores_disponiveis['nome_completo'].isin(titulares_selecionados.values())
+                ]['nome_completo'].tolist()
+                reservas_selecionados = st.multiselect(
+                    "Selecione os reservas",
+                    reservas_opcoes,
+                    default=[],
+                    key=f"reservas_{jogo_selecionado_id}"
+                )
+                if len(reservas_selecionados) > 12:
+                    st.warning("Máximo de 12 reservas. Os primeiros 12 serão salvos.")
+                    reservas_selecionados = reservas_selecionados[:12]
+
+                col_auto, col_salvar = st.columns(2)
+                with col_auto:
+                    if st.button("⚽ Gerar Automático", use_container_width=True):
+                        titulares, reservas = montar_time_automatico(df_elenco, formacao_escolhida, cartoes)
+                        if titulares:
+                            salvar_escalacao(jogo_selecionado_id, titulares, reservas)
+                            st.success("Escalação automática salva!")
+                            st.rerun()
+                with col_salvar:
+                    if st.button("💾 Salvar Manual", use_container_width=True):
+                        if len(titulares_selecionados) < len(posicoes):
+                            st.error("Preencha todos os titulares.")
+                        else:
+                            # Converte seleções para o formato esperado
+                            titulares = []
+                            for pos, nome in titulares_selecionados.items():
+                                row = df_elenco[df_elenco['nome_completo'] == nome].iloc[0]
+                                titulares.append({
+                                    'posicao_exibida': pos,
+                                    'posicao_tipo': 'Desconhecido',
+                                    'nome': nome,
+                                    'apelido': row['apelido'],
+                                    'row': row
+                                })
+                            reservas = []
+                            for nome in reservas_selecionados:
+                                row = df_elenco[df_elenco['nome_completo'] == nome].iloc[0]
+                                reservas.append({
+                                    'nome': nome,
+                                    'apelido': row['apelido'],
+                                    'row': row
+                                })
+                            salvar_escalacao(jogo_selecionado_id, titulares, reservas)
+                            st.success("Escalação salva!")
+                            st.rerun()
+
+    # Exibe a escalação atual
     conn = conectar_banco()
     df_lineup = pd.read_sql_query(f"""
-        SELECT e.*, el.nome, el.apelido, el.foto
+        SELECT e.*, el.nome, el.apelido
         FROM eventos e
         LEFT JOIN elenco el ON e.jogador_id = el.id
         WHERE e.jogo_id = {jogo_selecionado_id} AND e.tipo = 'Lineup'
@@ -701,122 +707,57 @@ def show():
     conn.close()
 
     if not df_lineup.empty:
-        st.info("Escalação já registrada.")
+        st.info("Escalação atual:")
         col1, col2 = st.columns(2)
-
         with col1:
-            st.write(f"**{time_casa}**")
-            titulares_casa = df_lineup[df_lineup['detalhes'].str.contains('Titular', na=False)]
+            st.write(f"**{time_casa} - Titulares**")
+            titulares_casa = df_lineup[~df_lineup['detalhes'].str.contains('Reserva', na=False)]
             for _, row in titulares_casa.iterrows():
                 nome = row['nome'] if row['nome'] else row['apelido'] or 'Desconhecido'
-                foto = row.get('foto')
-                if foto and os.path.exists(foto):
-                    st.image(foto, width=150)
-                else:
-                    caminho = obter_caminho_foto(row, "Profissional")
-                    if caminho and os.path.exists(caminho):
-                        st.image(caminho, width=150)
-                    else:
-                        st.write(f"📷 {nome}")
-                st.caption(nome)
-
+                st.write(f"• {nome}")
         with col2:
-            st.write(f"**{time_fora}**")
-            titulares_fora = df_lineup[df_lineup['detalhes'].str.contains('Visitante', na=False)]
-            for _, row in titulares_fora.iterrows():
+            st.write(f"**{time_casa} - Reservas**")
+            reservas_casa = df_lineup[df_lineup['detalhes'].str.contains('Reserva', na=False)]
+            for _, row in reservas_casa.iterrows():
                 nome = row['nome'] if row['nome'] else row['apelido'] or 'Desconhecido'
-                foto = row.get('foto')
-                if foto and os.path.exists(foto):
-                    st.image(foto, width=150)
-                else:
-                    caminho = obter_caminho_foto(row, "Profissional")
-                    if caminho and os.path.exists(caminho):
-                        st.image(caminho, width=150)
-                    else:
-                        st.write(f"📷 {nome}")
-                st.caption(nome)
+                st.write(f"• {nome}")
     else:
-        st.write("**Definir escalação manual:**")
-        if df_elenco.empty:
-            st.warning("Elenco não carregado. Importe os dados primeiro.")
-        else:
-            formacao_manual = st.text_input("Formação para escalação automática", value="4-4-2")
-            if st.button("⚽ Montar Time Automaticamente", width='stretch'):
-                titulares, reservas = montar_time(df_elenco, formacao_manual, cartoes)
-                if titulares:
-                    conn = conectar_banco()
-                    cursor = conn.cursor()
-                    for jog in titulares:
-                        if jog['row'] is not None:
-                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Titular')",
-                                           (jogo_selecionado_id, jog['row']['id']))
-                    for jog in reservas:
-                        if jog['row'] is not None:
-                            cursor.execute("INSERT INTO eventos (jogo_id, tempo, tipo, jogador_id, detalhes) VALUES (?,0,'Lineup',?,'Reserva')",
-                                           (jogo_selecionado_id, jog['row']['id']))
-                    conn.commit()
-                    conn.close()
-                    st.success("Escalação salva!")
-                    st.rerun()
+        st.info("Nenhuma escalação registrada ainda.")
 
     st.markdown("---")
 
-    # ===== STAFF TÉCNICO (COMISSÃO + TÉCNICOS) COM FOTOS EM 150px =====
+    # ============================================================
+    # STAFF TÉCNICO (resumido)
+    # ============================================================
     st.subheader("👔 Staff Técnico")
-
-    staff_casa = obter_staff_completo(jogo['time_casa_id'], jogo.get('competicao_id'))
-    staff_fora = obter_staff_completo(jogo['time_fora_id'], jogo.get('competicao_id'))
-
+    staff_casa = obter_staff_completo(jogo['time_casa_id'])
+    staff_fora = obter_staff_completo(jogo['time_fora_id'])
     col1, col2 = st.columns(2)
-
     with col1:
-        st.markdown(f"**{time_casa}**")
-        if staff_casa:
-            for membro in staff_casa:
-                col_foto, col_texto = st.columns([1, 4])
-                with col_foto:
-                    foto_path = caminho_foto_membro(membro)
-                    if foto_path and os.path.exists(foto_path):
-                        st.image(foto_path, width=150)
-                    else:
-                        st.write("📌")
-                with col_texto:
-                    cargo = membro.get('cargo', 'Técnico')
-                    st.write(f"**{membro['nome']}**")
-                    st.caption(cargo)
-        else:
-            st.write("*Nenhum staff cadastrado.*")
-
+        st.write(f"**{time_casa}**")
+        for membro in staff_casa:
+            foto = caminho_foto_membro(membro)
+            if foto:
+                st.image(foto, width=40)
+            st.write(f"{membro.get('nome', 'N/I')} ({membro.get('cargo', 'Técnico')})")
     with col2:
-        st.markdown(f"**{time_fora}**")
-        if staff_fora:
-            for membro in staff_fora:
-                col_foto, col_texto = st.columns([1, 4])
-                with col_foto:
-                    foto_path = caminho_foto_membro(membro)
-                    if foto_path and os.path.exists(foto_path):
-                        st.image(foto_path, width=150)
-                    else:
-                        st.write("📌")
-                with col_texto:
-                    cargo = membro.get('cargo', 'Técnico')
-                    st.write(f"**{membro['nome']}**")
-                    st.caption(cargo)
-        else:
-            st.write("*Nenhum staff cadastrado.*")
+        st.write(f"**{time_fora}**")
+        for membro in staff_fora:
+            foto = caminho_foto_membro(membro)
+            if foto:
+                st.image(foto, width=40)
+            st.write(f"{membro.get('nome', 'N/I')} ({membro.get('cargo', 'Técnico')})")
 
     st.markdown("---")
 
-    # ===== MONITORAMENTO AUTOMÁTICO =====
+    # ============================================================
+    # MONITORAMENTO AUTOMÁTICO (se houver jogo ao vivo)
+    # ============================================================
     st.subheader("🔄 Monitoramento Automático")
     if not eh_hoje:
         st.warning("⚠️ O monitoramento só pode ser iniciado no dia da partida.")
-        monitor_habilitado = False
     else:
-        monitor_habilitado = True
-
-    if monitor_habilitado:
-        if st.button("🔍 Verificar Jogo ao Vivo", width='stretch'):
+        if st.button("🔍 Verificar Jogo ao Vivo", use_container_width=True):
             fixture_id = verificar_jogo_ao_vivo_sql(team_id)
             if fixture_id:
                 st.session_state.fixture_id = fixture_id
@@ -825,9 +766,7 @@ def show():
                 st.success(f"Jogo ao vivo encontrado! ID: {fixture_id}")
                 st.rerun()
             else:
-                st.warning("Nenhum jogo ao vivo encontrado. Tente novamente quando a partida começar.")
-    else:
-        st.button("🔍 Verificar Jogo ao Vivo", width='stretch', disabled=True)
+                st.warning("Nenhum jogo ao vivo encontrado.")
 
     if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
         st_autorefresh(interval=10000, key="monitor_auto")
@@ -883,10 +822,9 @@ def show():
             conn.close()
             st.rerun()
 
-        if st.button("⏹️ Parar Monitoramento", width='stretch'):
+        if st.button("⏹️ Parar Monitoramento", use_container_width=True):
             st.session_state.monitoramento_ativo = False
             st.session_state.fixture_id = None
             st.rerun()
 
-    st.markdown("---")
     st.caption(f"Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
