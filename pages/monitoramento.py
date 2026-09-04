@@ -383,6 +383,16 @@ def show():
 
     inicializar_banco()
 
+    # Garantir que a coluna 'fonte' exista na tabela eventos
+    conn = conectar_banco()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(eventos)")
+    colunas = [col[1] for col in cursor.fetchall()]
+    if 'fonte' not in colunas:
+        cursor.execute("ALTER TABLE eventos ADD COLUMN fonte TEXT DEFAULT 'api'")
+        conn.commit()
+    conn.close()
+
     # Seleção de partida
     st.sidebar.header("Selecionar Partida")
     conn = conectar_banco()
