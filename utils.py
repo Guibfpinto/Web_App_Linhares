@@ -18,7 +18,6 @@ from io import BytesIO
 import requests
 import time
 from pathlib import Path
-import importlib.util
 
 # =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
@@ -43,12 +42,6 @@ DATA_DIR = "data"
 RELATORIOS_DIR = "relatorios"
 NOME_TIME = "Linhares FC"
 TEMPORADA = str(datetime.now().year)
-
-
-# =============================================
-# CONSTANTE DE FORMATAÇÃO DE DATA (JSON)
-# =============================================
-FORMATO_DATA_JSON = "%Y-%m-%d"   # ISO 8601
 
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
@@ -409,32 +402,20 @@ def inicializar_banco():
     conn.close()
 
 # =============================================
-# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA) - CORRIGIDA
+# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """
-    Carrega o CSV de perfil completo dos jogadores.
-    - Rejeita arquivos de estatísticas (com 'id_jogo').
-    - Identifica coluna de nome (prioridade: nome_completo, apelido, jogador, nome).
-    - Preenche nome_completo com apelido se vazio.
-    - Remove duplicatas baseadas em ogol_id (ou nome_completo).
-    - Garante colunas obrigatórias e cálculos.
-    """
     if not os.path.exists(caminho_arquivo):
-        st.warning(f"⚠️ Arquivo não encontrado: {caminho_arquivo}")
+        st.warning(f"Arquivo não encontrado: {caminho_arquivo}")
         return pd.DataFrame()
-
     try:
-        # ===== 1. LEITURA E NORMALIZAÇÃO =====
         df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # ===== 2. REJEITA ARQUIVOS DE ESTATÍSTICAS =====
         if 'id_jogo' in df.columns:
             st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
             return pd.DataFrame()
 
-        # ===== 3. IDENTIFICA A COLUNA DE NOME =====
         coluna_nome = None
         for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
             if possivel in df.columns:
@@ -445,28 +426,22 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             st.warning(f"⚠️ Nenhuma coluna de nome encontrada em {caminho_arquivo}. Ignorando.")
             return pd.DataFrame()
 
-        # Padroniza para 'nome_completo'
         if coluna_nome != 'nome_completo':
             df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
 
-        # ===== 4. PREENCHE NOME_COMPLETO COM APELIDO SE VAZIO =====
         if 'apelido' in df.columns:
             df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
-        # Se ainda houver vazio, usa o próprio nome (ou 'N/I')
         df['nome_completo'] = df['nome_completo'].fillna('N/I')
 
-        # ===== 5. REMOVE DUPLICATAS =====
         if 'ogol_id' in df.columns:
             df = df.drop_duplicates(subset=['ogol_id'], keep='first')
         else:
             df = df.drop_duplicates(subset=['nome_completo'], keep='first')
 
-        # ===== 6. GARANTE COLUNAS OBRIGATÓRIAS =====
         for col in ['apelido', 'data_nascimento', 'posicao']:
             if col not in df.columns:
                 df[col] = None
 
-        # ===== 7. CONVERTE COLUNAS NUMÉRICAS =====
         for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -479,7 +454,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             else:
                 df[attr] = np.nan
 
-        # ===== 8. CÁLCULOS (IMC, IDADE, GORDURA, ETC.) =====
         df['IMC'] = df.apply(
             lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
             if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
@@ -515,7 +489,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
-        # ===== 9. POSIÇÃO PRINCIPAL =====
         def cat_pos(pos_str):
             if pd.isna(pos_str):
                 return 'Outros', []
@@ -571,7 +544,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
-        # Remove 'foto' se existir
         if 'foto' in df.columns:
             df.drop(columns=['foto'], inplace=True)
 
@@ -583,10 +555,8 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
 
 @st.cache_data
 def carregar_elenco_profissional() -> pd.DataFrame:
-    # Tenta carregar da raiz primeiro
     caminho = ARQUIVO_CSV_PROFISSIONAL
     if not os.path.exists(caminho):
-        # Fallback: tenta na pasta data/
         caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_PROFISSIONAL)
     print(f"📂 Carregando profissional: {caminho}")
     return _carregar_elenco_generico(caminho)
@@ -655,84 +625,37 @@ def carregar_comissao_sub17() -> pd.DataFrame:
     return _carregar_comissao_generico(ARQUIVO_CSV_COMISSAO_SUB17)
 
 # =============================================
-# CRONOGRAMA – CORRIGIDO (FILTRA DATAS NULAS)
+# CRONOGRAMA
 # =============================================
 @st.cache_data
 def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
-    """
-    Carrega o cronograma. Primeiro tenta o CSV; se não existir, tenta importar
-    do script específico (ex: linhares_profissional_crono_2026.py).
-    Filtra datas inválidas (NaT) e retorna um DataFrame com coluna 'data' em datetime.
-    """
-    import importlib.util
-    from pathlib import Path
-
-    # Mapeia categoria para arquivo CSV e nome do script
     if categoria == "Profissional":
-        arquivo_csv = ARQUIVO_CRONO_PROF
-        nome_script = "linhares_profissional_crono_2026"
+        arquivo = ARQUIVO_CRONO_PROF
     elif categoria == "Sub-15":
-        arquivo_csv = ARQUIVO_CRONO_SUB15
-        nome_script = "linhares_sub15_crono_2026"
+        arquivo = ARQUIVO_CRONO_SUB15
     elif categoria == "Sub-17":
-        arquivo_csv = ARQUIVO_CRONO_SUB17
-        nome_script = "linhares_sub17_crono_2026"
+        arquivo = ARQUIVO_CRONO_SUB17
     else:
         return pd.DataFrame()
-
-    df = None
-
-    # Tenta carregar do CSV
-    if os.path.exists(arquivo_csv):
-        try:
-            df = pd.read_csv(arquivo_csv, sep=';', encoding='utf-8-sig')
-            if 'data' in df.columns:
-                df['data'] = pd.to_datetime(df['data'], errors='coerce')
-                df = df.dropna(subset=['data'])
-            if 'competicao' not in df.columns:
-                df['competicao'] = 'Desconhecida'
-            if 'fase' not in df.columns:
-                df['fase'] = ''
-            # Se o CSV tem dados, retorna
-            if not df.empty:
-                return df
-        except Exception as e:
-            print(f"Erro ao ler CSV de cronograma: {e}")
-
-    # Se não há CSV ou está vazio, tenta importar do script
+    if not os.path.exists(arquivo):
+        return pd.DataFrame()
     try:
-        spec = importlib.util.find_spec(nome_script)
-        if spec is None:
-            script_path = Path(__file__).resolve().parent / f"{nome_script}.py"
-            if not script_path.exists():
-                script_path = Path(__file__).resolve().parent / ".." / f"{nome_script}.py"
-            if not script_path.exists():
-                return pd.DataFrame()
-            spec = importlib.util.spec_from_file_location(nome_script, script_path)
-        if spec and spec.loader:
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            if hasattr(module, 'JOGOS_TEMPORADA_2026'):
-                jogos = module.JOGOS_TEMPORADA_2026
-                df = pd.DataFrame(jogos)
-                if 'data_jogo' in df.columns:
-                    df.rename(columns={'data_jogo': 'data'}, inplace=True)
-                if 'id_jogo' in df.columns:
-                    df.rename(columns={'id_jogo': 'id'}, inplace=True)
-                if 'url_completa' in df.columns:
-                    df.rename(columns={'url_completa': 'url'}, inplace=True)
-                if 'data' in df.columns:
-                    df['data'] = pd.to_datetime(df['data'], errors='coerce')
-                    df = df.dropna(subset=['data'])
-                if 'competicao' not in df.columns:
-                    df['competicao'] = 'Desconhecida'
-                if 'fase' not in df.columns:
-                    df['fase'] = ''
-                return df
+        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
+        if 'data' not in df.columns:
+            return pd.DataFrame()
+        df['data'] = pd.to_datetime(df['data'], errors='coerce')
+        if 'competicao' not in df.columns:
+            df['competicao'] = 'Desconhecida'
+        else:
+            df['competicao'] = df['competicao'].fillna('Desconhecida')
+        if 'fase' not in df.columns:
+            df['fase'] = ''
+        else:
+            df['fase'] = df['fase'].fillna('')
+        return df
     except Exception as e:
-        print(f"Erro ao carregar cronograma do script {nome_script}: {e}")
-
-    return pd.DataFrame()
+        st.error(f"Erro ao carregar cronograma: {e}")
+        return pd.DataFrame()
 
 def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     df = carregar_cronograma(categoria)
@@ -745,10 +668,9 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     return df_futuros.iloc[0].to_dict()
 
 # =============================================
-# EXIBIR FOTO (CORRIGIDO PARA NÃO DAR ERRO SE NÃO HOUVER COLUNA 'foto')
+# EXIBIR FOTO (JOGADORES E COMISSÃO)
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
-    # 1. Tenta usar a coluna 'foto' (se existir)
     if 'foto' in pessoa_row.index:
         foto = pessoa_row.get('foto')
         if foto and pd.notna(foto) and str(foto).strip():
@@ -756,7 +678,6 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
             if os.path.exists(caminho) or caminho.startswith('http'):
                 return caminho
 
-    # 2. Se não houver coluna 'foto', usa o apelido ou nome completo
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if nome:
         nome_clean = normalizar_texto(nome).replace(' ', '_')
@@ -790,31 +711,44 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
     st.write("📷")
 
 # =============================================
-# FOTO DE ÁRBITROS
+# FOTO DE ÁRBITROS (CORRIGIDA – VERSÃO FINAL)
 # =============================================
 def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
     """
     Retorna o caminho absoluto da foto do árbitro, se existir.
-    Procura na pasta 'fotos_arbitros/' com o nome normalizado.
+    Busca em múltiplas pastas usando pathlib.
     """
     if not nome_arbitro or pd.isna(nome_arbitro):
         return None
 
-    # Normaliza o nome (remove acentos, espaços -> _)
+    base_dir = Path(__file__).resolve().parent
     nome_clean = normalizar_texto(nome_arbitro).replace(' ', '_')
-    pastas = ["fotos_arbitros"]
-    extensoes = ['.png', '.jpg', '.jpeg']
+    extensoes = ['.png', '.jpg', '.jpeg', '.webp']
+
+    pastas = [
+        base_dir / "fotos_arbitros",
+        base_dir / "assets" / "fotos_arbitros",
+        base_dir / "data" / "fotos_arbitros",
+    ]
 
     for pasta in pastas:
+        if not pasta.exists():
+            continue
         for ext in extensoes:
-            # Tenta com o nome original (sem normalizar)
-            caminho = os.path.join(pasta, f"{nome_arbitro}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
-            # Tenta com o nome normalizado
-            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
+            caminho = pasta / f"{nome_arbitro}{ext}"
+            if caminho.exists():
+                return str(caminho.resolve())
+            caminho = pasta / f"{nome_clean}{ext}"
+            if caminho.exists():
+                return str(caminho.resolve())
+
+    # Busca recursiva
+    for pasta in pastas:
+        if pasta.exists():
+            for ext in extensoes:
+                for arquivo in pasta.rglob(f"*{ext}"):
+                    if arquivo.stem.lower() == nome_clean.lower() or arquivo.stem == nome_arbitro:
+                        return str(arquivo.resolve())
     return None
 
 # =============================================
@@ -1298,7 +1232,7 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
         for id_jogador, lista_datas in datas_globais.items():
             if isinstance(lista_datas, (list, tuple)):
                 dados_serializaveis[id_jogador] = [
-                    d.strftime(FORMATO_DATA_JSON) if hasattr(d, 'strftime') else str(d)
+                    d.strftime("%d/%m/%Y") if hasattr(d, 'strftime') else str(d)
                     for d in lista_datas
                 ]
             else:
@@ -1316,44 +1250,27 @@ def jogador_suspenso(nome, cartoes):
     return cartoes[nome].get('suspenso_proxima', False)
 
 # =============================================
-# INICIALIZAR CARTÕES – COM RESET DE AMARELOS E VERIFICAÇÃO POR DATA (CORRIGIDO)
+# INICIALIZAR CARTÕES – COM RESET DE AMARELOS E VERIFICAÇÃO POR DATA
 # =============================================
 def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
-    """
-    Reinicializa os cartões a partir de um DataFrame de estatísticas por partida.
-    Lógica:
-      - Amarelos acumulam até 3. Ao atingir 3, jogador fica suspenso (suspenso_proxima=True)
-        e data_suspensao = data do 3º amarelo.
-      - Vermelho direto também suspende e zera o contador de amarelos,
-        mas o vermelho é registrado e não impede novas contagens.
-      - Na verificação final, para cada jogador suspenso:
-        * Se a data de suspensão for anterior a hoje, procura a próxima partida no cronograma
-          após essa data. Se a próxima partida já passou e o jogador não jogou nela,
-          a suspensão é cumprida.
-        * Se não houver cronograma, usa fallback de 7 dias.
-      - Agora também conta vermelhos (armazena no campo 'total_vermelhos').
-    """
     if df.empty:
         return {}, {}
 
-    # Converte data_jogo para datetime
-    if 'data_jogo' in df.columns:
-        df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
-        df = df.dropna(subset=['data_jogo'])
-
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Obtém todas as datas de jogos únicas do CSV (ordem cronológica)
-    todas_datas = sorted(df['data_jogo'].dt.strftime('%Y-%m-%d').unique())
+    df_crono = carregar_cronograma(categoria.capitalize())
+    if not df_crono.empty and 'data' in df_crono.columns:
+        df_crono['data'] = pd.to_datetime(df_crono['data'], errors='coerce')
+        datas_validas = df_crono['data'].dropna()
+        datas_cronograma = sorted(datas_validas.dt.strftime('%Y-%m-%d').tolist())
+    else:
+        datas_cronograma = []
 
     cartoes = {}
     datas_globais = {}
-    jogador_datas = {}  # datas em que o jogador jogou (YYYY-MM-DD)
+    jogador_datas = {}
 
     for _, row in df.iterrows():
-        # ============================================================
-        # IDENTIFICA O JOGADOR (prioriza 'jogador' = apelido)
-        # ============================================================
         nome = row.get('jogador')
         if pd.isna(nome) or str(nome).strip() == '':
             nome = row.get('nome_completo')
@@ -1361,17 +1278,27 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             continue
         nome = str(nome).strip()
 
-        data_dt = row.get('data_jogo')
-        if pd.isna(data_dt):
-            continue
-        data = data_dt.strftime('%Y-%m-%d')
+        data_raw = row.get('data_jogo') or row.get('data')
+        if data_raw:
+            try:
+                if isinstance(data_raw, pd.Timestamp):
+                    data = data_raw.strftime('%Y-%m-%d')
+                elif '/' in str(data_raw):
+                    dt = datetime.strptime(str(data_raw).strip(), "%d/%m/%Y")
+                    data = dt.strftime('%Y-%m-%d')
+                else:
+                    dt = pd.to_datetime(data_raw, dayfirst=True)
+                    data = dt.strftime('%Y-%m-%d')
+            except:
+                try:
+                    dt = pd.to_datetime(data_raw)
+                    data = dt.strftime('%Y-%m-%d')
+                except:
+                    data = str(data_raw).strip()
+            if nome not in jogador_datas:
+                jogador_datas[nome] = set()
+            jogador_datas[nome].add(data)
 
-        # Registra que o jogador jogou nesta data
-        if nome not in jogador_datas:
-            jogador_datas[nome] = set()
-        jogador_datas[nome].add(data)
-
-        # Inicializa estrutura do jogador
         if nome not in cartoes:
             id_ogol = row.get('id_ogol_jogador')
             if pd.isna(id_ogol):
@@ -1381,10 +1308,10 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     id_ogol = str(int(float(id_ogol))) if not pd.isna(id_ogol) else None
                 except:
                     id_ogol = None
+
             cartoes[nome] = {
                 'amarelos': 0,
                 'vermelho': False,
-                'total_vermelhos': 0,          # <-- NOVO: contador de vermelhos
                 'suspenso_proxima': False,
                 'historico': [],
                 'id_ogol': id_ogol,
@@ -1399,7 +1326,7 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         amarelos = int(row.get('cartoes_amarelos', 0))
         vermelhos = int(row.get('cartoes_vermelhos', 0))
 
-        # --- PROCESSAR AMARELOS ---
+        # --- Amarelos ---
         if amarelos > 0:
             for _ in range(amarelos):
                 cartoes[nome]['historico'].append({
@@ -1422,11 +1349,10 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     cartoes[nome]['data_suspensao'] = data
                     cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # --- PROCESSAR VERMELHOS ---
+        # --- Vermelhos ---
         if vermelhos > 0:
             for _ in range(vermelhos):
                 cartoes[nome]['vermelho'] = True
-                cartoes[nome]['total_vermelhos'] += 1  # <-- INCREMENTA CONTADOR DE VERMELHOS
                 cartoes[nome]['historico'].append({
                     'data': data,
                     'adversario': adversario,
@@ -1442,21 +1368,17 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 cartoes[nome]['data_suspensao'] = data
                 cartoes[nome]['suspensoes_cumpridas'] = 0
 
-        # Atualiza amarelos atuais
         cartoes[nome]['amarelos'] = cartoes[nome]['contador_amarelos_desde_reset']
         if cartoes[nome]['vermelho']:
             cartoes[nome]['suspenso_proxima'] = True
 
-        # Datas globais (apenas se tiver id_ogol)
-        if cartoes[nome]['id_ogol']:
-            if cartoes[nome]['id_ogol'] not in datas_globais:
-                datas_globais[cartoes[nome]['id_ogol']] = []
-            if data not in datas_globais[cartoes[nome]['id_ogol']]:
-                datas_globais[cartoes[nome]['id_ogol']].append(data)
+        id_ogol = cartoes[nome]['id_ogol']
+        if id_ogol:
+            if id_ogol not in datas_globais:
+                datas_globais[id_ogol] = []
+            if data not in datas_globais[id_ogol]:
+                datas_globais[id_ogol].append(data)
 
-    # ============================================================
-    # VERIFICAÇÃO FINAL: cumprimento de suspensões
-    # ============================================================
     hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 
     for nome, dados in cartoes.items():
@@ -1467,29 +1389,24 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
         if not data_susp:
             continue
 
-        # Converte data de suspensão para date
         try:
             dt_susp = datetime.strptime(data_susp, "%Y-%m-%d").date()
         except:
             continue
 
-        # Encontra a próxima data de jogo (do CSV) após a data de suspensão
         data_proximo_jogo = None
-        for d in todas_datas:
-            if d > data_susp:
-                data_proximo_jogo = datetime.strptime(d, "%Y-%m-%d").date()
-                break
+        if datas_cronograma:
+            datas_futuras = [d for d in datas_cronograma if d > data_susp]
+            if datas_futuras:
+                data_proximo_jogo_str = datas_futuras[0]
+                data_proximo_jogo = datetime.strptime(data_proximo_jogo_str, "%Y-%m-%d").date()
 
-        # Se não houver próxima partida (fim da temporada), a suspensão não é cumprida ainda
         if data_proximo_jogo is None:
-            continue
+            data_proximo_jogo = dt_susp + timedelta(days=7)
 
-        # Se a próxima partida já passou
         if data_proximo_jogo < hoje:
             data_str_prox = data_proximo_jogo.strftime("%Y-%m-%d")
-            # Verifica se o jogador jogou nessa data
             if data_str_prox not in jogador_datas.get(nome, set()):
-                # === SUSPENSÃO CUMPRIDA ===
                 cartoes[nome]['historico'].append({
                     'data': data_str_prox,
                     'adversario': 'Suspensão cumprida (não jogou)',
@@ -1501,7 +1418,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                     'fase': '',
                     'observacao': f"Suspensão cumprida em {data_str_prox}"
                 })
-                # Reseta estado (mantém total_vermelhos)
                 cartoes[nome]['contador_amarelos_desde_reset'] = 0
                 cartoes[nome]['amarelos'] = 0
                 cartoes[nome]['suspenso_proxima'] = False
@@ -1671,7 +1587,7 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
     return cartoes, datas_globais
 
 # =============================================
-# ESTATÍSTICAS DE PARTIDAS (CORRIGIDO PARA CAMINHOS ABSOLUTOS)
+# ESTATÍSTICAS DE PARTIDAS
 # =============================================
 def listar_arquivos_estatisticas(categoria="Profissional") -> List[str]:
     if categoria == "Profissional":
@@ -1695,7 +1611,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
     if not arquivo:
         return pd.DataFrame()
 
-    # Tenta caminhos relativos primeiro
     caminho = os.path.join(
         PASTA_ESTATISTICAS_PROFISSIONAL if categoria == "Profissional" else
         PASTA_ESTATISTICAS_SUB15 if categoria == "Sub-15" else
@@ -1707,7 +1622,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         if os.path.exists(fallback):
             caminho = fallback
         else:
-            # Tenta caminho absoluto baseado no diretório do script (para uso fora do Streamlit)
             script_dir = Path(__file__).resolve().parent
             abs_caminho = script_dir / "data" / "estatisticas_jogadores" / arquivo
             if abs_caminho.exists():
@@ -1725,69 +1639,51 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
-    """
-    Adiciona colunas de estatísticas de partidas ao DataFrame do elenco,
-    evitando duplicatas e sufixos _x/_y.
-    Se df_stats_partidas estiver vazio ou sem colunas, apenas adiciona colunas zeradas.
-    """
-    # Cria uma cópia para não alterar o original
-    df_merged = df.copy()
-
-    # Se não houver estatísticas ou estiver vazio, adiciona colunas zeradas
     if df_stats_partidas.empty:
         for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-            df_merged[col] = 0
-        return df_merged
+            if col not in df.columns:
+                df[col] = 0
+        return df
 
-    # Verifica se as colunas necessárias existem em df_stats_partidas
     colunas_necessarias = ['starts', 'jogos_90min', 'minutos_totais']
     colunas_presentes = [col for col in colunas_necessarias if col in df_stats_partidas.columns]
     if not colunas_presentes:
-        # Se nenhuma coluna estiver presente, adiciona colunas zeradas
         for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-            df_merged[col] = 0
-        return df_merged
+            if col not in df.columns:
+                df[col] = 0
+        return df
 
-    # Cria uma coluna 'nome_canonico' no df (usando apelido)
+    df_merged = df.copy()
+
     if 'apelido' in df_merged.columns:
         df_merged['nome_canonico'] = df_merged['apelido'].apply(mapear_nome_para_canonico)
     else:
         df_merged['nome_canonico'] = None
 
-    # Prepara as estatísticas
     df_stats = df_stats_partidas.copy()
-    # Renomeia 'minutos_totais' para 'minutos_totais_partidas' se existir
     if 'minutos_totais' in df_stats.columns:
         df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
 
-    # Cria coluna 'jogador_canonico' nas estatísticas (se não existir)
     if 'jogador_canonico' not in df_stats.columns:
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
         elif 'nome_completo' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['nome_completo'].apply(mapear_nome_para_canonico)
         else:
-            # Se não houver coluna de nome, não faz merge
             for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
-                df_merged[col] = 0
+                if col not in df_merged.columns:
+                    df_merged[col] = 0
             return df_merged
 
-    # Seleciona apenas as colunas necessárias para o merge
     colunas_merge = ['jogador_canonico', 'starts', 'jogos_90min']
     if 'minutos_totais_partidas' in df_stats.columns:
         colunas_merge.append('minutos_totais_partidas')
     df_stats = df_stats[colunas_merge]
-
-    # Remove linhas com 'jogador_canonico' vazio
     df_stats = df_stats.dropna(subset=['jogador_canonico'])
 
-    # Merge (left join)
     df_merged = df_merged.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
-
-    # Remove colunas auxiliares
     df_merged.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore', inplace=True)
 
-    # Preenche NaN com 0 para as colunas de estatísticas
     for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
         if col in df_merged.columns:
             df_merged[col] = df_merged[col].fillna(0).astype(int)

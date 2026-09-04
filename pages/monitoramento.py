@@ -17,9 +17,9 @@ from utils import (
     mapear_nome_para_canonico,
     inicializar_banco,
     jogador_suspenso,
-    obter_caminho_foto,          # para fotos dos jogadores
-    obter_caminho_foto_arbitro,  # para fotos dos árbitros
-    normalizar_texto,            # <-- CORREÇÃO: importado
+    obter_caminho_foto,
+    obter_caminho_foto_arbitro,
+    normalizar_texto,
 )
 
 # ============================================================
@@ -299,58 +299,40 @@ def obter_staff_completo(time_id, competicao_id=None):
         c.setdefault('cargo', 'Membro')
     return tecnicos + comissao
 
-def caminho_foto_membro(membro):
-    """
-    Busca a foto de um membro da comissão ou técnico.
-    Prioriza:
-      1. O caminho exato da coluna 'foto'
-      2. Busca pelo apelido ou nome em pastas específicas
-      3. Busca recursiva em 'assets/fotos_comissao/' e 'assets/fotos_tecnicos/'
-    """
-    # 1. Tenta usar a coluna 'foto' (se existir)
-    foto = membro.get('foto')
-    if foto and pd.notna(foto) and str(foto).strip():
-        caminho = str(foto).strip()
-        if os.path.exists(caminho):
-            return os.path.abspath(caminho)
+# ============================================================
+# FUNÇÃO DE CAMINHO PARA FOTOS DO STAFF
+# ============================================================
+PASTA_FOTOS_COMISSAO = "assets/fotos_comissao/"
+PASTA_FOTOS_TECNICOS = "assets/fotos_tecnicos/"
 
-    # 2. Obtém o nome (prioriza apelido, depois nome)
-    nome = membro.get('apelido') or membro.get('nome')
-    if not nome:
+def caminho_foto_membro(membro):
+    """Busca a foto de um membro da comissão ou técnico."""
+    foto = membro.get('foto', '')
+    if not foto:
         return None
 
-    # Normaliza o nome (remove acentos, espaços -> _)
-    nome_clean = normalizar_texto(nome).replace(' ', '_')
-    extensoes = ['.png', '.jpg', '.jpeg']
+    if foto.startswith('C:') or '\\' in foto:
+        nome_arquivo = os.path.basename(foto)
+    else:
+        nome_arquivo = foto
 
-    # Pastas para procurar (ordem de prioridade)
     pastas = [
-        "assets/fotos_comissao/",
-        "assets/fotos_tecnicos/",
-        "fotos/",                     # fallback na raiz
-        "assets/fotos/",              # fallback genérico
+        PASTA_FOTOS_COMISSAO,
+        PASTA_FOTOS_TECNICOS,
+        "assets/fotos/",
+        "fotos/",
     ]
 
     for pasta in pastas:
-        for ext in extensoes:
-            # Tenta com o nome original (sem normalizar)
-            caminho = os.path.join(pasta, f"{nome}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
-            # Tenta com o nome normalizado
-            caminho = os.path.join(pasta, f"{nome_clean}{ext}")
-            if os.path.exists(caminho):
-                return os.path.abspath(caminho)
+        caminho = os.path.join(pasta, nome_arquivo)
+        if os.path.exists(caminho):
+            return caminho
 
-    # 3. Busca recursiva nas pastas (caso o arquivo esteja em subpastas)
     for pasta in pastas:
         if os.path.exists(pasta):
             for root, dirs, files in os.walk(pasta):
-                for ext in extensoes:
-                    if f"{nome}{ext}" in files:
-                        return os.path.join(root, f"{nome}{ext}")
-                    if f"{nome_clean}{ext}" in files:
-                        return os.path.join(root, f"{nome_clean}{ext}")
+                if nome_arquivo in files:
+                    return os.path.join(root, nome_arquivo)
     return None
 
 # ============================================================
@@ -388,7 +370,7 @@ def atualizar_arbitro_jogo(jogo_id, arbitro_id):
     conn.close()
 
 # ============================================================
-# FUNÇÃO AUXILIAR PARA MONTAR TIME (COM FOTOS)
+# FUNÇÃO AUXILIAR PARA MONTAR TIME
 # ============================================================
 def montar_time(df, formacao_str, cartoes, incluir_lesionados=False):
     if df.empty:
@@ -554,7 +536,7 @@ def show():
             col_foto, col_texto = st.columns([1, 3])
             with col_foto:
                 if foto_arb and os.path.exists(foto_arb):
-                    st.image(foto_arb, width=150)  # <-- TAMANHO 150px
+                    st.image(foto_arb, width=150)
                 else:
                     st.write("👤")
             with col_texto:
@@ -715,7 +697,6 @@ def show():
                 if foto and os.path.exists(foto):
                     st.image(foto, width=150)
                 else:
-                    # Tenta buscar pelo apelido
                     caminho = obter_caminho_foto(row, "Profissional")
                     if caminho and os.path.exists(caminho):
                         st.image(caminho, width=150)
@@ -780,7 +761,7 @@ def show():
                 with col_foto:
                     foto_path = caminho_foto_membro(membro)
                     if foto_path and os.path.exists(foto_path):
-                        st.image(foto_path, width=150)  # <-- TAMANHO 150px
+                        st.image(foto_path, width=150)
                     else:
                         st.write("📌")
                 with col_texto:
@@ -798,7 +779,7 @@ def show():
                 with col_foto:
                     foto_path = caminho_foto_membro(membro)
                     if foto_path and os.path.exists(foto_path):
-                        st.image(foto_path, width=150)  # <-- TAMANHO 150px
+                        st.image(foto_path, width=150)
                     else:
                         st.write("📌")
                 with col_texto:
