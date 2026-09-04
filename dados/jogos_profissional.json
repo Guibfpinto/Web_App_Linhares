@@ -137,7 +137,7 @@
       "fase": "1ª Fase"
     },
         {
-      "id_jogo": "",
+      "id_jogo": "12650865",
       "data_jogo": "05/09/2026",
       "horario": "16:00",
       "adversario": "Rive",
@@ -149,12 +149,12 @@
       "endereco": "R. Eupídio Quintino - Vargem Alta, ES, 29295-000",
       "cidade": "Vargem Alta",
       "slug": "2026-09-05-rive-linhares-fc",
-      "url_completa": "https://www.ogol.com.br/jogo/2026-09-05-rive-linhares-fc//performance",
+      "url_completa": "https://www.ogol.com.br/jogo/2026-09-05-rive-linhares-fc/12650865/performance",
       "competicao": "Capixabão Série B",
       "fase": "2ª Fase"
     },
             {
-      "id_jogo": "",
+      "id_jogo": "12650867",
       "data_jogo": "11/09/2026",
       "horario": "19:40",
       "adversario": "Rive",
@@ -165,8 +165,8 @@
       "estadio": "Estádio Conilon",
       "endereco": "Jaguaré, ES, 29950-000",
       "cidade": "Jaguaré",
-      "slug": "2026-09-12-linhares-fc-rive",
-      "url_completa": "https://www.ogol.com.br/jogo/2026-09-12-linhares-fc-rive//performance",
+      "slug": "2026-09-11-linhares-fc-rive",
+      "url_completa": "https://www.ogol.com.br/jogo/2026-09-11-linhares-fc-rive/12650867/performance",
       "competicao": "Capixabão Série B",
       "fase": "2ª Fase"
     }
