@@ -218,7 +218,7 @@ if os.path.exists(bg_path):
             background-color: #1a1a1a;
         }}
 
-        /* Container principal com opacidade 0.40 (40% opaco, 60% transparente) */
+        /* Container principal com opacidade 0.80 (80% opaco, 20% transparente) */
         .main > div {{
             background-color: rgba(0, 0, 0, 0.80) !important;
             padding: 2rem 2rem 2rem 2rem;
