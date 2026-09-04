@@ -200,7 +200,7 @@ st.markdown("""
 <style>
     /* Fundo da página com imagem background.png */
     .stApp {
-        background-image: url('background.png');
+        background-image: url('data/background.png');
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
