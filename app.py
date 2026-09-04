@@ -72,7 +72,7 @@ from utils import (
 )
 
 # ======================================================================
-# DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
+# DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO (MANTIDO)
 # ======================================================================
 TRADUCAO_ATRIBUTOS = {
     # Gerais
@@ -185,7 +185,7 @@ TRADUCAO_ATRIBUTOS = {
 }
 
 # ======================================================================
-# CONFIGURAÇÃO INICIAL & CSS PERSONALIZADO (UNIFICADO)
+# CONFIGURAÇÃO INICIAL
 # ======================================================================
 st.set_page_config(
     layout="wide",
@@ -194,183 +194,206 @@ st.set_page_config(
 )
 
 # ======================================================================
-# CSS ÚNICO - FUNDO, OPACIDADE 0.40, SEM SIDEBAR/HEADER/FOOTER, TEXTO BRANCO
+# CSS COM FUNDO BASE64 E OPACIDADE 0.40
 # ======================================================================
-st.markdown("""
-<style>
-    /* Fundo da página com imagem background.png */
-    .stApp {
-        background-image: url('data/background.png');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        background-color: #1a1a1a;
-    }
+def get_base64_image(image_path):
+    """Lê a imagem e retorna a string base64."""
+    with open(image_path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
 
-    /* Container principal com opacidade 0.40 */
-    .main > div {
-        background-color: rgba(0, 0, 0, 0.40) !important;
-        padding: 2rem;
-        border-radius: 12px;
-        color: white !important;
-    }
+bg_path = "data/background.png"  # caminho relativo à raiz do projeto
 
-    /* Remover cabeçalho, menu, rodapé e sidebar */
-    header {
-        display: none !important;
-    }
-    #MainMenu {
-        display: none !important;
-    }
-    footer {
-        display: none !important;
-    }
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
+if os.path.exists(bg_path):
+    b64_bg = get_base64_image(bg_path)
+    st.markdown(f"""
+    <style>
+        /* Fundo da página com imagem base64 */
+        .stApp {{
+            background-image: url("data:image/png;base64,{b64_bg}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-color: #1a1a1a;
+        }}
 
-    /* Container principal ocupa toda a largura */
-    .main .block-container {
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        max-width: 100% !important;
-    }
+        /* Container principal com opacidade 0.40 (40% opaco, 60% transparente) */
+        .main > div {{
+            background-color: rgba(0, 0, 0, 0.40) !important;
+            padding: 2rem 2rem 2rem 2rem;
+            border-radius: 12px;
+            color: white !important;
+        }}
 
-    /* Força cor branca em todos os textos */
-    .main, .main * {
-        color: white !important;
-    }
+        /* Remover cabeçalho, menu, rodapé e sidebar */
+        header {{
+            display: none !important;
+        }}
+        #MainMenu {{
+            display: none !important;
+        }}
+        footer {{
+            display: none !important;
+        }}
+        [data-testid="stSidebar"] {{
+            display: none !important;
+        }}
 
-    /* Botões com fundo translúcido e texto branco */
-    .stButton button {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-    }
-    .stButton button:hover {
-        background-color: rgba(255, 255, 255, 0.25) !important;
-        color: white !important;
-        border-color: rgba(255, 255, 255, 0.5) !important;
-    }
+        /* Container principal ocupa toda a largura */
+        .main .block-container {{
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            max-width: 100% !important;
+        }}
 
-    /* Inputs, selects e áreas de texto */
-    .stTextInput input, .stSelectbox select, .stNumberInput input,
-    .stDateInput input, .stTextArea textarea {
-        background-color: rgba(255, 255, 255, 0.12) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 4px;
-    }
-    .stTextInput input::placeholder, .stTextArea textarea::placeholder {
-        color: #cccccc !important;
-    }
-    .stTextInput input:focus, .stSelectbox select:focus,
-    .stNumberInput input:focus, .stDateInput input:focus,
-    .stTextArea textarea:focus {
-        border-color: rgba(255, 255, 255, 0.6) !important;
-        background-color: rgba(255, 255, 255, 0.18) !important;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
-    }
+        /* Força cor branca em todos os textos */
+        .main, .main * {{
+            color: white !important;
+        }}
 
-    /* Selectbox dropdown */
-    .stSelectbox div[data-baseweb="select"] {
-        background-color: rgba(0, 0, 0, 0.8) !important;
-        color: white !important;
-    }
+        /* Botões com fundo translúcido e texto branco */
+        .stButton button {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }}
+        .stButton button:hover {{
+            background-color: rgba(255, 255, 255, 0.25) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+        }}
 
-    /* Tabelas (DataFrames) */
-    .dataframe, .stDataFrame {
-        background-color: rgba(0, 0, 0, 0.5) !important;
-        color: white !important;
-    }
-    .dataframe thead th, .stDataFrame thead th {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        color: white !important;
-        border-color: rgba(255, 255, 255, 0.2) !important;
-    }
-    .dataframe tbody td, .stDataFrame tbody td {
-        color: white !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
-    }
+        /* Inputs, selects e áreas de texto */
+        .stTextInput input, .stSelectbox select, .stNumberInput input,
+        .stDateInput input, .stTextArea textarea {{
+            background-color: rgba(255, 255, 255, 0.12) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 4px;
+        }}
+        .stTextInput input::placeholder, .stTextArea textarea::placeholder {{
+            color: #cccccc !important;
+        }}
+        .stTextInput input:focus, .stSelectbox select:focus,
+        .stNumberInput input:focus, .stDateInput input:focus,
+        .stTextArea textarea:focus {{
+            border-color: rgba(255, 255, 255, 0.6) !important;
+            background-color: rgba(255, 255, 255, 0.18) !important;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+        }}
 
-    /* Alertas */
-    .stAlert {
-        background-color: rgba(0, 0, 0, 0.65) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        border-radius: 6px !important;
-    }
-    .stAlert .stAlertContent {
-        color: white !important;
-    }
-    .stAlert .stAlertIcon {
-        color: white !important;
-    }
+        /* Selectbox dropdown */
+        .stSelectbox div[data-baseweb="select"] {{
+            background-color: rgba(0, 0, 0, 0.8) !important;
+            color: white !important;
+        }}
 
-    /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: white !important;
-        border-radius: 6px !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-    .streamlit-expanderHeader:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-    }
-    .streamlit-expanderContent {
-        background-color: rgba(0, 0, 0, 0.3) !important;
-        color: white !important;
-        border-radius: 0 0 6px 6px !important;
-        border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
+        /* Tabelas (DataFrames) */
+        .dataframe, .stDataFrame {{
+            background-color: rgba(0, 0, 0, 0.5) !important;
+            color: white !important;
+        }}
+        .dataframe thead th, .stDataFrame thead th {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }}
+        .dataframe tbody td, .stDataFrame tbody td {{
+            color: white !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }}
 
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: white !important;
-        border-radius: 4px 4px 0 0 !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-bottom: none !important;
-        padding: 8px 16px !important;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
-    }
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: rgba(0, 0, 0, 0.3) !important;
-        color: white !important;
-        padding: 16px !important;
-        border-radius: 0 0 6px 6px !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-top: none !important;
-    }
+        /* Alertas */
+        .stAlert {{
+            background-color: rgba(0, 0, 0, 0.65) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 6px !important;
+        }}
+        .stAlert .stAlertContent {{
+            color: white !important;
+        }}
+        .stAlert .stAlertIcon {{
+            color: white !important;
+        }}
 
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-</style>
-""", unsafe_allow_html=True)
+        /* Expanders */
+        .streamlit-expanderHeader {{
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: white !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }}
+        .streamlit-expanderHeader:hover {{
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }}
+        .streamlit-expanderContent {{
+            background-color: rgba(0, 0, 0, 0.3) !important;
+            color: white !important;
+            border-radius: 0 0 6px 6px !important;
+            border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }}
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {{
+            gap: 8px;
+        }}
+        .stTabs [data-baseweb="tab"] {{
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: white !important;
+            border-radius: 4px 4px 0 0 !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-bottom: none !important;
+            padding: 8px 16px !important;
+        }}
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+        }}
+        .stTabs [data-baseweb="tab-panel"] {{
+            background-color: rgba(0, 0, 0, 0.3) !important;
+            color: white !important;
+            padding: 16px !important;
+            border-radius: 0 0 6px 6px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-top: none !important;
+        }}
+
+        /* Scrollbar personalizada */
+        ::-webkit-scrollbar {{
+            width: 8px;
+        }}
+        ::-webkit-scrollbar-track {{
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }}
+        ::-webkit-scrollbar-thumb {{
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }}
+        ::-webkit-scrollbar-thumb:hover {{
+            background: rgba(255, 255, 255, 0.3);
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    # Fallback caso a imagem não seja encontrada
+    st.warning("Imagem de fundo (data/background.png) não encontrada. Usando fundo escuro.")
+    st.markdown("""
+    <style>
+        .stApp { background-color: #1a1a1a; }
+        .main > div { background-color: rgba(0,0,0,0.8); padding: 2rem; border-radius: 12px; color: white; }
+        header, #MainMenu, footer, [data-testid="stSidebar"] { display: none !important; }
+        .main .block-container { padding-top: 0; padding-bottom: 0; max-width: 100%; }
+        .main, .main * { color: white !important; }
+        /* ... restante dos estilos básicos ... */
+    </style>
+    """, unsafe_allow_html=True)
 
 # ======================================================================
 # FUNÇÃO UNIFICADA PARA BUSCAR FOTO (JOGADORES E COMISSÃO)
@@ -378,8 +401,6 @@ st.markdown("""
 def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
     """
     Busca a foto de um jogador ou membro da comissão usando a lógica mais robusta.
-    - Se tipo='jogador', usa obter_caminho_foto.
-    - Se tipo='comissao', usa lógica similar à do monitoramento (busca em subpastas, fallback para nome/apelido).
     """
     if tipo == 'jogador':
         return obter_caminho_foto(row, categoria)
@@ -399,7 +420,7 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
         nome_clean = normalizar_texto(base).replace(' ', '_')
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = script_dir  # app.py está na raiz, então script_dir já é o projeto
+        parent_dir = script_dir  # app.py está na raiz
 
         pastas_raiz = [
             "assets/fotos_comissao",
@@ -426,7 +447,6 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
                 caminho = os.path.join(pasta, f"{nome_clean}{ext}")
                 if os.path.exists(caminho):
                     return os.path.abspath(caminho)
-            # Glob
             import glob
             matches = glob.glob(os.path.join(pasta, f"{base}.*"))
             if matches:
@@ -435,7 +455,6 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
             if matches:
                 return os.path.abspath(matches[0])
 
-        # Busca recursiva
         pastas_recursivas = [
             os.path.join(parent_dir, "assets/fotos_comissao"),
             os.path.join(parent_dir, "assets/fotos_tecnicos"),
@@ -543,7 +562,6 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
     with st.expander(f"📋 DETALHES - {row.get('nome', row.get('apelido', 'Membro'))}", expanded=True):
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Usa a função unificada para comissão
             caminho_foto = buscar_foto_unificada(row, categoria, tipo='comissao')
             if caminho_foto and os.path.exists(caminho_foto):
                 try:
@@ -615,7 +633,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            # Usa a função unificada para jogador
             caminho_foto = buscar_foto_unificada(row, categoria, tipo='jogador')
             if caminho_foto and os.path.exists(caminho_foto):
                 try:
@@ -783,7 +800,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ======================================================================
-# CARREGAMENTO DE DADOS (CACHE) – TODAS AS CATEGORIAS
+# CARREGAMENTO DE DADOS (CACHE)
 # ======================================================================
 @st.cache_data
 def carregar_dfs():
@@ -802,12 +819,10 @@ def carregar_dfs():
         "cartoes_com_sub17": {},
     }
     try:
-        # Carrega elencos
         df_prof = carregar_elenco_profissional()
         df_sub15 = carregar_elenco_sub15()
         df_sub17 = carregar_elenco_sub17()
 
-        # Aplica lesões e bioimpedância
         if df_prof is not None and not df_prof.empty:
             df_prof = adicionar_coluna_lesionado(df_prof, 'profissional')
             bio_prof = carregar_dados_bioimpedancia('profissional')
@@ -825,12 +840,10 @@ def carregar_dfs():
         resultado["Sub-15"] = df_sub15
         resultado["Sub-17"] = df_sub17
 
-        # Comissão
         resultado["Comissão Profissional"] = carregar_comissao()
         resultado["Comissão Sub-15"] = carregar_comissao_sub15()
         resultado["Comissão Sub-17"] = carregar_comissao_sub17()
 
-        # Estatísticas de partidas
         from utils import carregar_estatisticas_partidas
         df_stats_prof = carregar_estatisticas_partidas("Profissional")
         df_stats_sub15 = carregar_estatisticas_partidas("Sub-15")
@@ -843,7 +856,6 @@ def carregar_dfs():
         if not df_stats_sub17.empty and df_sub17 is not None:
             resultado["Sub-17"] = precomputar_scores_posicionais(df_sub17, df_stats_sub17)
 
-        # Cartões
         for cat, key in [
             ('profissional', 'cartoes_prof'),
             ('sub15', 'cartoes_sub15'),
@@ -873,12 +885,11 @@ def get_df_cartoes(categoria):
     return dados.get(df_key), dados.get(cart_key, {})
 
 # ======================================================================
-# MENU SUPERIOR (NÃO HÁ SIDEBAR, USAMOS TABS PARA NAVEGAÇÃO)
+# MENU SUPERIOR
 # ======================================================================
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 st.caption(f"👤 Logado como: {st.session_state.usuario}")
 
-# Botão de logout
 if st.button("Sair"):
     st.session_state.authenticated = False
     st.rerun()
