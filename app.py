@@ -220,7 +220,7 @@ if os.path.exists(bg_path):
 
         /* Container principal com opacidade 0.40 (40% opaco, 60% transparente) */
         .main > div {{
-            background-color: rgba(0, 0, 0, 0.60) !important;
+            background-color: rgba(0, 0, 0, 0.80) !important;
             padding: 2rem 2rem 2rem 2rem;
             border-radius: 12px;
             color: white !important;
