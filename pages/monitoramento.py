@@ -166,10 +166,8 @@ def obter_detalhes_jogo_sql(fixture_id):
     }
 
 def obter_eventos_jogo_sql(fixture_id):
-    """Retorna eventos do jogo, sem depender da coluna time_id (que não existe)."""
     conn = conectar_banco()
     cursor = conn.cursor()
-    # Garante que a coluna 'fonte' existe
     garantir_coluna_fonte()
     cursor.execute("""
         SELECT e.*, el.nome AS jogador_nome, el.apelido AS jogador_apelido
@@ -188,7 +186,7 @@ def obter_eventos_jogo_sql(fixture_id):
             "type": d.get("tipo", ""),
             "detail": d.get("detalhes", ""),
             "player": {"name": d.get("jogador_nome") or d.get("jogador_apelido") or "Desconhecido"},
-            "team": {"name": ""},  # sem time_id, não temos o nome do time
+            "team": {"name": ""},
             "fonte": d.get("fonte", "api")
         })
     return eventos
@@ -293,40 +291,44 @@ def salvar_escalacao(jogo_id, titulares, reservas):
     conn.close()
 
 # ============================================================
-# FUNÇÕES DE EXIBIÇÃO DE FOTOS (STAFF E ÁRBITRO)
+# FUNÇÃO MELHORADA PARA BUSCAR FOTO DE MEMBRO DO STAFF
 # ============================================================
-import glob
-
 def caminho_foto_membro(membro):
     """
-    Busca a foto do membro da comissão técnica em várias pastas,
-    usando caminhos absolutos e relativos.
+    Busca a foto do membro da comissão técnica.
+    Estratégias:
+    1. Se o campo 'foto' for um caminho absoluto existente, usa-o.
+    2. Se o campo 'foto' for um nome de arquivo, procura nas pastas.
+    3. Se o campo 'foto' estiver vazio, tenta usar o nome do membro.
+    4. Usa glob para achar arquivos com qualquer extensão.
     """
+    # Primeiro, tenta usar o campo 'foto'
     foto = membro.get('foto', '')
-    if not foto:
-        # Se não tiver foto, tenta usar o nome do membro
+    nome_base = None
+
+    if foto:
+        # Se for caminho absoluto e existir, retorna
+        if os.path.isabs(foto) and os.path.exists(foto):
+            return foto
+        # Extrai o nome do arquivo
+        nome_base = os.path.basename(foto)
+    else:
+        # Se o campo 'foto' estiver vazio, tenta usar o nome ou apelido do membro
         nome_membro = membro.get('nome') or membro.get('apelido')
-        if not nome_membro:
-            return None
-        foto = nome_membro
+        if nome_membro:
+            nome_base = nome_membro
 
-    # Se já for um caminho absoluto existente, retorna
-    if os.path.isabs(foto) and os.path.exists(foto):
-        return foto
-
-    # Extrai o nome do arquivo (sem caminho)
-    nome_arquivo = os.path.basename(foto)
-    if not nome_arquivo:
+    if not nome_base:
         return None
 
-    # Remove extensão para tentar com várias
-    base, _ = os.path.splitext(nome_arquivo)
+    # Remove extensão se houver
+    base, _ = os.path.splitext(nome_base)
     nome_clean = normalizar_texto(base).replace(' ', '_')
 
     # Diretório base do script
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Pastas relativas ao script_dir (mais abrangente)
+    # Pastas relativas ao script_dir
     pastas_relativas = [
         "assets/fotos_comissao",
         "assets/fotos_tecnicos",
@@ -337,7 +339,7 @@ def caminho_foto_membro(membro):
         "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
 
-    # Pastas absolutas (fornecidas por você)
+    # Pastas absolutas (fornecidas pelo usuário)
     pastas_absolutas = [
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
@@ -345,25 +347,26 @@ def caminho_foto_membro(membro):
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
     ]
 
-    # Combina todas as pastas (absolutas e relativas)
+    # Combina todas as pastas
     pastas = pastas_absolutas + [os.path.join(script_dir, p) for p in pastas_relativas]
 
+    # Extensões comuns
     extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
     for pasta in pastas:
         if not os.path.isdir(pasta):
             continue
-        # 1. Tenta com o nome original + extensão
+        # Tenta com o nome original
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{base}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # 2. Tenta com o nome normalizado
+        # Tenta com o nome normalizado
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # 3. Tenta com glob (caso o nome tenha variações)
+        # Tenta com glob (caso tenha outras extensões ou variações)
         padrao = os.path.join(pasta, f"{base}.*")
         matches = glob.glob(padrao)
         if matches:
@@ -414,7 +417,6 @@ def obter_arbitro_por_id(arbitro_id):
 # PÁGINA PRINCIPAL
 # ============================================================
 def show():
-    # Garante que a coluna 'fonte' exista desde o início
     garantir_coluna_fonte()
 
     categoria = st.session_state.get("categoria_monitoramento", "Profissional")
@@ -559,7 +561,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # MONITORAMENTO AO VIVO (PRIORIDADE MÁXIMA)
+    # MONITORAMENTO AO VIVO
     # ============================================================
     st.subheader("🔴 Monitoramento Ao Vivo")
 
@@ -583,14 +585,19 @@ def show():
                 gols_fora_api = detalhes['goals']['away'] or 0
                 status_anterior = status
 
+                # Atualiza placar
                 if (gols_casa_api, gols_fora_api) != (gols_casa, gols_fora):
                     atualizar_placar_sqlite(jogo_selecionado_id, gols_casa_api, gols_fora_api)
+                    # Toca som de gol (se houve mudança)
                     if gols_casa_api > gols_casa:
-                        play_sound('gol_linhares' if team_id == jogo['time_casa_id'] else 'gol_adversario')
+                        time_marcador = jogo['time_casa_id']
+                        play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                     elif gols_fora_api > gols_fora:
-                        play_sound('gol_linhares' if team_id == jogo['time_fora_id'] else 'gol_adversario')
+                        time_marcador = jogo['time_fora_id']
+                        play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                     st.rerun()
 
+                # Atualiza status
                 status_api = detalhes['fixture']['status']['short']
                 if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
@@ -602,6 +609,7 @@ def show():
 
                 st.info(f"**Status:** {status_api} | **Minuto:** {detalhes['fixture']['status'].get('elapsed', 0)}")
 
+            # Busca eventos da API
             eventos_api = obter_eventos_jogo_sql(fixture_id)
             if eventos_api:
                 conn = conectar_banco()
@@ -610,11 +618,13 @@ def show():
                 for ev in eventos_api:
                     jogador_nome = ev.get('player', {}).get('name', '')
                     jogador_id = 0
+                    time_jogador_id = None
                     if jogador_nome:
-                        cursor.execute("SELECT id FROM elenco WHERE nome = ? OR apelido = ?", (jogador_nome, jogador_nome))
+                        cursor.execute("SELECT id, time_id FROM elenco WHERE nome = ? OR apelido = ?", (jogador_nome, jogador_nome))
                         jogador = cursor.fetchone()
                         if jogador:
                             jogador_id = jogador['id']
+                            time_jogador_id = jogador['time_id']
                     cursor.execute("""
                         SELECT id FROM eventos
                         WHERE jogo_id = ? AND tempo = ? AND tipo = ? AND jogador_id = ? AND fonte = 'api'
@@ -625,10 +635,13 @@ def show():
                             VALUES (?, ?, ?, ?, ?, 'api')
                         ''', (jogo_selecionado_id, ev['time']['elapsed'], ev['type'], jogador_id, ev.get('detail', '')))
                         novos_eventos += 1
+                        # Sons
                         tipo = ev['type'].lower()
                         if tipo == 'goal':
-                            # Não temos time_nome, mas podemos tocar som genérico
-                            play_sound('gol_linhares')  # ou 'gol_adversario' dependendo do time
+                            if time_jogador_id == team_id:
+                                play_sound('gol_linhares')
+                            else:
+                                play_sound('gol_adversario')
                         elif tipo == 'card':
                             play_sound('cartao')
                         else:
@@ -654,7 +667,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # REGISTRO MANUAL DE EVENTOS (FALLBACK)
+    # REGISTRO MANUAL DE EVENTOS
     # ============================================================
     st.subheader("📝 Registro Manual de Eventos (Fallback)")
     st.caption("Use esta seção apenas se a API não estiver fornecendo os dados corretamente.")
@@ -687,10 +700,11 @@ def show():
                 if tipo == 'Gol' and jogador_id != 0:
                     if time_jogador == jogo['time_casa_id']:
                         atualizar_placar_sqlite(jogo_selecionado_id, gols_casa + 1, gols_fora)
-                        play_sound('gol_linhares' if team_id == jogo['time_casa_id'] else 'gol_adversario')
+                        time_marcador = jogo['time_casa_id']
                     else:
                         atualizar_placar_sqlite(jogo_selecionado_id, gols_casa, gols_fora + 1)
-                        play_sound('gol_linhares' if team_id == jogo['time_fora_id'] else 'gol_adversario')
+                        time_marcador = jogo['time_fora_id']
+                    play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                 elif tipo == 'Cartão':
                     play_sound('cartao')
                 else:
@@ -704,7 +718,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # LISTA DE ÚLTIMOS EVENTOS (API + MANUAL)
+    # LISTA DE ÚLTIMOS EVENTOS
     # ============================================================
     conn = conectar_banco()
     try:
@@ -732,7 +746,7 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # ESCALAÇÃO MANUAL
+    # ESCALAÇÃO
     # ============================================================
     st.subheader("📋 Escalação")
 
