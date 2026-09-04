@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import random
 import base64
+import glob
 from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
 from utils import (
@@ -294,10 +295,12 @@ def salvar_escalacao(jogo_id, titulares, reservas):
 # ============================================================
 # FUNÇÕES DE EXIBIÇÃO DE FOTOS (STAFF E ÁRBITRO)
 # ============================================================
+import glob
+
 def caminho_foto_membro(membro):
     """
     Busca a foto do membro da comissão técnica em várias pastas,
-    usando caminhos absolutos relativos ao diretório do script.
+    usando caminhos absolutos e relativos.
     """
     foto = membro.get('foto', '')
     if not foto:
@@ -319,32 +322,52 @@ def caminho_foto_membro(membro):
     # Diretório base do script
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Pastas relativas ao script_dir (incluindo as fornecidas pelo usuário)
+    # Pastas relativas ao script_dir (mais abrangente)
     pastas_relativas = [
         "assets/fotos_comissao",
         "assets/fotos_tecnicos",
         "fotos",
-        "assets/fotos_jogadores",  # opcional
+        "assets/fotos_jogadores",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
 
-    # Converte para caminhos absolutos
-    pastas = [os.path.join(script_dir, p) for p in pastas_relativas]
+    # Pastas absolutas (fornecidas por você)
+    pastas_absolutas = [
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
+    ]
 
-    extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+    # Combina todas as pastas (absolutas e relativas)
+    pastas = pastas_absolutas + [os.path.join(script_dir, p) for p in pastas_relativas]
+
+    extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
     for pasta in pastas:
         if not os.path.isdir(pasta):
             continue
-        # Tenta com o nome original
+        # 1. Tenta com o nome original + extensão
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{base}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
-        # Tenta com o nome normalizado
+        # 2. Tenta com o nome normalizado
         for ext in extensoes:
             caminho = os.path.join(pasta, f"{nome_clean}{ext}")
             if os.path.exists(caminho):
                 return os.path.abspath(caminho)
+        # 3. Tenta com glob (caso o nome tenha variações)
+        padrao = os.path.join(pasta, f"{base}.*")
+        matches = glob.glob(padrao)
+        if matches:
+            return os.path.abspath(matches[0])
+        padrao_clean = os.path.join(pasta, f"{nome_clean}.*")
+        matches = glob.glob(padrao_clean)
+        if matches:
+            return os.path.abspath(matches[0])
 
     return None
 
