@@ -69,6 +69,7 @@ from utils import (
     inicializar_banco,
     carregar_cronograma,
     normalizar_texto,
+    sanitizar_dataframe,  # nova função exportada
 )
 
 # ======================================================================
@@ -602,9 +603,8 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = pd.DataFrame(historico)
-                # Garante que a coluna 'fase' seja string para evitar erro de Arrow
-                if 'fase' in df_hist.columns:
-                    df_hist['fase'] = df_hist['fase'].astype(str)
+                # Sanitiza para evitar erro de Arrow
+                df_hist = sanitizar_dataframe(df_hist)
                 st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
             else:
                 st.info("Nenhum cartão registrado.")
@@ -746,9 +746,8 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = pd.DataFrame(historico)
-                # Garante que a coluna 'fase' seja string para evitar erro de Arrow
-                if 'fase' in df_hist.columns:
-                    df_hist['fase'] = df_hist['fase'].astype(str)
+                # Sanitiza para evitar erro de Arrow
+                df_hist = sanitizar_dataframe(df_hist)
                 st.dataframe(df_hist[['data','adversario','cor','terceiro_amarelo','suspenso_causada','suspenso_cumprida']], width='stretch')
             else:
                 st.info("Nenhum cartão registrado.")
@@ -957,7 +956,9 @@ with tabs[0]:
 
         if opcao_analise == "Lista resumida":
             cols = ['nome_completo','apelido','Posicao_Principal','Idade','Rating_Geral_FM26','Estado_Fisico']
-            st.dataframe(df_analise[[c for c in cols if c in df_analise.columns]])
+            df_exib = df_analise[[c for c in cols if c in df_analise.columns]]
+            df_exib = sanitizar_dataframe(df_exib)
+            st.dataframe(df_exib, width='stretch')
 
         elif opcao_analise == "Detalhes do jogador":
             col_nome = None
@@ -985,15 +986,21 @@ with tabs[0]:
             for estado in sorted(df_analise['Estado_Fisico'].unique()):
                 grupo = df_analise[df_analise['Estado_Fisico'] == estado]
                 st.write(f"**{estado}** ({len(grupo)} jogadores)")
-                st.dataframe(grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']])
+                df_grupo = grupo[['nome_completo','apelido','IMC','Gordura_Corporal_%']]
+                df_grupo = sanitizar_dataframe(df_grupo)
+                st.dataframe(df_grupo, width='stretch')
 
         elif opcao_analise == "Origem (UF/País)":
             st.subheader("Distribuição por UF")
             if 'uf_nascimento' in df_analise.columns:
-                st.dataframe(df_analise['uf_nascimento'].value_counts())
+                df_uf = df_analise['uf_nascimento'].value_counts().reset_index()
+                df_uf = sanitizar_dataframe(df_uf)
+                st.dataframe(df_uf, width='stretch')
             st.subheader("Por País")
             if 'pais_nascimento' in df_analise.columns:
-                st.dataframe(df_analise['pais_nascimento'].value_counts())
+                df_pais = df_analise['pais_nascimento'].value_counts().reset_index()
+                df_pais = sanitizar_dataframe(df_pais)
+                st.dataframe(df_pais, width='stretch')
 
         elif opcao_analise == "Recomendações":
             st.subheader("🔍 Recomendações")
@@ -1007,11 +1014,15 @@ with tabs[0]:
             criticos = df_analise[df_analise['Estado_Fisico'] == 'Crítico']
             if not criticos.empty:
                 st.error("Jogadores com condição crítica:")
-                st.dataframe(criticos[['nome_completo','Estado_Fisico','IMC','Gordura_Corporal_%']])
+                df_crit = criticos[['nome_completo','Estado_Fisico','IMC','Gordura_Corporal_%']]
+                df_crit = sanitizar_dataframe(df_crit)
+                st.dataframe(df_crit, width='stretch')
             jovens = df_analise[(df_analise['Idade'] < 20) & (df_analise['Rating_Geral_FM26'] >= 70)]
             if not jovens.empty:
                 st.success("🌟 Jovens promessas:")
-                st.dataframe(jovens[['nome_completo','Idade','Rating_Geral_FM26']])
+                df_jov = jovens[['nome_completo','Idade','Rating_Geral_FM26']]
+                df_jov = sanitizar_dataframe(df_jov)
+                st.dataframe(df_jov, width='stretch')
 
         elif opcao_analise == "Comparar categorias":
             comp_texto = "Comparação entre categorias:\n\n"
@@ -1025,7 +1036,9 @@ with tabs[0]:
 
         elif opcao_analise == "Filtrar por posição":
             pos = st.selectbox("Posição", df_analise['Posicao_Principal'].unique())
-            st.dataframe(df_analise[df_analise['Posicao_Principal'] == pos][['nome_completo','apelido','Idade','Rating_Geral_FM26']])
+            df_filt = df_analise[df_analise['Posicao_Principal'] == pos][['nome_completo','apelido','Idade','Rating_Geral_FM26']]
+            df_filt = sanitizar_dataframe(df_filt)
+            st.dataframe(df_filt, width='stretch')
 
         elif opcao_analise == "Filtrar por idade":
             faixa = st.selectbox("Faixa", ["<20", "21-29", "≥30"])
@@ -1035,11 +1048,15 @@ with tabs[0]:
                 filtro = df_analise[(df_analise['Idade'] >= 21) & (df_analise['Idade'] <= 29)]
             else:
                 filtro = df_analise[df_analise['Idade'] >= 30]
-            st.dataframe(filtro[['nome_completo','Idade','Posicao_Principal']])
+            df_filt = filtro[['nome_completo','Idade','Posicao_Principal']]
+            df_filt = sanitizar_dataframe(df_filt)
+            st.dataframe(df_filt, width='stretch')
 
         elif opcao_analise == "Filtrar por rating":
             min_rating = st.slider("Rating mínimo", 0, 100, 70)
-            st.dataframe(df_analise[df_analise['Rating_Geral_FM26'] >= min_rating][['nome_completo','Rating_Geral_FM26','Posicao_Principal']])
+            df_filt = df_analise[df_analise['Rating_Geral_FM26'] >= min_rating][['nome_completo','Rating_Geral_FM26','Posicao_Principal']]
+            df_filt = sanitizar_dataframe(df_filt)
+            st.dataframe(df_filt, width='stretch')
 
         elif opcao_analise == "Listar lesionados":
             lesionados = df_analise[df_analise['lesionado'] == True]
@@ -1072,7 +1089,9 @@ with tabs[1]:
             df_com_filtrado = df_com
         
         cols_exibicao = [c for c in ['apelido', 'cargo', 'idade', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento'] if c in df_com_filtrado.columns]
-        st.dataframe(df_com_filtrado[cols_exibicao] if cols_exibicao else df_com_filtrado, width='stretch')
+        df_exib = df_com_filtrado[cols_exibicao] if cols_exibicao else df_com_filtrado
+        df_exib = sanitizar_dataframe(df_exib)
+        st.dataframe(df_exib, width='stretch')
         
         if not df_com_filtrado.empty:
             if 'apelido' in df_com_filtrado.columns:

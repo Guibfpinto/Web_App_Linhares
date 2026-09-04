@@ -157,6 +157,30 @@ ATRIBUTOS_FM26 = [
 ]
 
 # =============================================
+# FUNÇÃO PARA SANITIZAR DATAFRAMES (EVITA ERRO DE ARROW)
+# =============================================
+def sanitizar_dataframe(df):
+    """
+    Converte todas as colunas de tipo object para string,
+    e transforma listas em string separada por vírgulas.
+    Isso evita erros de serialização com Arrow.
+    """
+    if df is None or df.empty:
+        return df
+    df = df.copy()
+    for col in df.columns:
+        # Se a coluna for object (inclui listas, misturas)
+        if df[col].dtype == object:
+            # Converte para string, tratando listas
+            df[col] = df[col].apply(
+                lambda x: ', '.join(x) if isinstance(x, list) else (str(x) if pd.notna(x) else '')
+            )
+        # Se for categórica, converter para string também
+        elif pd.api.types.is_categorical_dtype(df[col]):
+            df[col] = df[col].astype(str)
+    return df
+
+# =============================================
 # FUNÇÕES AUXILIARES BÁSICAS
 # =============================================
 def calcular_idade(data_nasc_str, data_referencia=None):
@@ -1633,6 +1657,10 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
         if 'data_jogo' in df.columns:
             df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
+        # Garantir que colunas problemáticas sejam string para evitar erro de Arrow
+        for col in ['fase', 'competicao', 'adversario', 'jogador']:
+            if col in df.columns:
+                df[col] = df[col].astype(str)
         return df
     except Exception as e:
         print(f"Erro ao carregar {caminho}: {e}")
