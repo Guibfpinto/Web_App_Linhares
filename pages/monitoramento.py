@@ -6,6 +6,7 @@ import os
 import random
 import base64
 import glob
+import json
 from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
 from utils import (
@@ -31,10 +32,9 @@ SOUNDS_DIR = "assets/sounds/"
 SOUND_FILES = {
     "gol_linhares": "gol_linhares.wav",
     "gol_adversario": "gol_adversario.wav",
-    "cartao": "falta.wav",          # cartão amarelo/vermelho
+    "cartao": "falta.wav",
     "inicio": "inicio_tempo.wav",
     "notificacao": "notificacao.wav",
-    "fim_jogo": "fim_jogo.wav",      # adicionado
 }
 
 def play_sound(sound_key):
@@ -51,7 +51,6 @@ def play_sound(sound_key):
         """
         st.components.v1.html(audio_html, height=0)
     else:
-        # Fallback: beep simples
         st.components.v1.html("""
             <script>
                 try {
@@ -70,7 +69,7 @@ def play_sound(sound_key):
         """, height=0)
 
 # ============================================================
-# CONFIGURAÇÕES DA CATEGORIA (LOCAL)
+# CONFIGURAÇÕES DA CATEGORIA
 # ============================================================
 CATEGORIA_CONFIG = {
     "Profissional": {
@@ -79,7 +78,8 @@ CATEGORIA_CONFIG = {
         "elenco_func": carregar_elenco_profissional,
         "cartoes_key": "profissional",
         "liga_nome": "Campeonato Capixaba Série B",
-        "competicao_id": 2
+        "competicao_id": 2,
+        "json_jogos": "jogos_profissional.json"
     },
     "Sub-15": {
         "team_id": 27831,
@@ -87,7 +87,8 @@ CATEGORIA_CONFIG = {
         "elenco_func": carregar_elenco_sub15,
         "cartoes_key": "sub15",
         "liga_nome": "Copa Espírito Santo Sub-15",
-        "competicao_id": 11
+        "competicao_id": 11,
+        "json_jogos": "jogos_sub15.json"
     },
     "Sub-17": {
         "team_id": 27832,
@@ -95,7 +96,8 @@ CATEGORIA_CONFIG = {
         "elenco_func": carregar_elenco_sub17,
         "cartoes_key": "sub17",
         "liga_nome": "Copa Espírito Santo Sub-17",
-        "competicao_id": 10
+        "competicao_id": 10,
+        "json_jogos": "jogos_sub17.json"
     }
 }
 
@@ -148,6 +150,85 @@ def atualizar_arbitro_jogo(jogo_id, arbitro_id):
     conn = conectar_banco()
     cursor = conn.cursor()
     cursor.execute("UPDATE jogos SET arbitro_id = ? WHERE id = ?", (arbitro_id, jogo_id))
+    conn.commit()
+    conn.close()
+
+# ============================================================
+# FUNÇÃO PARA CARREGAR JOGOS DO JSON (FALLBACK)
+# ============================================================
+def carregar_jogos_do_json(categoria="Profissional"):
+    """Carrega os jogos do arquivo JSON correspondente e insere no banco SQLite se não existirem."""
+    config = CATEGORIA_CONFIG.get(categoria)
+    if not config:
+        return
+    json_path = config.get("json_jogos")
+    if not json_path or not os.path.exists(json_path):
+        return
+
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    conn = conectar_banco()
+    cursor = conn.cursor()
+
+    for jogo in data.get("jogos", []):
+        jogo_id = int(jogo["id_jogo"])
+        # Verifica se já existe
+        cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo_id,))
+        if cursor.fetchone():
+            continue
+
+        time_casa = jogo.get("time_casa", "").strip()
+        time_fora = jogo.get("time_fora", "").strip()
+
+        # Busca ou cria os times
+        cursor.execute("SELECT id FROM times WHERE nome = ?", (time_casa,))
+        row = cursor.fetchone()
+        if row:
+            time_casa_id = row[0]
+        else:
+            cursor.execute("INSERT INTO times (nome) VALUES (?)", (time_casa,))
+            time_casa_id = cursor.lastrowid
+
+        cursor.execute("SELECT id FROM times WHERE nome = ?", (time_fora,))
+        row = cursor.fetchone()
+        if row:
+            time_fora_id = row[0]
+        else:
+            cursor.execute("INSERT INTO times (nome) VALUES (?)", (time_fora,))
+            time_fora_id = cursor.lastrowid
+
+        # Data/hora
+        data_str = jogo.get("data_jogo", "")
+        hora_str = jogo.get("horario", "00:00")
+        if data_str and hora_str:
+            try:
+                dt = datetime.strptime(f"{data_str} {hora_str}", "%d/%m/%Y %H:%M")
+                data_hora = dt.strftime("%Y-%m-%d %H:%M")
+            except:
+                data_hora = f"{data_str} {hora_str}"
+        else:
+            data_hora = ""
+
+        # Insere o jogo
+        cursor.execute("""
+            INSERT INTO jogos (id, time_casa_id, time_fora_id, gols_casa, gols_fora, status, data_hora, formacao_casa, formacao_fora, venue_id, arbitro_id, competicao_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            jogo_id,
+            time_casa_id,
+            time_fora_id,
+            0,
+            0,
+            jogo.get("status", "NS"),
+            data_hora,
+            None,
+            None,
+            None,
+            None,
+            config.get("competicao_id")
+        ))
+
     conn.commit()
     conn.close()
 
@@ -328,45 +409,31 @@ def caminho_foto_membro(membro):
 
     return None
 
-# ============================================================
-# FUNÇÃO OBTEM STAFF (CORRIGIDA)
-# ============================================================
 def obter_staff_completo(time_id, competicao_id=None):
     conn = conectar_banco()
     cursor = conn.cursor()
-    
-    # --- Comissão ---
-    query_com = """
+    query = """
         SELECT id, nome, apelido, cargo, foto, idade, data_nascimento
         FROM comissao
         WHERE time_id = ?
     """
-    params_com = [time_id]
+    params = [time_id]
     if competicao_id:
-        query_com += " AND competicao_id = ?"
-        params_com.append(competicao_id)
-    query_com += " ORDER BY nome"
-    cursor.execute(query_com, params_com)
+        query += " AND competicao_id = ?"
+        params.append(competicao_id)
+    query += " ORDER BY nome"
+    cursor.execute(query, params)
     comissao = [dict(row) for row in cursor.fetchall()]
-    
-    # --- Técnicos ---
-    query_tec = """
+    cursor.execute("""
         SELECT id, nome, apelido, foto, idade, data_nascimento,
                'Técnico' as cargo
         FROM tecnicos
         WHERE time_id = ?
-    """
-    params_tec = [time_id]
-    if competicao_id:
-        query_tec += " AND competicao_id = ?"
-        params_tec.append(competicao_id)
-    cursor.execute(query_tec, params_tec)
+    """, params)
     tecnicos = [dict(row) for row in cursor.fetchall()]
-    
     conn.close()
     return tecnicos + comissao
 
-# ============================================================
 def obter_arbitro_por_id(arbitro_id):
     if not arbitro_id:
         return None
@@ -408,12 +475,18 @@ def show():
 
     inicializar_banco()
 
-    # Cliente FastAPI
+    # ============================================================
+    # CLIENTE FASTAPI
+    # ============================================================
     FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
     client = FastAPIMonitorClient(FASTAPI_URL)
 
-    # Seleção de partida (via SQLite)
+    # ============================================================
+    # SELECIONAR PARTIDA (via SQLite + fallback JSON)
+    # ============================================================
     st.sidebar.header("Selecionar Partida")
+
+    # Tenta carregar jogos do banco
     conn = conectar_banco()
     try:
         df_jogos = pd.read_sql_query(f"""
@@ -428,17 +501,38 @@ def show():
         """, conn)
     except Exception as e:
         st.error(f"Erro ao carregar jogos: {e}")
+        df_jogos = pd.DataFrame()
+    finally:
         conn.close()
-        return
+
+    # Se não houver jogos, tenta carregar do JSON
+    if df_jogos.empty:
+        carregar_jogos_do_json(categoria)
+        # Recarrega do banco
+        conn = conectar_banco()
+        try:
+            df_jogos = pd.read_sql_query(f"""
+                SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora,
+                       j.status, j.data_hora, j.formacao_casa, j.arbitro_id,
+                       v.nome AS estadio
+                FROM jogos j
+                LEFT JOIN venues v ON j.venue_id = v.id
+                WHERE (j.time_casa_id = {team_id} OR j.time_fora_id = {team_id})
+                  AND (substr(j.data_hora, 1, 10) >= date('now') OR j.status IN ('1H','2H','HT','ET','P'))
+                ORDER BY j.data_hora ASC
+            """, conn)
+        except Exception as e:
+            st.error(f"Erro ao carregar jogos após fallback: {e}")
+            df_jogos = pd.DataFrame()
+        finally:
+            conn.close()
 
     try:
         times_df = pd.read_sql_query("SELECT id, nome FROM times", conn)
         arbitros_df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
     except Exception as e:
         st.error(f"Erro ao carregar times ou árbitros: {e}")
-        conn.close()
         return
-    conn.close()
 
     times_dict = dict(zip(times_df['id'], times_df['nome']))
     if df_jogos.empty:
@@ -483,7 +577,9 @@ def show():
     hoje = date.today()
     eh_hoje = (data_jogo == hoje) if data_jogo else False
 
-    # Cabecalho
+    # ============================================================
+    # CABEÇALHO DO JOGO
+    # ============================================================
     st.subheader(f"⚽ {time_casa} {gols_casa} x {gols_fora} {time_fora}")
     col1, col2, col_arb = st.columns([2, 1, 2])
     with col1:
@@ -528,16 +624,24 @@ def show():
 
     st.markdown("---")
 
-    # Monitoramento ao vivo
+    # ============================================================
+    # MONITORAMENTO AO VIVO
+    # ============================================================
     st.subheader("🔴 Monitoramento Ao Vivo")
 
     if eh_hoje:
         with st.spinner("Verificando jogo ao vivo..."):
-            fixture_id = client.get_live_fixture(team_id)
-            if fixture_id:
-                st.session_state.fixture_id = fixture_id
-                st.session_state.monitoramento_ativo = True
-            else:
+            try:
+                fixture_id = client.get_live_fixture(team_id)
+                if fixture_id:
+                    st.session_state.fixture_id = fixture_id
+                    st.session_state.monitoramento_ativo = True
+                else:
+                    st.session_state.monitoramento_ativo = False
+            except Exception as e:
+                st.warning(f"⚠️ Não foi possível conectar ao servidor FastAPI: {e}")
+                st.info("📡 Operando em modo offline – apenas dados locais disponíveis.")
+                fixture_id = None
                 st.session_state.monitoramento_ativo = False
 
         if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
@@ -569,14 +673,9 @@ def show():
 
                 if status_api != status_anterior:
                     atualizar_status_sqlite(jogo_selecionado_id, status_api)
-                    # Som de início de tempo
                     if status_api in ['1H', '2H']:
                         play_sound('inicio')
-                    # Som de fim de jogo (FT, AET, PEN)
                     elif status_api in ['FT', 'AET', 'PEN']:
-                        play_sound('fim_jogo')
-                    # Outros status (ex: notificação genérica)
-                    else:
                         play_sound('notificacao')
                     st.rerun()
 
@@ -619,7 +718,7 @@ def show():
                             else:
                                 play_sound('gol_adversario')
                         elif tipo == 'card':
-                            play_sound('cartao')  # falta.wav
+                            play_sound('cartao')
                         else:
                             play_sound('notificacao')
                 conn.commit()
@@ -642,7 +741,9 @@ def show():
 
     st.markdown("---")
 
-    # Registro manual
+    # ============================================================
+    # REGISTRO MANUAL DE EVENTOS (FALLBACK)
+    # ============================================================
     st.subheader("📝 Registro Manual de Eventos (Fallback)")
     st.caption("Use esta seção apenas se a FastAPI não estiver fornecendo os dados corretamente.")
 
@@ -680,7 +781,7 @@ def show():
                         time_marcador = jogo['time_fora_id']
                     play_sound('gol_linhares' if time_marcador == team_id else 'gol_adversario')
                 elif tipo == 'Cartão':
-                    play_sound('cartao')  # falta.wav
+                    play_sound('cartao')
                 else:
                     play_sound('notificacao')
                 salvar_evento_sqlite(jogo_selecionado_id, tempo, tipo, jogador_id, detalhes, fonte="manual")
@@ -691,7 +792,9 @@ def show():
 
     st.markdown("---")
 
-    # Lista de eventos
+    # ============================================================
+    # LISTA DE ÚLTIMOS EVENTOS (SANITIZADO)
+    # ============================================================
     conn = conectar_banco()
     try:
         df_eventos = pd.read_sql_query(f"""
@@ -718,7 +821,9 @@ def show():
 
     st.markdown("---")
 
-    # Escalação
+    # ============================================================
+    # ESCALAÇÃO - COM CAMPO DE TEXTO PARA FORMAÇÃO (CORRIGIDO)
+    # ============================================================
     st.subheader("📋 Escalação")
 
     with st.expander("✏️ Definir Escalação", expanded=False):
@@ -750,12 +855,15 @@ def show():
                 else:
                     st.warning("Digite uma formação válida.")
 
+        # --- RESTANTE DA ESCALAÇÃO (jogadores, automático, etc.) ---
+        # Recarregar formação atualizada (GARANTE QUE NÃO SEJA None)
         conn = conectar_banco()
         cursor = conn.cursor()
         cursor.execute("SELECT formacao_casa FROM jogos WHERE id = ?", (jogo_selecionado_id,))
         row = cursor.fetchone()
         conn.close()
-        formacao_casa_atual = row['formacao_casa'] if row else formacao_casa
+        # Se a formação for None ou vazia, usa a formação anterior ou string vazia
+        formacao_casa_atual = (row['formacao_casa'] if row and row['formacao_casa'] is not None else '') or formacao_casa or ''
 
         jogadores_disponiveis = df_elenco.copy()
         if 'lesionado' in jogadores_disponiveis.columns:
@@ -844,6 +952,7 @@ def show():
                             st.success("Escalação salva!")
                             st.rerun()
 
+    # Exibe a escalação atual (sanitizado)
     conn = conectar_banco()
     try:
         df_lineup = pd.read_sql_query(f"""
@@ -880,7 +989,9 @@ def show():
 
     st.markdown("---")
 
-    # Staff Técnico
+    # ============================================================
+    # STAFF TÉCNICO (COM DEPURAÇÃO)
+    # ============================================================
     st.subheader("👔 Staff Técnico")
     staff_casa = obter_staff_completo(jogo['time_casa_id'], competicao_id)
     staff_fora = obter_staff_completo(jogo['time_fora_id'], competicao_id)
@@ -918,6 +1029,7 @@ def show():
 
     st.markdown("---")
 
+    # Exibição normal das fotos
     col1, col2 = st.columns(2)
     with col1:
         st.write(f"**{time_casa}**")

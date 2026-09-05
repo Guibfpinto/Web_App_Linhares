@@ -194,7 +194,6 @@ def sanitizar_dataframe(df):
 # FUNÇÃO PARA ORDENAR HISTÓRICO DE CARTÕES
 # =============================================
 def ordenar_historico_cartoes(cartoes: dict) -> dict:
-    """Ordena o histórico de cartões de cada jogador por data (crescente)."""
     for jogador, dados in cartoes.items():
         if 'historico' in dados and dados['historico']:
             dados['historico'] = sorted(
@@ -1353,7 +1352,6 @@ def carregar_cartoes_json(categoria):
         with open(caminho, 'r', encoding='utf-8') as f:
             dados = json.load(f)
             cartoes = dados.get('cartoes', {})
-            # Ordena o histórico de cada jogador
             cartoes = ordenar_historico_cartoes(cartoes)
             datas_globais = dados.get('datas_globais', {})
             return cartoes, datas_globais
@@ -1377,7 +1375,6 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
     else:
         caminho = os.path.join(DATA_DIR, f"cartoes_{categoria}.json")
 
-    # Ordena o histórico antes de salvar
     cartoes = ordenar_historico_cartoes(cartoes)
 
     dados = {'cartoes': cartoes}
@@ -1412,7 +1409,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
 
     df = df.sort_values('data_jogo', ascending=True)
 
-    # Carrega cronograma da categoria para buscar competição e fase
     df_crono = carregar_cronograma(categoria.capitalize())
     if not df_crono.empty and 'data' in df_crono.columns:
         df_crono['data'] = pd.to_datetime(df_crono['data'], errors='coerce')
@@ -1557,7 +1553,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
             if datas_futuras:
                 data_proximo_jogo_str = datas_futuras[0]
                 data_proximo_jogo = datetime.strptime(data_proximo_jogo_str, "%Y-%m-%d").date()
-                # Busca competição e fase no cronograma
                 if df_crono is not None and not df_crono.empty:
                     jogos_prox = df_crono[df_crono['data'].dt.strftime('%Y-%m-%d') == data_proximo_jogo_str]
                     if not jogos_prox.empty:
@@ -1587,7 +1582,6 @@ def inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id=None):
                 cartoes[nome]['suspensoes_cumpridas'] = 0
                 cartoes[nome]['data_suspensao'] = None
 
-    # Ordena os históricos antes de salvar
     cartoes = ordenar_historico_cartoes(cartoes)
     salvar_cartoes_json(cartoes, categoria, datas_globais)
     return cartoes, datas_globais
@@ -1799,7 +1793,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
         if 'data_jogo' in df.columns:
             df['data_jogo'] = pd.to_datetime(df['data_jogo'], dayfirst=True, errors='coerce')
-        # Garantir que colunas problemáticas sejam string
         for col in ['fase', 'competicao', 'adversario', 'jogador']:
             if col in df.columns:
                 df[col] = df[col].astype(str)
@@ -1863,9 +1856,15 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
     return sanitizar_dataframe(df_merged)
 
 # =============================================
-# FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO
+# FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO (CORRIGIDO)
 # =============================================
 def interpretar_formacao(formacao_str):
+    """
+    Interpreta uma string de formação (ex: '4-4-2') e retorna a lista de posições.
+    Retorna (None, None, None, None) se a formação for inválida ou vazia.
+    """
+    if not formacao_str or not isinstance(formacao_str, str):
+        return None, None, None, None
     partes = formacao_str.split('-')
     if len(partes) < 3:
         return None, None, None, None
@@ -2009,7 +2008,7 @@ def corrigir_nome_time(nome):
 # FUNÇÕES DA FASTAPI (USANDO BANCO LOCAL)
 # =============================================
 def _chamar_api(endpoint, params=None, tentativa=1):
-    return None  # Mantido para compatibilidade
+    return None
 
 def verificar_jogo_ao_vivo(team_id=None):
     conn = sqlite3.connect('meu_futebol.db')
@@ -2200,7 +2199,6 @@ def formatar_cartoes(cartoes: dict, nome_jogador: str = None) -> str:
             ""
         ]
         if historico:
-            # Ordena por data (mais recente primeiro) para exibição
             historico_ordenado = sorted(historico, key=lambda x: x['data'], reverse=True)
             linhas.append("  **Histórico (últimos eventos):**")
             for ev in historico_ordenado[-8:]:
