@@ -82,6 +82,7 @@ import pages.tatica_page as tatica_page
 import pages.gestao as gestao
 import pages.visualizacao as visualizacao
 import pages.relatorios as relatorios
+import pages.minutagem as minutagem          # <--- NOVO
 
 # ======================================================================
 # DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
@@ -942,7 +943,7 @@ if st.button("Sair"):
     st.rerun()
 
 # ======================================================================
-# ABAS PRINCIPAIS
+# ABAS PRINCIPAIS (AGORA COM 11 ABAS)
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco",
@@ -953,12 +954,13 @@ tabs = st.tabs([
     "📐 Escalação Tática",
     "⚙️ Gestão",
     "📄 Relatórios",
+    "📊 Minutagem",              # <--- NOVA ABA
     "📤 Exportar",
     "🎥 Visualização Tática"
 ])
 
 # ======================================================================
-# ABA 1: ANÁLISE DE ELENCO
+# ABA 0: ANÁLISE DE ELENCO
 # ======================================================================
 with tabs[0]:
     st.header("Análise de Jogadores")
@@ -1107,7 +1109,7 @@ with tabs[0]:
         st.error(f"Dados não disponíveis para {cat_analise}")
 
 # ======================================================================
-# ABA 2: COMISSÃO TÉCNICA
+# ABA 1: COMISSÃO TÉCNICA
 # ======================================================================
 with tabs[1]:
     st.header("Comissão Técnica")
@@ -1188,7 +1190,7 @@ with tabs[1]:
         st.info("Nenhum dado de comissão disponível.")
 
 # ======================================================================
-# ABA 3: MONITORAMENTO AO VIVO
+# ABA 2: MONITORAMENTO AO VIVO
 # ======================================================================
 with tabs[2]:
     cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
@@ -1201,7 +1203,7 @@ with tabs[2]:
         st.error(f"Erro ao executar monitoramento: {e}")
 
 # ======================================================================
-# ABA 4: CARTÕES
+# ABA 3: CARTÕES
 # ======================================================================
 with tabs[3]:
     try:
@@ -1210,7 +1212,7 @@ with tabs[3]:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO
+# ABA 4: PRÓXIMO JOGO
 # ======================================================================
 with tabs[4]:
     try:
@@ -1221,7 +1223,7 @@ with tabs[4]:
         st.error(f"Erro ao executar próximo jogo: {e}")
 
 # ======================================================================
-# ABA 6: ESCALAÇÃO TÁTICA
+# ABA 5: ESCALAÇÃO TÁTICA
 # ======================================================================
 with tabs[5]:
     st.header("📐 Escalação Tática")
@@ -1283,7 +1285,7 @@ with tabs[5]:
                         st.write(f"• {j['nome']} ({j['apelido']})")
 
 # ======================================================================
-# ABA 7: GESTÃO
+# ABA 6: GESTÃO
 # ======================================================================
 with tabs[6]:
     cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
@@ -1296,7 +1298,7 @@ with tabs[6]:
         st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS (NOVA VERSÃO COMPLETA)
+# ABA 7: RELATÓRIOS
 # ======================================================================
 with tabs[7]:
     try:
@@ -1307,9 +1309,15 @@ with tabs[7]:
         st.error(f"Erro ao executar relatórios: {e}")
 
 # ======================================================================
-# ABA 9: EXPORTAR
+# ABA 8: MINUTAGEM (NOVA)
 # ======================================================================
 with tabs[8]:
+    minutagem.show()
+
+# ======================================================================
+# ABA 9: EXPORTAR
+# ======================================================================
+with tabs[9]:
     st.header("📤 Exportar Dados")
     cat_export = st.selectbox(
         "Categoria",
@@ -1340,7 +1348,7 @@ with tabs[8]:
 # ======================================================================
 # ABA 10: VISUALIZAÇÃO TÁTICA
 # ======================================================================
-with tabs[9]:
+with tabs[10]:
     st.header("🎥 Visualização Tática")
     cat_viz = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="viz_categoria")
     df_viz, _ = get_df_cartoes(cat_viz)
