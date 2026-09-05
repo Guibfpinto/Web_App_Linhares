@@ -822,36 +822,112 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     return df_futuros.iloc[0].to_dict()
 
 # =============================================
-# EXIBIR FOTO (JOGADORES E COMISSÃO)
+# EXIBIR FOTO (JOGADORES E COMISSÃO) - VERSÃO MELHORADA
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
-    if 'foto' in pessoa_row.index:
-        foto = pessoa_row.get('foto')
-        if foto and pd.notna(foto) and str(foto).strip():
-            caminho = str(foto).strip()
-            if os.path.exists(caminho) or caminho.startswith('http'):
-                return caminho
+    """
+    Busca a foto do jogador em várias pastas, usando correspondência flexível.
+    """
+    # Tenta obter o nome a partir da coluna 'foto'
+    foto = pessoa_row.get('foto', '')
+    if foto and pd.notna(foto) and str(foto).strip():
+        caminho = str(foto).strip()
+        if os.path.exists(caminho) or caminho.startswith('http'):
+            return caminho
 
+    # Obtém o nome base (apelido ou nome completo)
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
-    if nome:
-        nome_clean = normalizar_texto(nome).replace(' ', '_')
-        pastas = [
-            "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
-            "fotos_sistema_Analise_Elenco/Jogadores/Sub15",
-            "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
-            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
-            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
-            "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
-            "fotos"
-        ]
-        for ext in ['.png', '.jpg', '.jpeg']:
-            for pasta in pastas:
-                caminho = os.path.join(pasta, f"{nome}{ext}")
+    if not nome or pd.isna(nome):
+        return None
+
+    # Normaliza o nome para comparação
+    nome_clean = normalizar_texto(nome).replace(' ', '_')
+    nome_sem_acento = normalizar_texto(nome)  # sem substituir espaços por underscore
+
+    # Lista de pastas onde procurar (inclui todas as categorias e pastas genéricas)
+    pastas_base = [
+        # Pastas relativas ao diretório do projeto
+        "assets/fotos_jogadores",
+        "assets/fotos_jogadores/Profissional",
+        "assets/fotos_jogadores/Sub15",
+        "assets/fotos_jogadores/Sub17",
+        "fotos",
+        "fotos/Profissional",
+        "fotos/Sub15",
+        "fotos/Sub17",
+        "fotos_sistema_Analise_Elenco/Jogadores",
+        "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
+        "fotos_sistema_Analise_Elenco/Jogadores/Sub15",
+        "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
+        # Pastas da comissão (também podem conter fotos)
+        "assets/fotos_comissao",
+        "assets/fotos_comissao/Profissional",
+        "assets/fotos_comissao/Sub15",
+        "assets/fotos_comissao/Sub17",
+        "assets/fotos_tecnicos",
+        "fotos_comissao",
+        "Fotos_Tecnicos",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
+    ]
+
+    # Pastas absolutas (caminhos fixos, se necessário)
+    pastas_absolutas = [
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos_sistema_Analise_Elenco\Jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
+    ]
+
+    # Combina pastas relativas ao script e ao diretório pai
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+
+    pastas = pastas_absolutas.copy()
+    for p in pastas_base:
+        pastas.append(os.path.join(script_dir, p))
+        pastas.append(os.path.join(parent_dir, p))
+
+    # Extensões de imagem suportadas
+    extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
+
+    # Função auxiliar para verificar se um arquivo corresponde ao nome do jogador
+    def arquivo_corresponde(nome_arquivo):
+        nome_arquivo_sem_ext = os.path.splitext(nome_arquivo)[0]
+        # Remove acentos e caracteres especiais
+        nome_arquivo_clean = normalizar_texto(nome_arquivo_sem_ext).replace(' ', '_')
+        # Verifica se o nome do jogador (clean) está contido no nome do arquivo ou vice-versa
+        return (nome_clean in nome_arquivo_clean) or (nome_arquivo_clean in nome_clean) or (nome_sem_acento in normalizar_texto(nome_arquivo_sem_ext))
+
+    # Primeiro, tenta encontrar um arquivo que corresponda exatamente ou contenha o nome
+    for pasta in set(pastas):
+        if not os.path.isdir(pasta):
+            continue
+        for ext in extensoes:
+            # Tenta com o nome exato (apelido) e com o nome limpo
+            for nome_tentativa in [nome, nome_clean]:
+                caminho = os.path.join(pasta, f"{nome_tentativa}{ext}")
                 if os.path.exists(caminho):
-                    return caminho
-                caminho = os.path.join(pasta, f"{nome_clean}{ext}")
-                if os.path.exists(caminho):
-                    return caminho
+                    return os.path.abspath(caminho)
+
+        # Se não encontrou, varre todos os arquivos da pasta procurando correspondência parcial
+        for arquivo in os.listdir(pasta):
+            if any(arquivo.lower().endswith(ext) for ext in extensoes):
+                if arquivo_corresponde(arquivo):
+                    return os.path.abspath(os.path.join(pasta, arquivo))
+
+    # Busca recursiva em subpastas (caso as fotos estejam em estruturas mais profundas)
+    for pasta in set(pastas):
+        if not os.path.isdir(pasta):
+            continue
+        for root, dirs, files in os.walk(pasta):
+            for arquivo in files:
+                if any(arquivo.lower().endswith(ext) for ext in extensoes):
+                    if arquivo_corresponde(arquivo):
+                        return os.path.abspath(os.path.join(root, arquivo))
+
     return None
 
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
@@ -1920,54 +1996,141 @@ def obter_atributos_chave(posicao):
     return mapa.get(posicao, ['Rating_Geral_FM26'])
 
 # =============================================
-# AUTENTICAÇÃO DE USUÁRIOS
+# AUTENTICAÇÃO DE USUÁRIOS (COM ADMINISTRADORES FIXOS)
 # =============================================
 ARQUIVO_USUARIOS = "usuarios.json"
 
+# Lista de administradores fixos (não podem ser removidos)
+ADMIN_FIXOS = [
+    "Guibfpinto",
+    "Ricardosantosr",
+    "YupiSilva",
+    "AdautoMenegussi",
+    "Asamoah",
+    "Nanico",
+    "MaryaEduarda",
+    "KarenLoureiro",
+    "FabianoEller"
+]
+
+# Mapeamento de senhas para os administradores fixos
+SENHAS_FIXAS = {
+    "Guibfpinto": "@W.d06302005",
+    "Ricardosantosr": "@R.s02011991",
+    "YupiSilva": "@J.s10021989",
+    "AdautoMenegussi": "@A.m13071966",
+    "Asamoah": "@M.v24061989",
+    "Nanico": "@W.s0511",
+    "MaryaEduarda": "@M.e12062002",
+    "KarenLoureiro": "@K.l04082000",
+    "FabianoEller": "@F.e1977"
+}
+
 def carregar_usuarios():
+    """
+    Retorna um dicionário {usuario: {'senha_hash': hash, 'is_admin': bool}}.
+    Se o arquivo não existir, cria os administradores fixos com suas senhas.
+    """
     if not os.path.exists(ARQUIVO_USUARIOS):
-        senha_admin = "@W.d06302005"
-        hash_admin = bcrypt.hashpw(senha_admin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        usuarios = {"Guibfpinto": hash_admin}
+        usuarios = {}
+        for admin in ADMIN_FIXOS:
+            senha = SENHAS_FIXAS.get(admin)
+            if senha:
+                hash_admin = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                usuarios[admin] = {"senha_hash": hash_admin, "is_admin": True}
         with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
             json.dump(usuarios, f, indent=2, ensure_ascii=False)
         return usuarios
+
     try:
         with open(ARQUIVO_USUARIOS, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
-        return {"Guibfpinto": ""}
+            dados = json.load(f)
+        # Converte para o formato esperado (caso o arquivo antigo só tenha hashes)
+        usuarios = {}
+        for usuario, valor in dados.items():
+            if isinstance(valor, dict):
+                usuarios[usuario] = valor
+            else:
+                # Formato antigo (apenas hash) – assume que NÃO é admin (exceto fixos)
+                is_admin = usuario in ADMIN_FIXOS
+                usuarios[usuario] = {"senha_hash": valor, "is_admin": is_admin}
+        return usuarios
+    except Exception as e:
+        print(f"Erro ao carregar usuários: {e}")
+        return {}
+
+def salvar_usuarios(usuarios):
+    with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
+        json.dump(usuarios, f, indent=2, ensure_ascii=False)
 
 def autenticar_usuario(usuario, senha):
+    """Retorna (bool autenticado, bool is_admin)."""
+    # Verifica se é um admin fixo (mesmo que o JSON não exista)
+    if usuario in ADMIN_FIXOS:
+        senha_correta = SENHAS_FIXAS.get(usuario)
+        if senha_correta and bcrypt.checkpw(senha.encode('utf-8'), bcrypt.hashpw(senha_correta.encode('utf-8'), bcrypt.gensalt())):
+            return True, True
+        # Se a senha não bater, tenta pelo arquivo (caso tenha sido alterada)
+    # Tenta autenticar pelo arquivo
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
-        return False
-    hash_senha = usuarios[usuario].encode('utf-8')
-    return bcrypt.checkpw(senha.encode('utf-8'), hash_senha)
+        return False, False
+    dados = usuarios[usuario]
+    hash_senha = dados["senha_hash"].encode('utf-8')
+    autenticado = bcrypt.checkpw(senha.encode('utf-8'), hash_senha)
+    is_admin = dados.get("is_admin", False)
+    return autenticado, is_admin
 
 def listar_usuarios():
     return list(carregar_usuarios().keys())
 
-def adicionar_usuario(usuario, senha):
+def adicionar_usuario(usuario, senha, is_admin=False):
     usuarios = carregar_usuarios()
     if usuario in usuarios:
         return False
     hash_novo = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    usuarios[usuario] = hash_novo
-    with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
-        json.dump(usuarios, f, indent=2, ensure_ascii=False)
+    usuarios[usuario] = {"senha_hash": hash_novo, "is_admin": is_admin}
+    salvar_usuarios(usuarios)
     return True
 
 def remover_usuario(usuario):
-    if usuario == "Guibfpinto":
+    if usuario in ADMIN_FIXOS:  # não permite remover os fixos
         return False
     usuarios = carregar_usuarios()
     if usuario in usuarios:
         del usuarios[usuario]
-        with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
-            json.dump(usuarios, f, indent=2, ensure_ascii=False)
+        salvar_usuarios(usuarios)
         return True
     return False
+
+def promover_admin(usuario):
+    """Promove um usuário existente a administrador."""
+    if usuario in ADMIN_FIXOS:
+        return True  # já é fixo
+    usuarios = carregar_usuarios()
+    if usuario not in usuarios:
+        return False
+    usuarios[usuario]["is_admin"] = True
+    salvar_usuarios(usuarios)
+    return True
+
+def rebaixar_admin(usuario):
+    """Rebaixa um administrador (exceto fixos)."""
+    if usuario in ADMIN_FIXOS:
+        return False
+    usuarios = carregar_usuarios()
+    if usuario not in usuarios:
+        return False
+    usuarios[usuario]["is_admin"] = False
+    salvar_usuarios(usuarios)
+    return True
+
+def usuario_eh_admin(usuario):
+    """Verifica se um usuário é administrador (fixo ou do JSON)."""
+    if usuario in ADMIN_FIXOS:
+        return True
+    usuarios = carregar_usuarios()
+    return usuarios.get(usuario, {}).get("is_admin", False)
 
 # =============================================
 # RELATÓRIOS E EXPORTAÇÃO

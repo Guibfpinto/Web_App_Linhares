@@ -41,6 +41,11 @@ from utils import (
     listar_usuarios,
     adicionar_usuario,
     remover_usuario,
+    promover_admin,
+    rebaixar_admin,
+    usuario_eh_admin,
+    ADMIN_FIXOS,
+    carregar_usuarios,
     gerar_relatorio_completo_texto,
     exportar_para_excel,
     exportar_para_powerbi,
@@ -82,7 +87,7 @@ import pages.tatica_page as tatica_page
 import pages.gestao as gestao
 import pages.visualizacao as visualizacao
 import pages.relatorios as relatorios
-import pages.minutagem as minutagem          # <--- NOVO
+import pages.minutagem as minutagem
 
 # ======================================================================
 # DICIONÁRIO DE TRADUÇÃO DOS ATRIBUTOS DA COMISSÃO
@@ -506,12 +511,35 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
         return None
 
 # ======================================================================
+# FUNÇÃO PARA CAMPO DE SENHA COM VISIBILIDADE
+# ======================================================================
+def campo_senha_com_visibilidade(label, key, placeholder=""):
+    """Cria um campo de senha com checkbox para mostrar/ocultar."""
+    visivel_key = f"{key}_visivel"
+    if visivel_key not in st.session_state:
+        st.session_state[visivel_key] = False
+
+    mostrar = st.checkbox("Mostrar senha", key=f"{key}_mostrar", value=st.session_state[visivel_key])
+    if mostrar != st.session_state[visivel_key]:
+        st.session_state[visivel_key] = mostrar
+        st.rerun()
+
+    if st.session_state[visivel_key]:
+        return st.text_input(label, type="default", key=key, placeholder=placeholder)
+    else:
+        return st.text_input(label, type="password", key=key, placeholder=placeholder)
+
+# ======================================================================
 # INICIALIZAÇÃO DE ESTADO
 # ======================================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "usuario" not in st.session_state:
     st.session_state.usuario = ""
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "gerenciar_usuarios" not in st.session_state:
+    st.session_state.gerenciar_usuarios = False
 if "titulares" not in st.session_state:
     st.session_state.titulares = []
 if "reservas" not in st.session_state:
@@ -794,58 +822,104 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             st.info("Nenhum cartão registrado.")
 
 # ======================================================================
-# AUTENTICAÇÃO
+# AUTENTICAÇÃO E GERENCIAMENTO DE USUÁRIOS (CORRIGIDO)
 # ======================================================================
 def login():
-    with st.form("login"):
+    # Se o usuário estiver no modo de gerenciamento, exibe o gerenciador
+    if st.session_state.get("gerenciar_usuarios", False):
+        abrir_gerenciador_usuarios()
+        if st.button("🔙 Voltar ao Login"):
+            st.session_state.gerenciar_usuarios = False
+            st.rerun()
+        return
+
+    # Formulário de login
+    with st.form("login_form"):
         st.subheader("🔐 Acesso ao Sistema")
         usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
-        col1, col2 = st.columns(2)
-        with col1:
-            submitted = st.form_submit_button("Entrar")
-        with col2:
-            gerenciar = st.form_submit_button("👥 Gerenciar Usuários")
+        # Campo de senha com visibilidade
+        senha = campo_senha_com_visibilidade("Senha", "login_senha")
+        submitted = st.form_submit_button("Entrar")
         if submitted:
-            if autenticar_usuario(usuario, senha):
+            autenticado, is_admin = autenticar_usuario(usuario, senha)
+            if autenticado:
                 st.session_state.authenticated = True
                 st.session_state.usuario = usuario
+                st.session_state.is_admin = is_admin
                 st.rerun()
             else:
                 st.error("Usuário ou senha inválidos")
-        if gerenciar:
-            if usuario == "Guibfpinto" and autenticar_usuario(usuario, senha):
-                abrir_gerenciador_usuarios()
-            else:
-                st.error("Apenas o administrador pode gerenciar usuários.")
+
+    # Botão para abrir o gerenciador (FORA do formulário)
+    if st.button("👥 Gerenciar Usuários"):
+        st.session_state.gerenciar_usuarios = True
+        st.rerun()
 
 def abrir_gerenciador_usuarios():
-    with st.expander("Gerenciar Usuários", expanded=True):
-        st.write("**Usuários cadastrados:**")
-        for u in listar_usuarios():
-            st.write(f"- {u}")
-        st.divider()
-        with st.form("novo_usuario"):
-            novo_user = st.text_input("Novo usuário")
-            nova_senha = st.text_input("Senha", type="password")
-            if st.form_submit_button("Adicionar"):
-                if adicionar_usuario(novo_user, nova_senha):
-                    st.success(f"Usuário {novo_user} adicionado.")
-                    st.rerun()
-                else:
-                    st.error("Usuário já existe.")
-        with st.form("remover_usuario"):
-            remove_user = st.selectbox("Selecionar usuário para remover", [u for u in listar_usuarios() if u != "Guibfpinto"])
+    """Exibe a interface de gerenciamento de usuários (sem aninhar forms)."""
+    st.subheader("👥 Gerenciamento de Usuários")
+
+    # Mostra a lista com status de admin
+    usuarios = carregar_usuarios()
+    st.write("**Usuários cadastrados:**")
+    for u, dados in usuarios.items():
+        is_admin = dados.get("is_admin", False) or (u in ADMIN_FIXOS)
+        st.write(f"- {u} {'⭐ Admin' if is_admin else ''}")
+
+    st.divider()
+
+    # Formulário para adicionar
+    with st.form("novo_usuario"):
+        st.write("**Adicionar novo usuário**")
+        novo_user = st.text_input("Novo usuário")
+        nova_senha = campo_senha_com_visibilidade("Senha", "novo_senha")
+        tornar_admin = st.checkbox("Tornar administrador")
+        if st.form_submit_button("Adicionar"):
+            if adicionar_usuario(novo_user, nova_senha, is_admin=tornar_admin):
+                st.success(f"Usuário {novo_user} adicionado.")
+                st.rerun()
+            else:
+                st.error("Usuário já existe.")
+
+    # Formulário para remover
+    with st.form("remover_usuario"):
+        st.write("**Remover usuário**")
+        usuarios_para_remover = [u for u in listar_usuarios() if u not in ADMIN_FIXOS]
+        if usuarios_para_remover:
+            remove_user = st.selectbox("Selecionar usuário para remover", usuarios_para_remover)
             if st.form_submit_button("Remover"):
                 if remover_usuario(remove_user):
                     st.success(f"Usuário {remove_user} removido.")
                     st.rerun()
                 else:
                     st.error("Não foi possível remover.")
+        else:
+            st.info("Nenhum outro usuário para remover.")
 
-if not st.session_state.authenticated:
-    login()
-    st.stop()
+    # Formulário para promover/rebaixar
+    with st.form("promover_rebaixar"):
+        st.write("**Alterar permissão de administrador**")
+        usuarios_nao_fixos = [u for u in listar_usuarios() if u not in ADMIN_FIXOS]
+        if usuarios_nao_fixos:
+            usuario_alterar = st.selectbox("Selecionar usuário", usuarios_nao_fixos)
+            # Verifica status atual
+            is_admin_atual = usuarios.get(usuario_alterar, {}).get("is_admin", False)
+            nova_permissao = st.checkbox("É administrador", value=is_admin_atual)
+            if st.form_submit_button("Alterar permissão"):
+                if nova_permissao:
+                    if promover_admin(usuario_alterar):
+                        st.success(f"{usuario_alterar} agora é administrador.")
+                        st.rerun()
+                    else:
+                        st.error("Falha ao promover.")
+                else:
+                    if rebaixar_admin(usuario_alterar):
+                        st.success(f"{usuario_alterar} não é mais administrador.")
+                        st.rerun()
+                    else:
+                        st.error("Falha ao rebaixar.")
+        else:
+            st.info("Nenhum usuário não-fixo para alterar.")
 
 # ======================================================================
 # CARREGAMENTO DE DADOS (CACHE)
@@ -933,17 +1007,33 @@ def get_df_cartoes(categoria):
     return dados.get(df_key), dados.get(cart_key, {})
 
 # ======================================================================
+# VERIFICAÇÃO DE AUTENTICAÇÃO
+# ======================================================================
+if not st.session_state.authenticated:
+    login()
+    st.stop()
+
+# ======================================================================
 # MENU SUPERIOR
 # ======================================================================
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 st.caption(f"👤 Logado como: {st.session_state.usuario}")
 
-if st.button("Sair"):
-    st.session_state.authenticated = False
-    st.rerun()
+col_sair, col_admin = st.columns([1, 4])
+with col_sair:
+    if st.button("Sair"):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# Botão de gerenciamento de usuários (apenas para admin)
+if st.session_state.get("is_admin", False):
+    with col_admin:
+        if st.button("👥 Gerenciar Usuários (Admin)"):
+            st.session_state.gerenciar_usuarios = True
+            st.rerun()
 
 # ======================================================================
-# ABAS PRINCIPAIS (AGORA COM 11 ABAS)
+# ABAS PRINCIPAIS (11 ABAS)
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco",
@@ -954,7 +1044,7 @@ tabs = st.tabs([
     "📐 Escalação Tática",
     "⚙️ Gestão",
     "📄 Relatórios",
-    "📊 Minutagem",              # <--- NOVA ABA
+    "📊 Minutagem",
     "📤 Exportar",
     "🎥 Visualização Tática"
 ])
@@ -1309,7 +1399,7 @@ with tabs[7]:
         st.error(f"Erro ao executar relatórios: {e}")
 
 # ======================================================================
-# ABA 8: MINUTAGEM (NOVA)
+# ABA 8: MINUTAGEM
 # ======================================================================
 with tabs[8]:
     minutagem.show()
