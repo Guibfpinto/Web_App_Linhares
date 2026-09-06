@@ -482,12 +482,12 @@ def show():
     client = FastAPIMonitorClient(FASTAPI_URL)
 
     # ============================================================
-    # SELECIONAR PARTIDA (via SQLite + fallback JSON)
+    # SELECIONAR PARTIDA (CORRIGIDO - CONEXÃO MANTIDA ATÉ O FIM)
     # ============================================================
     st.sidebar.header("Selecionar Partida")
 
-    # Tenta carregar jogos do banco
-    conn = conectar_banco()
+    conn = conectar_banco()  # abre a conexão
+
     try:
         df_jogos = pd.read_sql_query(f"""
             SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora,
@@ -502,14 +502,11 @@ def show():
     except Exception as e:
         st.error(f"Erro ao carregar jogos: {e}")
         df_jogos = pd.DataFrame()
-    finally:
-        conn.close()
 
     # Se não houver jogos, tenta carregar do JSON
     if df_jogos.empty:
         carregar_jogos_do_json(categoria)
-        # Recarrega do banco
-        conn = conectar_banco()
+        # Recarrega com a mesma conexão
         try:
             df_jogos = pd.read_sql_query(f"""
                 SELECT j.id, j.time_casa_id, j.time_fora_id, j.gols_casa, j.gols_fora,
@@ -524,15 +521,18 @@ def show():
         except Exception as e:
             st.error(f"Erro ao carregar jogos após fallback: {e}")
             df_jogos = pd.DataFrame()
-        finally:
-            conn.close()
 
+    # Carrega times e árbitros (com a conexão ainda aberta)
     try:
         times_df = pd.read_sql_query("SELECT id, nome FROM times", conn)
         arbitros_df = pd.read_sql_query("SELECT id, nome, categoria FROM arbitros ORDER BY nome", conn)
     except Exception as e:
         st.error(f"Erro ao carregar times ou árbitros: {e}")
+        conn.close()  # Fecha antes de sair
         return
+
+    # Fecha a conexão somente depois de tudo carregado
+    conn.close()
 
     times_dict = dict(zip(times_df['id'], times_df['nome']))
     if df_jogos.empty:
