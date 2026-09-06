@@ -428,6 +428,17 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
+
+# ======================================================================
+# FUNÇÃO PARA LIMPAR CACHE
+# ======================================================================
+def limpar_cache():
+    """Limpa todos os caches do Streamlit e recarrega a página."""
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.success("✅ Cache limpo com sucesso! A página será recarregada.")
+    st.rerun()
+
 # ======================================================================
 # FUNÇÃO UNIFICADA PARA BUSCAR FOTO (JOGADORES E COMISSÃO)
 # ======================================================================
@@ -1019,15 +1030,20 @@ if not st.session_state.authenticated:
 st.title(f"⚽ {NOME_TIME} - Temporada {TEMPORADA}")
 st.caption(f"👤 Logado como: {st.session_state.usuario}")
 
-col_sair, col_admin = st.columns([1, 4])
-with col_sair:
+# Colunas para os botões (Sair, Limpar Cache, Gerenciar Usuários)
+col1, col2, col3 = st.columns([1, 1, 2])
+with col1:
     if st.button("Sair"):
         st.session_state.authenticated = False
         st.rerun()
 
+with col2:
+    if st.button("🧹 Limpar Cache"):
+        limpar_cache()
+
 # Botão de gerenciamento de usuários (apenas para admin)
 if st.session_state.get("is_admin", False):
-    with col_admin:
+    with col3:
         if st.button("👥 Gerenciar Usuários (Admin)"):
             st.session_state.gerenciar_usuarios = True
             st.rerun()
