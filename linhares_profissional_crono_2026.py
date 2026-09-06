@@ -150,7 +150,7 @@ POSICOES_CSV = {
     'Matheus Nossa': 'Goleiro',
     'Gabriel Jesus': 'Ponta Esquerda',
     'Luander': 'Centroavante',
-    'Thayson': 'Atacante',
+    'Thayson': 'Lateral Direito',
 }
 
 # Conjunto de IDs válidos para agilizar a verificação
