@@ -556,20 +556,25 @@ def inicializar_banco():
     conn.close()
 
 # =============================================
-# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA)
+# FUNÇÃO AUXILIAR PARA CARREGAR ELENCO (GENÉRICA) - CORRIGIDA
 # =============================================
 def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     if not os.path.exists(caminho_arquivo):
         st.warning(f"Arquivo não encontrado: {caminho_arquivo}")
         return pd.DataFrame()
     try:
-        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
+        # Força leitura com ponto e vírgula, codificação UTF-8, e trata espaços iniciais
+        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
+                         on_bad_lines='skip', skipinitialspace=True, dtype=str)
+        # Limpa nomes das colunas: minúsculas, sem espaços extras
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
+        # Verifica se é arquivo de estatísticas (contém id_jogo) - se sim, ignora
         if 'id_jogo' in df.columns:
             st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
             return pd.DataFrame()
 
+        # Identifica a coluna de nome principal
         coluna_nome = None
         for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
             if possivel in df.columns:
@@ -580,34 +585,43 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             st.warning(f"⚠️ Nenhuma coluna de nome encontrada em {caminho_arquivo}. Ignorando.")
             return pd.DataFrame()
 
+        # Renomeia para 'nome_completo' se necessário
         if coluna_nome != 'nome_completo':
             df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
 
-        if 'apelido' in df.columns:
-            df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
+        # Garante que 'apelido' exista e não seja sobrescrito
+        if 'apelido' not in df.columns:
+            df['apelido'] = df['nome_completo']
+        # Preenche nome_completo com apelido se estiver vazio
+        df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
         df['nome_completo'] = df['nome_completo'].fillna('N/I')
 
+        # Remove duplicatas (prioriza ogol_id se existir)
         if 'ogol_id' in df.columns:
             df = df.drop_duplicates(subset=['ogol_id'], keep='first')
         else:
             df = df.drop_duplicates(subset=['nome_completo'], keep='first')
 
-        for col in ['apelido', 'data_nascimento', 'posicao']:
+        # Garante colunas obrigatórias
+        for col in ['apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
             if col not in df.columns:
                 df[col] = None
 
+        # Converte colunas numéricas
         for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
             else:
                 df[col] = np.nan
 
+        # Atributos FM26
         for attr in ATRIBUTOS_FM26:
             if attr in df.columns:
                 df[attr] = pd.to_numeric(df[attr], errors='coerce')
             else:
                 df[attr] = np.nan
 
+        # Cálculo do IMC
         df['IMC'] = df.apply(
             lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
             if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
@@ -615,7 +629,11 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         ).round(1)
         df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
+
+        # Idade
         df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
+
+        # Gordura corporal (estimativa)
         df['Gordura_Corporal_%'] = df.apply(
             lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
             if pd.notna(row['IMC']) and pd.notna(row['Idade'])
@@ -643,6 +661,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
+        # Posições
         def cat_pos(pos_str):
             if pd.isna(pos_str):
                 return 'Outros', []
@@ -691,6 +710,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         df['Posicao_Principal'] = res.apply(lambda x: x[0])
         df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
 
+        # Rating FM26
         df['Rating_Geral_FM26'] = df.apply(
             lambda row: min(100, row['habilidade_atual'] / 2)
             if pd.notna(row.get('habilidade_atual'))
@@ -698,6 +718,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
             axis=1
         )
 
+        # Remove coluna 'foto' se existir (será buscada separadamente)
         if 'foto' in df.columns:
             df.drop(columns=['foto'], inplace=True)
 
@@ -712,7 +733,6 @@ def carregar_elenco_profissional() -> pd.DataFrame:
     caminho = ARQUIVO_CSV_PROFISSIONAL
     if not os.path.exists(caminho):
         caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_PROFISSIONAL)
-    print(f"📂 Carregando profissional: {caminho}")
     return _carregar_elenco_generico(caminho)
 
 @st.cache_data
@@ -720,7 +740,6 @@ def carregar_elenco_sub15() -> pd.DataFrame:
     caminho = ARQUIVO_CSV_SUB15
     if not os.path.exists(caminho):
         caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_SUB15)
-    print(f"📂 Carregando sub15: {caminho}")
     return _carregar_elenco_generico(caminho)
 
 @st.cache_data
@@ -728,7 +747,6 @@ def carregar_elenco_sub17() -> pd.DataFrame:
     caminho = ARQUIVO_CSV_SUB17
     if not os.path.exists(caminho):
         caminho = os.path.join(DATA_DIR, ARQUIVO_CSV_SUB17)
-    print(f"📂 Carregando sub17: {caminho}")
     return _carregar_elenco_generico(caminho)
 
 # =============================================
@@ -738,7 +756,7 @@ def _carregar_comissao_generico(caminho_arquivo: str) -> pd.DataFrame:
     if not os.path.exists(caminho_arquivo):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig')
+        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig', skipinitialspace=True)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
         if 'nome' not in df.columns and 'apelido' in df.columns:
             df['nome'] = df['apelido']
@@ -794,7 +812,7 @@ def carregar_cronograma(categoria="Profissional") -> pd.DataFrame:
     if not os.path.exists(arquivo):
         return pd.DataFrame()
     try:
-        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig')
+        df = pd.read_csv(arquivo, sep=';', encoding='utf-8-sig', skipinitialspace=True)
         if 'data' not in df.columns:
             return pd.DataFrame()
         df['data'] = pd.to_datetime(df['data'], errors='coerce')
