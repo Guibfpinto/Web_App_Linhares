@@ -412,28 +412,32 @@ def caminho_foto_membro(membro):
 def obter_staff_completo(time_id, competicao_id=None):
     conn = conectar_banco()
     cursor = conn.cursor()
-    query = """
+    
+    # Busca comissão (pode ter competicao_id)
+    query_comissao = """
         SELECT id, nome, apelido, cargo, foto, idade, data_nascimento
         FROM comissao
         WHERE time_id = ?
     """
-    params = [time_id]
+    params_comissao = [time_id]
     if competicao_id:
-        query += " AND competicao_id = ?"
-        params.append(competicao_id)
-    query += " ORDER BY nome"
-    cursor.execute(query, params)
+        query_comissao += " AND competicao_id = ?"
+        params_comissao.append(competicao_id)
+    query_comissao += " ORDER BY nome"
+    cursor.execute(query_comissao, params_comissao)
     comissao = [dict(row) for row in cursor.fetchall()]
+    
+    # Busca técnicos (apenas time_id, sem competicao_id)
     cursor.execute("""
         SELECT id, nome, apelido, foto, idade, data_nascimento,
                'Técnico' as cargo
         FROM tecnicos
         WHERE time_id = ?
-    """, params)
+    """, [time_id])  # <--- APENAS time_id, não use params_comissao
     tecnicos = [dict(row) for row in cursor.fetchall()]
+    
     conn.close()
     return tecnicos + comissao
-
 def obter_arbitro_por_id(arbitro_id):
     if not arbitro_id:
         return None
