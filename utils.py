@@ -173,7 +173,7 @@ ATRIBUTOS_FM26 = [
 ]
 
 # =============================================
-# FUNÇÃO PARA SANITIZAR DATAFRAMES (EVITA ERRO DE ARROW)
+# FUNÇÃO PARA SANITIZAR DATAFRAMES
 # =============================================
 def sanitizar_dataframe(df):
     if df is None or df.empty:
@@ -562,171 +562,197 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     if not os.path.exists(caminho_arquivo):
         st.warning(f"Arquivo não encontrado: {caminho_arquivo}")
         return pd.DataFrame()
-    try:
-        # Força leitura com ponto e vírgula, codificação UTF-8, e trata espaços iniciais
-        df = pd.read_csv(caminho_arquivo, sep=';', encoding='utf-8-sig',
-                         on_bad_lines='skip', skipinitialspace=True, dtype=str)
-        # Limpa nomes das colunas: minúsculas, sem espaços extras
-        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # Verifica se é arquivo de estatísticas (contém id_jogo) - se sim, ignora
-        if 'id_jogo' in df.columns:
-            st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
-            return pd.DataFrame()
+    # Detecta separador automaticamente
+    separadores = [';', ',', '\t', '|']
+    df = None
+    separador_usado = None
 
-        # Identifica a coluna de nome principal
-        coluna_nome = None
-        for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
-            if possivel in df.columns:
-                coluna_nome = possivel
+    for sep in separadores:
+        try:
+            # Testa com poucas linhas
+            df_temp = pd.read_csv(
+                caminho_arquivo,
+                sep=sep,
+                encoding='utf-8-sig',
+                skipinitialspace=True,
+                on_bad_lines='skip',
+                dtype=str,
+                nrows=5
+            )
+            if len(df_temp.columns) > 1:
+                df = pd.read_csv(
+                    caminho_arquivo,
+                    sep=sep,
+                    encoding='utf-8-sig',
+                    skipinitialspace=True,
+                    on_bad_lines='skip',
+                    dtype=str
+                )
+                separador_usado = sep
                 break
+        except Exception:
+            continue
 
-        if coluna_nome is None:
-            st.warning(f"⚠️ Nenhuma coluna de nome encontrada em {caminho_arquivo}. Ignorando.")
-            return pd.DataFrame()
-
-        # Renomeia para 'nome_completo' se necessário
-        if coluna_nome != 'nome_completo':
-            df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
-
-        # Garante que 'apelido' exista e não seja sobrescrito
-        if 'apelido' not in df.columns:
-            df['apelido'] = df['nome_completo']
-        # Preenche nome_completo com apelido se estiver vazio
-        df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
-        df['nome_completo'] = df['nome_completo'].fillna('N/I')
-
-        # Remove duplicatas (prioriza ogol_id se existir)
-        if 'ogol_id' in df.columns:
-            df = df.drop_duplicates(subset=['ogol_id'], keep='first')
-        else:
-            df = df.drop_duplicates(subset=['nome_completo'], keep='first')
-
-        # Garante colunas obrigatórias
-        for col in ['apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
-            if col not in df.columns:
-                df[col] = None
-
-        # Converte colunas numéricas
-        for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            else:
-                df[col] = np.nan
-
-        # Atributos FM26
-        for attr in ATRIBUTOS_FM26:
-            if attr in df.columns:
-                df[attr] = pd.to_numeric(df[attr], errors='coerce')
-            else:
-                df[attr] = np.nan
-
-        # Cálculo do IMC
-        df['IMC'] = df.apply(
-            lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
-            if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
-            else np.nan,
-            axis=1
-        ).round(1)
-        df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
-
-        # Idade
-        df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
-
-        # Gordura corporal (estimativa)
-        df['Gordura_Corporal_%'] = df.apply(
-            lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
-            if pd.notna(row['IMC']) and pd.notna(row['Idade'])
-            else np.nan,
-            axis=1
-        )
-        df['Massa_Magra_kg'] = df.apply(
-            lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%'] / 100), 1)
-            if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%'])
-            else np.nan,
-            axis=1
-        )
-        df['Massa_Muscular_Estimada_kg'] = df.apply(
-            lambda row: round(row['Massa_Magra_kg'] * 0.55, 1)
-            if pd.notna(row['Massa_Magra_kg'])
-            else np.nan,
-            axis=1
-        )
-        df['Classificacao_Gordura'] = df.apply(
-            lambda x: classif_gordura(x['Gordura_Corporal_%'], x['Idade']),
-            axis=1
-        )
-        df['Estado_Fisico'] = df.apply(
-            lambda row: estado_fisico(row['Classificacao_IMC'], row['Classificacao_Gordura']),
-            axis=1
-        )
-
-        # Posições
-        def cat_pos(pos_str):
-            if pd.isna(pos_str):
-                return 'Outros', []
-            pos = str(pos_str).upper().strip()
-            pos_list = [p.strip() for p in pos.split('/')] if '/' in pos else [pos.strip()]
-            cats = []
-            for p in pos_list:
-                pu = p.upper()
-                if 'GOLEIRO' in pu:
-                    cats.append('Goleiro')
-                elif 'ZAGUEIRO' in pu:
-                    cats.append('Zagueiro')
-                elif 'LATERAL DIREITO' in pu or 'LAT. DIREITO' in pu:
-                    cats.append('Lateral Direito')
-                elif 'LATERAL ESQUERDO' in pu or 'LAT. ESQUERDO' in pu:
-                    cats.append('Lateral Esquerdo')
-                elif 'LATERAL' in pu:
-                    cats.append('Lateral')
-                elif 'VOLANTE' in pu:
-                    cats.append('Volante')
-                elif 'MEIA-CENTRAL' in pu or 'MEIA CENTRAL' in pu or 'MEIO-CENTRO' in pu:
-                    cats.append('Meia-Central')
-                elif 'MEIA-ATACANTE' in pu or 'MEIA ATACANTE' in pu or 'MEIA OFENSIVO' in pu:
-                    cats.append('Meia-Atacante')
-                elif 'MEIA' in pu or 'MEIO' in pu:
-                    cats.append('Meia')
-                elif 'PONTA DIREITA' in pu:
-                    cats.append('Ponta Direita')
-                elif 'PONTA ESQUERDA' in pu:
-                    cats.append('Ponta Esquerda')
-                elif 'PONTA' in pu:
-                    cats.append('Ponta')
-                elif 'CENTROAVANTE' in pu:
-                    cats.append('Centroavante')
-                elif 'SEGUNDO ATACANTE' in pu:
-                    cats.append('Segundo Atacante')
-                elif 'ATACANTE' in pu:
-                    cats.append('Atacante')
-                else:
-                    cats.append('Outros')
-            cats = [c for c in cats if c != 'Outros']
-            cats = list(dict.fromkeys(cats))
-            return cats[0] if cats else 'Outros', cats
-
-        res = df['posicao'].apply(cat_pos)
-        df['Posicao_Principal'] = res.apply(lambda x: x[0])
-        df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
-
-        # Rating FM26
-        df['Rating_Geral_FM26'] = df.apply(
-            lambda row: min(100, row['habilidade_atual'] / 2)
-            if pd.notna(row.get('habilidade_atual'))
-            else 50,
-            axis=1
-        )
-
-        # Remove coluna 'foto' se existir (será buscada separadamente)
-        if 'foto' in df.columns:
-            df.drop(columns=['foto'], inplace=True)
-
-        return sanitizar_dataframe(df)
-
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar {caminho_arquivo}: {e}")
+    if df is None:
+        st.error(f"❌ Não foi possível ler o arquivo {caminho_arquivo}. Verifique o formato.")
         return pd.DataFrame()
+
+    # Limpa nomes das colunas
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+
+    # Verifica se é arquivo de estatísticas
+    if 'id_jogo' in df.columns:
+        st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
+        return pd.DataFrame()
+
+    # Identifica coluna de nome
+    coluna_nome = None
+    for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
+        if possivel in df.columns:
+            coluna_nome = possivel
+            break
+
+    if coluna_nome is None:
+        st.warning(f"⚠️ Nenhuma coluna de nome encontrada. Colunas disponíveis: {list(df.columns)}")
+        return pd.DataFrame()
+
+    if coluna_nome != 'nome_completo':
+        df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
+
+    # Garante coluna apelido
+    if 'apelido' not in df.columns:
+        df['apelido'] = df['nome_completo']
+
+    df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
+    df['nome_completo'] = df['nome_completo'].fillna('N/I')
+
+    # Remove duplicatas
+    if 'ogol_id' in df.columns:
+        df = df.drop_duplicates(subset=['ogol_id'], keep='first')
+    else:
+        df = df.drop_duplicates(subset=['nome_completo'], keep='first')
+
+    # Garante colunas obrigatórias
+    for col in ['apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
+        if col not in df.columns:
+            df[col] = None
+
+    # Converte colunas numéricas
+    for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        else:
+            df[col] = np.nan
+
+    # Atributos FM26
+    for attr in ATRIBUTOS_FM26:
+        if attr in df.columns:
+            df[attr] = pd.to_numeric(df[attr], errors='coerce')
+        else:
+            df[attr] = np.nan
+
+    # Cálculo do IMC
+    df['IMC'] = df.apply(
+        lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
+        if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
+        else np.nan,
+        axis=1
+    ).round(1)
+    df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
+
+    # Idade
+    df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
+
+    # Gordura corporal
+    df['Gordura_Corporal_%'] = df.apply(
+        lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
+        if pd.notna(row['IMC']) and pd.notna(row['Idade'])
+        else np.nan,
+        axis=1
+    )
+    df['Massa_Magra_kg'] = df.apply(
+        lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%'] / 100), 1)
+        if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%'])
+        else np.nan,
+        axis=1
+    )
+    df['Massa_Muscular_Estimada_kg'] = df.apply(
+        lambda row: round(row['Massa_Magra_kg'] * 0.55, 1)
+        if pd.notna(row['Massa_Magra_kg'])
+        else np.nan,
+        axis=1
+    )
+    df['Classificacao_Gordura'] = df.apply(
+        lambda x: classif_gordura(x['Gordura_Corporal_%'], x['Idade']),
+        axis=1
+    )
+    df['Estado_Fisico'] = df.apply(
+        lambda row: estado_fisico(row['Classificacao_IMC'], row['Classificacao_Gordura']),
+        axis=1
+    )
+
+    # Posições
+    def cat_pos(pos_str):
+        if pd.isna(pos_str):
+            return 'Outros', []
+        pos = str(pos_str).upper().strip()
+        pos_list = [p.strip() for p in pos.split('/')] if '/' in pos else [pos.strip()]
+        cats = []
+        for p in pos_list:
+            pu = p.upper()
+            if 'GOLEIRO' in pu:
+                cats.append('Goleiro')
+            elif 'ZAGUEIRO' in pu:
+                cats.append('Zagueiro')
+            elif 'LATERAL DIREITO' in pu or 'LAT. DIREITO' in pu:
+                cats.append('Lateral Direito')
+            elif 'LATERAL ESQUERDO' in pu or 'LAT. ESQUERDO' in pu:
+                cats.append('Lateral Esquerdo')
+            elif 'LATERAL' in pu:
+                cats.append('Lateral')
+            elif 'VOLANTE' in pu:
+                cats.append('Volante')
+            elif 'MEIA-CENTRAL' in pu or 'MEIA CENTRAL' in pu or 'MEIO-CENTRO' in pu:
+                cats.append('Meia-Central')
+            elif 'MEIA-ATACANTE' in pu or 'MEIA ATACANTE' in pu or 'MEIA OFENSIVO' in pu:
+                cats.append('Meia-Atacante')
+            elif 'MEIA' in pu or 'MEIO' in pu:
+                cats.append('Meia')
+            elif 'PONTA DIREITA' in pu:
+                cats.append('Ponta Direita')
+            elif 'PONTA ESQUERDA' in pu:
+                cats.append('Ponta Esquerda')
+            elif 'PONTA' in pu:
+                cats.append('Ponta')
+            elif 'CENTROAVANTE' in pu:
+                cats.append('Centroavante')
+            elif 'SEGUNDO ATACANTE' in pu:
+                cats.append('Segundo Atacante')
+            elif 'ATACANTE' in pu:
+                cats.append('Atacante')
+            else:
+                cats.append('Outros')
+        cats = [c for c in cats if c != 'Outros']
+        cats = list(dict.fromkeys(cats))
+        return cats[0] if cats else 'Outros', cats
+
+    res = df['posicao'].apply(cat_pos)
+    df['Posicao_Principal'] = res.apply(lambda x: x[0])
+    df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
+
+    # Rating FM26
+    df['Rating_Geral_FM26'] = df.apply(
+        lambda row: min(100, row['habilidade_atual'] / 2)
+        if pd.notna(row.get('habilidade_atual'))
+        else 50,
+        axis=1
+    )
+
+    if 'foto' in df.columns:
+        df.drop(columns=['foto'], inplace=True)
+
+    return sanitizar_dataframe(df)
 
 @st.cache_data
 def carregar_elenco_profissional() -> pd.DataFrame:
@@ -750,7 +776,7 @@ def carregar_elenco_sub17() -> pd.DataFrame:
     return _carregar_elenco_generico(caminho)
 
 # =============================================
-# CARREGAMENTO DA COMISSÃO (COM TODOS OS ATRIBUTOS)
+# CARREGAMENTO DA COMISSÃO
 # =============================================
 def _carregar_comissao_generico(caminho_arquivo: str) -> pd.DataFrame:
     if not os.path.exists(caminho_arquivo):
@@ -1950,7 +1976,7 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
     return sanitizar_dataframe(df_merged)
 
 # =============================================
-# FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO (CORRIGIDO)
+# FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO
 # =============================================
 def interpretar_formacao(formacao_str):
     """
