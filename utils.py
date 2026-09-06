@@ -570,7 +570,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
 
     for sep in separadores:
         try:
-            # Testa com poucas linhas
+            # Testa com poucas linhas, sem usar a primeira coluna como índice
             df_temp = pd.read_csv(
                 caminho_arquivo,
                 sep=sep,
@@ -578,7 +578,8 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
                 skipinitialspace=True,
                 on_bad_lines='skip',
                 dtype=str,
-                nrows=5
+                nrows=5,
+                index_col=False  # IMPORTANTE: não usa a primeira coluna como índice
             )
             if len(df_temp.columns) > 1:
                 df = pd.read_csv(
@@ -587,7 +588,8 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
                     encoding='utf-8-sig',
                     skipinitialspace=True,
                     on_bad_lines='skip',
-                    dtype=str
+                    dtype=str,
+                    index_col=False
                 )
                 separador_usado = sep
                 break
@@ -598,43 +600,125 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         st.error(f"❌ Não foi possível ler o arquivo {caminho_arquivo}. Verifique o formato.")
         return pd.DataFrame()
 
-    # Limpa nomes das colunas
+    # Limpa nomes das colunas (remove espaços, converte para minúsculas)
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-    # Verifica se é arquivo de estatísticas
-    if 'id_jogo' in df.columns:
-        st.warning(f"⚠️ O arquivo {caminho_arquivo} parece ser de estatísticas (coluna 'id_jogo'). Ignorando.")
-        return pd.DataFrame()
+    # Remove colunas sem nome (ex: primeira coluna vazia)
+    df = df.loc[:, ~df.columns.str.match('^unnamed.*$', case=False)]
 
-    # Identifica coluna de nome
-    coluna_nome = None
-    for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
-        if possivel in df.columns:
-            coluna_nome = possivel
-            break
+    # Verifica se há colunas com nomes de data (ex: '15/12/2009' como nome de coluna) – descarta
+    # Isso pode acontecer se o CSV estiver muito mal formatado.
+    # Vamos identificar as colunas esperadas por conteúdo, não por nome.
+    
+    # Mapeamento inteligente: tentamos identificar qual coluna contém o nome do jogador,
+    # qual contém o apelido, qual contém a data de nascimento, etc.
+    # Vamos usar uma abordagem baseada no conteúdo.
 
-    if coluna_nome is None:
-        st.warning(f"⚠️ Nenhuma coluna de nome encontrada. Colunas disponíveis: {list(df.columns)}")
-        return pd.DataFrame()
+    # Primeiro, tenta identificar a coluna que parece ser o nome completo (texto longo com várias palavras)
+    colunas = df.columns.tolist()
+    col_nome = None
+    col_apelido = None
+    col_data_nasc = None
+    col_posicao = None
+    col_altura = None
+    col_peso = None
 
-    if coluna_nome != 'nome_completo':
-        df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
+    # Pega os primeiros valores não nulos de cada coluna para análise
+    sample = df.iloc[0] if not df.empty else None
+    if sample is not None:
+        for col in colunas:
+            valor = str(sample.get(col, '')).strip()
+            if not valor:
+                continue
+            # Se o valor parece uma data (contém / ou - e tem números)
+            if re.match(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$', valor):
+                # Provavelmente é data de nascimento
+                if col_data_nasc is None:
+                    col_data_nasc = col
+                continue
+            # Se parece um nome com duas ou mais palavras (ex: "Julio César")
+            if len(valor.split()) >= 2 and not any(c.isdigit() for c in valor):
+                if col_nome is None:
+                    col_nome = col
+                elif col_apelido is None:
+                    col_apelido = col
+            # Se parece uma posição (Goleiro, Zagueiro, Meia, etc.)
+            if valor in ['Goleiro', 'Zagueiro', 'Lateral', 'Volante', 'Meia', 'Atacante', 'Ponta', 'Centroavante',
+                         'Meia-Central', 'Meia-Atacante', 'Lateral Direito', 'Lateral Esquerdo', 'Segundo Atacante']:
+                col_posicao = col
+            # Se parece altura (número com vírgula ou ponto)
+            if re.match(r'^\d+[,.]?\d*$', valor) and len(valor) <= 5:
+                if col_altura is None:
+                    col_altura = col
+            # Se parece peso (número com vírgula ou ponto)
+            if re.match(r'^\d+[,.]?\d*$', valor) and len(valor) <= 5:
+                if col_peso is None:
+                    col_peso = col
 
-    # Garante coluna apelido
+    # Se não encontrou col_nome, tenta por nomes conhecidos
+    if col_nome is None:
+        for possivel in ['nome_completo', 'nome', 'jogador']:
+            if possivel in colunas:
+                col_nome = possivel
+                break
+    if col_apelido is None:
+        for possivel in ['apelido', 'nick', 'alcunha']:
+            if possivel in colunas:
+                col_apelido = possivel
+                break
+    if col_data_nasc is None:
+        for possivel in ['data_nascimento', 'nascimento', 'data_nasc']:
+            if possivel in colunas:
+                col_data_nasc = possivel
+                break
+    if col_posicao is None:
+        for possivel in ['posicao', 'pos']:
+            if possivel in colunas:
+                col_posicao = possivel
+                break
+
+    # Se ainda não encontrou col_nome, usa a primeira coluna (que não seja vazia)
+    if col_nome is None:
+        for col in colunas:
+            if df[col].notna().any() and col not in [col_data_nasc, col_apelido]:
+                col_nome = col
+                break
+
+    # Renomeia as colunas identificadas para os nomes padrão
+    rename_dict = {}
+    if col_nome:
+        rename_dict[col_nome] = 'nome_completo'
+    if col_apelido and col_apelido != col_nome:
+        rename_dict[col_apelido] = 'apelido'
+    if col_data_nasc:
+        rename_dict[col_data_nasc] = 'data_nascimento'
+    if col_posicao:
+        rename_dict[col_posicao] = 'posicao'
+
+    if rename_dict:
+        df.rename(columns=rename_dict, inplace=True)
+
+    # Se 'apelido' não foi identificado, usamos 'nome_completo' como apelido
     if 'apelido' not in df.columns:
-        df['apelido'] = df['nome_completo']
+        df['apelido'] = df.get('nome_completo', '')
 
-    df['nome_completo'] = df['nome_completo'].fillna(df['apelido'])
-    df['nome_completo'] = df['nome_completo'].fillna('N/I')
+    # Se 'data_nascimento' não foi identificado, criamos coluna vazia
+    if 'data_nascimento' not in df.columns:
+        df['data_nascimento'] = None
 
-    # Remove duplicatas
-    if 'ogol_id' in df.columns:
-        df = df.drop_duplicates(subset=['ogol_id'], keep='first')
-    else:
-        df = df.drop_duplicates(subset=['nome_completo'], keep='first')
+    # Se 'posicao' não foi identificado, criamos coluna vazia
+    if 'posicao' not in df.columns:
+        df['posicao'] = None
 
-    # Garante colunas obrigatórias
-    for col in ['apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
+    # Remove colunas que não são necessárias (opcional)
+    # Mantém apenas as colunas que queremos
+    colunas_desejadas = ['nome_completo', 'apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg'] + ATRIBUTOS_FM26
+    colunas_extra = ['ogol_id', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'historico', 'habilidade_atual', 'habilidade_potencial']
+    colunas_manter = [c for c in colunas_desejadas + colunas_extra if c in df.columns]
+    df = df[colunas_manter]
+
+    # Garante que as colunas obrigatórias existam
+    for col in ['pe_pref', 'altura_cm', 'peso_kg']:
         if col not in df.columns:
             df[col] = None
 
@@ -652,7 +736,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         else:
             df[attr] = np.nan
 
-    # Cálculo do IMC
+    # Cálculo do IMC, idade, etc. (mantido)
     df['IMC'] = df.apply(
         lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
         if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
@@ -661,10 +745,8 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     ).round(1)
     df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
 
-    # Idade
     df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
 
-    # Gordura corporal
     df['Gordura_Corporal_%'] = df.apply(
         lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
         if pd.notna(row['IMC']) and pd.notna(row['Idade'])
