@@ -11,6 +11,9 @@ from utils import (
     mapear_nome_para_canonico,
     verificar_e_reinicializar_cartoes,
     sanitizar_dataframe,
+    carregar_comissao,
+    carregar_comissao_sub15,
+    carregar_comissao_sub17,
 )
 
 def show():
@@ -23,7 +26,6 @@ def show():
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         if st.button("🔄 Reordenar Cartões por Mês"):
-            # Força o recarregamento do cache e reordena
             st.cache_data.clear()
             st.rerun()
     with col2:
@@ -198,16 +200,32 @@ def show():
         else:
             st.info("Nenhum evento de cartão para este jogador com os filtros atuais.")
 
-        # Botão reinicializar manual
+        # ============================================================
+        # BOTÃO REINICIALIZAR MANUAL (CORRIGIDO)
+        # ============================================================
         if st.button(f"🔄 Reinicializar cartões de {categoria}"):
-            if "Comissão" in categoria:
-                novos_cartoes, _ = inicializar_cartoes_comissao(chave_categoria, None)
-            else:
-                canonico_para_ogol_id = {}
-                novos_cartoes, _ = inicializar_cartoes_por_csvs(chave_categoria, canonico_para_ogol_id)
-            st.success("Cartões reinicializados com sucesso!")
-            st.cache_data.clear()
-            st.rerun()
+            with st.spinner("Reinicializando cartões..."):
+                if "Comissão" in categoria:
+                    # Carrega a comissão correta
+                    if categoria == "Comissão Profissional":
+                        df_comissao = carregar_comissao()
+                    elif categoria == "Comissão Sub-15":
+                        df_comissao = carregar_comissao_sub15()
+                    elif categoria == "Comissão Sub-17":
+                        df_comissao = carregar_comissao_sub17()
+                    else:
+                        df_comissao = None
+                    if df_comissao is not None and not df_comissao.empty:
+                        novos_cartoes, _ = inicializar_cartoes_comissao(chave_categoria, df_comissao)
+                    else:
+                        st.error("Dados da comissão não encontrados.")
+                        novos_cartoes = {}
+                else:
+                    canonico_para_ogol_id = {}
+                    novos_cartoes, _ = inicializar_cartoes_por_csvs(chave_categoria, canonico_para_ogol_id)
+                st.success("Cartões reinicializados com sucesso!")
+                st.cache_data.clear()
+                st.rerun()
 
     st.markdown("---")
     st.caption("Os cartões são gerenciados automaticamente pelos CSVs de estatísticas. Reinicialize se necessário.")
