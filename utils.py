@@ -22,6 +22,11 @@ from pathlib import Path
 # =============================================
 # CONSTANTES DE CAMINHOS (CSVs)
 # =============================================
+DATA_DIR = "data"
+RELATORIOS_DIR = "relatorios"
+NOME_TIME = "Linhares FC"
+TEMPORADA = str(datetime.now().year)
+
 ARQUIVO_CSV_PROFISSIONAL = "perfil_completo_jogadores_profissional_2026.csv"
 ARQUIVO_CSV_SUB15 = "perfil_completo_jogadores_Sub15_2026.csv"
 ARQUIVO_CSV_SUB17 = "perfil_completo_jogadores_Sub17_2026.csv"
@@ -37,11 +42,6 @@ ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia.csv"
 ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
 ARQUIVO_CRONO_SUB15 = "cronograma_sub15_2026.csv"
 ARQUIVO_CRONO_SUB17 = "cronograma_sub17_2026.csv"
-
-DATA_DIR = "data"
-RELATORIOS_DIR = "relatorios"
-NOME_TIME = "Linhares FC"
-TEMPORADA = str(datetime.now().year)
 
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
@@ -146,6 +146,8 @@ MAPEAMENTO_NOMES_PROFISSIONAL = {
     'Matheus Sarmento': 'Matheus Nossa',
     'Gabriel de Jesus Rodrigues': 'Gabriel Jesus',
     'Gabriel Jesus': 'Gabriel Jesus',
+    'Luander da Silva Denerval': 'Luander',
+    'Thayson Lourenço dos Santos': 'Thayson',
 }
 MAPEAMENTO_NOMES_SUB15 = {}
 MAPEAMENTO_NOMES_SUB17 = {}
@@ -566,11 +568,8 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     # Detecta separador automaticamente
     separadores = [';', ',', '\t', '|']
     df = None
-    separador_usado = None
-
     for sep in separadores:
         try:
-            # Testa com poucas linhas, sem usar a primeira coluna como índice
             df_temp = pd.read_csv(
                 caminho_arquivo,
                 sep=sep,
@@ -579,7 +578,7 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
                 on_bad_lines='skip',
                 dtype=str,
                 nrows=5,
-                index_col=False  # IMPORTANTE: não usa a primeira coluna como índice
+                index_col=False
             )
             if len(df_temp.columns) > 1:
                 df = pd.read_csv(
@@ -591,7 +590,6 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
                     dtype=str,
                     index_col=False
                 )
-                separador_usado = sep
                 break
         except Exception:
             continue
@@ -600,130 +598,24 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         st.error(f"❌ Não foi possível ler o arquivo {caminho_arquivo}. Verifique o formato.")
         return pd.DataFrame()
 
-    # Limpa nomes das colunas (remove espaços, converte para minúsculas)
+    # Limpa nomes das colunas
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-
-    # Remove colunas sem nome (ex: primeira coluna vazia)
+    # Remove colunas sem nome
     df = df.loc[:, ~df.columns.str.match('^unnamed.*$', case=False)]
 
-    # Verifica se há colunas com nomes de data (ex: '15/12/2009' como nome de coluna) – descarta
-    # Isso pode acontecer se o CSV estiver muito mal formatado.
-    # Vamos identificar as colunas esperadas por conteúdo, não por nome.
-    
-    # Mapeamento inteligente: tentamos identificar qual coluna contém o nome do jogador,
-    # qual contém o apelido, qual contém a data de nascimento, etc.
-    # Vamos usar uma abordagem baseada no conteúdo.
+    # Renomeia colunas de estatísticas para garantir consistência
+    # (já estão nos nomes corretos)
 
-    # Primeiro, tenta identificar a coluna que parece ser o nome completo (texto longo com várias palavras)
-    colunas = df.columns.tolist()
-    col_nome = None
-    col_apelido = None
-    col_data_nasc = None
-    col_posicao = None
-    col_altura = None
-    col_peso = None
-
-    # Pega os primeiros valores não nulos de cada coluna para análise
-    sample = df.iloc[0] if not df.empty else None
-    if sample is not None:
-        for col in colunas:
-            valor = str(sample.get(col, '')).strip()
-            if not valor:
-                continue
-            # Se o valor parece uma data (contém / ou - e tem números)
-            if re.match(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$', valor):
-                # Provavelmente é data de nascimento
-                if col_data_nasc is None:
-                    col_data_nasc = col
-                continue
-            # Se parece um nome com duas ou mais palavras (ex: "Julio César")
-            if len(valor.split()) >= 2 and not any(c.isdigit() for c in valor):
-                if col_nome is None:
-                    col_nome = col
-                elif col_apelido is None:
-                    col_apelido = col
-            # Se parece uma posição (Goleiro, Zagueiro, Meia, etc.)
-            if valor in ['Goleiro', 'Zagueiro', 'Lateral', 'Volante', 'Meia', 'Atacante', 'Ponta', 'Centroavante',
-                         'Meia-Central', 'Meia-Atacante', 'Lateral Direito', 'Lateral Esquerdo', 'Segundo Atacante']:
-                col_posicao = col
-            # Se parece altura (número com vírgula ou ponto)
-            if re.match(r'^\d+[,.]?\d*$', valor) and len(valor) <= 5:
-                if col_altura is None:
-                    col_altura = col
-            # Se parece peso (número com vírgula ou ponto)
-            if re.match(r'^\d+[,.]?\d*$', valor) and len(valor) <= 5:
-                if col_peso is None:
-                    col_peso = col
-
-    # Se não encontrou col_nome, tenta por nomes conhecidos
-    if col_nome is None:
-        for possivel in ['nome_completo', 'nome', 'jogador']:
-            if possivel in colunas:
-                col_nome = possivel
-                break
-    if col_apelido is None:
-        for possivel in ['apelido', 'nick', 'alcunha']:
-            if possivel in colunas:
-                col_apelido = possivel
-                break
-    if col_data_nasc is None:
-        for possivel in ['data_nascimento', 'nascimento', 'data_nasc']:
-            if possivel in colunas:
-                col_data_nasc = possivel
-                break
-    if col_posicao is None:
-        for possivel in ['posicao', 'pos']:
-            if possivel in colunas:
-                col_posicao = possivel
-                break
-
-    # Se ainda não encontrou col_nome, usa a primeira coluna (que não seja vazia)
-    if col_nome is None:
-        for col in colunas:
-            if df[col].notna().any() and col not in [col_data_nasc, col_apelido]:
-                col_nome = col
-                break
-
-    # Renomeia as colunas identificadas para os nomes padrão
-    rename_dict = {}
-    if col_nome:
-        rename_dict[col_nome] = 'nome_completo'
-    if col_apelido and col_apelido != col_nome:
-        rename_dict[col_apelido] = 'apelido'
-    if col_data_nasc:
-        rename_dict[col_data_nasc] = 'data_nascimento'
-    if col_posicao:
-        rename_dict[col_posicao] = 'posicao'
-
-    if rename_dict:
-        df.rename(columns=rename_dict, inplace=True)
-
-    # Se 'apelido' não foi identificado, usamos 'nome_completo' como apelido
-    if 'apelido' not in df.columns:
-        df['apelido'] = df.get('nome_completo', '')
-
-    # Se 'data_nascimento' não foi identificado, criamos coluna vazia
-    if 'data_nascimento' not in df.columns:
-        df['data_nascimento'] = None
-
-    # Se 'posicao' não foi identificado, criamos coluna vazia
-    if 'posicao' not in df.columns:
-        df['posicao'] = None
-
-    # Remove colunas que não são necessárias (opcional)
-    # Mantém apenas as colunas que queremos
-    colunas_desejadas = ['nome_completo', 'apelido', 'data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg'] + ATRIBUTOS_FM26
-    colunas_extra = ['ogol_id', 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'historico', 'habilidade_atual', 'habilidade_potencial']
-    colunas_manter = [c for c in colunas_desejadas + colunas_extra if c in df.columns]
-    df = df[colunas_manter]
-
-    # Garante que as colunas obrigatórias existam
-    for col in ['pe_pref', 'altura_cm', 'peso_kg']:
-        if col not in df.columns:
-            df[col] = None
-
-    # Converte colunas numéricas
-    for col in ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']:
+    # Converte colunas numéricas (incluindo estatísticas)
+    colunas_numericas = [
+        'altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial',
+        'jogos_temporada', 'minutos_totais', 'media_minutos_por_jogo',
+        'gols_totais', 'assistencias_totais', 'cartoes_amarelos_totais',
+        'cartoes_vermelhos_totais', 'chutes_totais', 'chutes_ao_gol_totais',
+        'desarmes_totais', 'interceptacoes_totais', 'passes_certos_totais',
+        'passes_chave_totais', 'defesas_totais', 'participacoes_diretas'
+    ]
+    for col in colunas_numericas:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
         else:
@@ -736,7 +628,39 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         else:
             df[attr] = np.nan
 
-    # Cálculo do IMC, idade, etc. (mantido)
+    # Identifica a coluna de nome principal
+    coluna_nome = None
+    for possivel in ['nome_completo', 'apelido', 'jogador', 'nome']:
+        if possivel in df.columns:
+            coluna_nome = possivel
+            break
+
+    if coluna_nome is None:
+        st.warning(f"⚠️ Nenhuma coluna de nome encontrada. Colunas disponíveis: {list(df.columns)}")
+        return pd.DataFrame()
+
+    if coluna_nome != 'nome_completo':
+        df.rename(columns={coluna_nome: 'nome_completo'}, inplace=True)
+
+    # Garante coluna 'apelido'
+    if 'apelido' not in df.columns:
+        df['apelido'] = df['nome_completo']
+
+    # Remove duplicatas
+    if 'ogol_id' in df.columns:
+        df = df.drop_duplicates(subset=['ogol_id'], keep='first')
+    else:
+        df = df.drop_duplicates(subset=['nome_completo'], keep='first')
+
+    # Garante colunas básicas
+    for col in ['data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
+        if col not in df.columns:
+            df[col] = None
+        elif col in ['altura_cm', 'peso_kg']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        # data_nascimento mantido como string
+
+    # Cálculo do IMC (usando altura_cm e peso_kg)
     df['IMC'] = df.apply(
         lambda x: x['peso_kg'] / ((x['altura_cm'] / 100) ** 2)
         if pd.notna(x['altura_cm']) and pd.notna(x['peso_kg']) and x['altura_cm'] > 0
@@ -745,8 +669,10 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     ).round(1)
     df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
 
+    # Idade
     df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
 
+    # Gordura corporal (estimativa)
     df['Gordura_Corporal_%'] = df.apply(
         lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
         if pd.notna(row['IMC']) and pd.notna(row['Idade'])
@@ -823,14 +749,20 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     df['Posicao_Principal'] = res.apply(lambda x: x[0])
     df['Posicoes_Secundarias'] = res.apply(lambda x: x[1])
 
-    # Rating FM26
-    df['Rating_Geral_FM26'] = df.apply(
-        lambda row: min(100, row['habilidade_atual'] / 2)
-        if pd.notna(row.get('habilidade_atual'))
-        else 50,
-        axis=1
-    )
+    # Rating FM26 (usando habilidade_atual ou média dos atributos)
+    if 'habilidade_atual' in df.columns and df['habilidade_atual'].notna().any():
+        df['Rating_Geral_FM26'] = df['habilidade_atual'] / 2
+    else:
+        attr_values = df[ATRIBUTOS_FM26].mean(axis=1)
+        df['Rating_Geral_FM26'] = attr_values
+    df['Rating_Geral_FM26'] = df['Rating_Geral_FM26'].clip(0, 100).fillna(50)
 
+    # Preenche estatísticas NaN com 0
+    for col in colunas_numericas:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+
+    # Remove coluna 'foto' se existir
     if 'foto' in df.columns:
         df.drop(columns=['foto'], inplace=True)
 
@@ -948,12 +880,9 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
     return df_futuros.iloc[0].to_dict()
 
 # =============================================
-# EXIBIR FOTO (JOGADORES E COMISSÃO) - VERSÃO MELHORADA
+# EXIBIR FOTO (JOGADORES E COMISSÃO)
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
-    """
-    Busca a foto do jogador em várias pastas, usando correspondência flexível.
-    """
     # Tenta obter o nome a partir da coluna 'foto'
     foto = pessoa_row.get('foto', '')
     if foto and pd.notna(foto) and str(foto).strip():
@@ -961,18 +890,14 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         if os.path.exists(caminho) or caminho.startswith('http'):
             return caminho
 
-    # Obtém o nome base (apelido ou nome completo)
     nome = pessoa_row.get('apelido') or pessoa_row.get('nome_completo') or pessoa_row.get('nome')
     if not nome or pd.isna(nome):
         return None
 
-    # Normaliza o nome para comparação
     nome_clean = normalizar_texto(nome).replace(' ', '_')
-    nome_sem_acento = normalizar_texto(nome)  # sem substituir espaços por underscore
+    nome_sem_acento = normalizar_texto(nome)
 
-    # Lista de pastas onde procurar (inclui todas as categorias e pastas genéricas)
     pastas_base = [
-        # Pastas relativas ao diretório do projeto
         "assets/fotos_jogadores",
         "assets/fotos_jogadores/Profissional",
         "assets/fotos_jogadores/Sub15",
@@ -985,66 +910,39 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
         "fotos_sistema_Analise_Elenco/Jogadores/Sub15",
         "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
-        # Pastas da comissão (também podem conter fotos)
-        "assets/fotos_comissao",
-        "assets/fotos_comissao/Profissional",
-        "assets/fotos_comissao/Sub15",
-        "assets/fotos_comissao/Sub17",
-        "assets/fotos_tecnicos",
-        "fotos_comissao",
-        "Fotos_Tecnicos",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
-        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
-
-    # Pastas absolutas (caminhos fixos, se necessário)
     pastas_absolutas = [
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_jogadores",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos_sistema_Analise_Elenco\Jogadores",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
     ]
-
-    # Combina pastas relativas ao script e ao diretório pai
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
-
     pastas = pastas_absolutas.copy()
     for p in pastas_base:
         pastas.append(os.path.join(script_dir, p))
         pastas.append(os.path.join(parent_dir, p))
 
-    # Extensões de imagem suportadas
     extensoes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
 
-    # Função auxiliar para verificar se um arquivo corresponde ao nome do jogador
     def arquivo_corresponde(nome_arquivo):
         nome_arquivo_sem_ext = os.path.splitext(nome_arquivo)[0]
-        # Remove acentos e caracteres especiais
         nome_arquivo_clean = normalizar_texto(nome_arquivo_sem_ext).replace(' ', '_')
-        # Verifica se o nome do jogador (clean) está contido no nome do arquivo ou vice-versa
         return (nome_clean in nome_arquivo_clean) or (nome_arquivo_clean in nome_clean) or (nome_sem_acento in normalizar_texto(nome_arquivo_sem_ext))
 
-    # Primeiro, tenta encontrar um arquivo que corresponda exatamente ou contenha o nome
     for pasta in set(pastas):
         if not os.path.isdir(pasta):
             continue
         for ext in extensoes:
-            # Tenta com o nome exato (apelido) e com o nome limpo
             for nome_tentativa in [nome, nome_clean]:
                 caminho = os.path.join(pasta, f"{nome_tentativa}{ext}")
                 if os.path.exists(caminho):
                     return os.path.abspath(caminho)
-
-        # Se não encontrou, varre todos os arquivos da pasta procurando correspondência parcial
         for arquivo in os.listdir(pasta):
             if any(arquivo.lower().endswith(ext) for ext in extensoes):
                 if arquivo_corresponde(arquivo):
                     return os.path.abspath(os.path.join(pasta, arquivo))
 
-    # Busca recursiva em subpastas (caso as fotos estejam em estruturas mais profundas)
     for pasta in set(pastas):
         if not os.path.isdir(pasta):
             continue
@@ -1053,7 +951,6 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
                 if any(arquivo.lower().endswith(ext) for ext in extensoes):
                     if arquivo_corresponde(arquivo):
                         return os.path.abspath(os.path.join(root, arquivo))
-
     return None
 
 def exibir_foto(pessoa_row, categoria="Profissional", width=100):
@@ -1072,17 +969,14 @@ def exibir_foto(pessoa_row, categoria="Profissional", width=100):
 def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
     if not nome_arbitro or pd.isna(nome_arbitro):
         return None
-
     base_dir = Path(__file__).resolve().parent
     nome_clean = normalizar_texto(nome_arbitro).replace(' ', '_')
     extensoes = ['.png', '.jpg', '.jpeg', '.webp']
-
     pastas = [
         base_dir / "fotos_arbitros",
         base_dir / "assets" / "fotos_arbitros",
         base_dir / "data" / "fotos_arbitros",
     ]
-
     for pasta in pastas:
         if not pasta.exists():
             continue
@@ -1093,7 +987,6 @@ def obter_caminho_foto_arbitro(nome_arbitro: str) -> Optional[str]:
             caminho = pasta / f"{nome_clean}{ext}"
             if caminho.exists():
                 return str(caminho.resolve())
-
     for pasta in pastas:
         if pasta.exists():
             for ext in extensoes:
@@ -1285,7 +1178,7 @@ def obter_lesao_atual(jogador_row, categoria):
     return ""
 
 # =============================================
-# GESTÃO DE LESÕES (ADICIONAR/ATUALIZAR)
+# GESTÃO DE LESÕES
 # =============================================
 def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=None):
     import pandas as pd
@@ -2061,101 +1954,27 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
 # FUNÇÕES DE ESCALAÇÃO E FORMAÇÃO
 # =============================================
 def interpretar_formacao(formacao_str):
-    """
-    Interpreta uma string de formação (ex: '4-4-2', '4-3-3', '3-5-2').
-    Retorna uma tupla (defensores, meio_campistas, atacantes, posicoes_lista)
-    onde posicoes_lista é uma lista de (posicao_exibida, posicao_tipo) para cada jogador.
-    """
     if not formacao_str or not isinstance(formacao_str, str):
         return None, None, None, None
-
-    # Remove espaços e hífens extras
-    formacao_str = formacao_str.strip()
-    partes = re.split(r'[-/]', formacao_str)
+    partes = formacao_str.split('-')
     if len(partes) < 3:
         return None, None, None, None
-
     try:
         nums = [int(p) for p in partes]
         if sum(nums) != 10:
             return None, None, None, None
         defensores = nums[0]
-        meio_campistas = nums[1] if len(nums) > 2 else 0
-        atacantes = nums[2] if len(nums) > 2 else nums[1]
-        # Se a formação for do tipo "4-4-2", nums = [4,4,2]
-        # Mas se for "4-3-3", nums = [4,3,3]
-        # Vamos ajustar: meio_campistas = nums[1], atacantes = nums[2]
-        if len(nums) >= 3:
-            meio_campistas = nums[1]
-            atacantes = nums[2]
-        else:
-            meio_campistas = nums[1]  # fallback
-
+        atacantes = nums[-1]
+        meio_campistas = sum(nums[1:-1])
         posicoes = [('Goleiro', 'Goleiro')]
-
-        # Defensores: Zagueiros e Laterais (distribuição padrão)
-        if defensores == 5:
-            for i in range(defensores):
-                if i == 0:
-                    posicoes.append(('Lateral Esquerdo', 'Lateral'))
-                elif i == defensores - 1:
-                    posicoes.append(('Lateral Direito', 'Lateral'))
-                else:
-                    posicoes.append((f'Zagueiro {i}', 'Zagueiro'))
-        elif defensores == 4:
-            posicoes.append(('Lateral Esquerdo', 'Lateral'))
-            posicoes.append(('Zagueiro', 'Zagueiro'))
-            posicoes.append(('Zagueiro', 'Zagueiro'))
-            posicoes.append(('Lateral Direito', 'Lateral'))
-        elif defensores == 3:
-            posicoes.append(('Zagueiro Esquerdo', 'Zagueiro'))
-            posicoes.append(('Zagueiro Central', 'Zagueiro'))
-            posicoes.append(('Zagueiro Direito', 'Zagueiro'))
-        else:
-            for i in range(defensores):
-                posicoes.append((f'Defensor {i+1}', 'Defensor'))
-
-        # Meio-campistas
-        if meio_campistas == 5:
-            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Direito', 'Meio-Campo'))
-        elif meio_campistas == 4:
-            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Direito', 'Meio-Campo'))
-        elif meio_campistas == 3:
-            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Direito', 'Meio-Campo'))
-        elif meio_campistas == 2:
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-            posicoes.append(('Meia Central', 'Meio-Campo'))
-        else:
-            for i in range(meio_campistas):
-                posicoes.append((f'Meio-Campo {i+1}', 'Meio-Campo'))
-
-        # Atacantes
-        if atacantes == 3:
-            posicoes.append(('Ponta Esquerda', 'Ponta'))
-            posicoes.append(('Centroavante', 'Atacante'))
-            posicoes.append(('Ponta Direita', 'Ponta'))
-        elif atacantes == 2:
-            posicoes.append(('Atacante', 'Atacante'))
-            posicoes.append(('Atacante', 'Atacante'))
-        elif atacantes == 1:
-            posicoes.append(('Centroavante', 'Atacante'))
-        else:
-            for i in range(atacantes):
-                posicoes.append((f'Atacante {i+1}', 'Atacante'))
-
+        for i in range(defensores):
+            posicoes.append((f'Defensor {i+1}', 'Defensor'))
+        for i in range(meio_campistas):
+            posicoes.append((f'Meio-Campista {i+1}', 'Meio-Campo'))
+        for i in range(atacantes):
+            posicoes.append((f'Atacante {i+1}', 'Atacante'))
         return defensores, meio_campistas, atacantes, posicoes
-
-    except Exception as e:
-        print(f"Erro ao interpretar formação '{formacao_str}': {e}")
+    except:
         return None, None, None, None
 
 def obter_jogadores_para_posicao(df, pos_tipo, excluidos, cartoes, incluir_lesionados=False):
@@ -2196,7 +2015,6 @@ def obter_atributos_chave(posicao):
 # =============================================
 ARQUIVO_USUARIOS = "usuarios.json"
 
-# Lista de administradores fixos (não podem ser removidos)
 ADMIN_FIXOS = [
     "Guibfpinto",
     "Ricardosantosr",
@@ -2209,7 +2027,6 @@ ADMIN_FIXOS = [
     "FabianoEller"
 ]
 
-# Mapeamento de senhas para os administradores fixos
 SENHAS_FIXAS = {
     "Guibfpinto": "@W.d06302005",
     "Ricardosantosr": "@R.s02011991",
@@ -2223,10 +2040,6 @@ SENHAS_FIXAS = {
 }
 
 def carregar_usuarios():
-    """
-    Retorna um dicionário {usuario: {'senha_hash': hash, 'is_admin': bool}}.
-    Se o arquivo não existir, cria os administradores fixos com suas senhas.
-    """
     if not os.path.exists(ARQUIVO_USUARIOS):
         usuarios = {}
         for admin in ADMIN_FIXOS:
@@ -2241,13 +2054,11 @@ def carregar_usuarios():
     try:
         with open(ARQUIVO_USUARIOS, 'r', encoding='utf-8') as f:
             dados = json.load(f)
-        # Converte para o formato esperado (caso o arquivo antigo só tenha hashes)
         usuarios = {}
         for usuario, valor in dados.items():
             if isinstance(valor, dict):
                 usuarios[usuario] = valor
             else:
-                # Formato antigo (apenas hash) – assume que NÃO é admin (exceto fixos)
                 is_admin = usuario in ADMIN_FIXOS
                 usuarios[usuario] = {"senha_hash": valor, "is_admin": is_admin}
         return usuarios
@@ -2260,14 +2071,10 @@ def salvar_usuarios(usuarios):
         json.dump(usuarios, f, indent=2, ensure_ascii=False)
 
 def autenticar_usuario(usuario, senha):
-    """Retorna (bool autenticado, bool is_admin)."""
-    # Verifica se é um admin fixo (mesmo que o JSON não exista)
     if usuario in ADMIN_FIXOS:
         senha_correta = SENHAS_FIXAS.get(usuario)
         if senha_correta and bcrypt.checkpw(senha.encode('utf-8'), bcrypt.hashpw(senha_correta.encode('utf-8'), bcrypt.gensalt())):
             return True, True
-        # Se a senha não bater, tenta pelo arquivo (caso tenha sido alterada)
-    # Tenta autenticar pelo arquivo
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
         return False, False
@@ -2290,7 +2097,7 @@ def adicionar_usuario(usuario, senha, is_admin=False):
     return True
 
 def remover_usuario(usuario):
-    if usuario in ADMIN_FIXOS:  # não permite remover os fixos
+    if usuario in ADMIN_FIXOS:
         return False
     usuarios = carregar_usuarios()
     if usuario in usuarios:
@@ -2300,9 +2107,8 @@ def remover_usuario(usuario):
     return False
 
 def promover_admin(usuario):
-    """Promove um usuário existente a administrador."""
     if usuario in ADMIN_FIXOS:
-        return True  # já é fixo
+        return True
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
         return False
@@ -2311,7 +2117,6 @@ def promover_admin(usuario):
     return True
 
 def rebaixar_admin(usuario):
-    """Rebaixa um administrador (exceto fixos)."""
     if usuario in ADMIN_FIXOS:
         return False
     usuarios = carregar_usuarios()
@@ -2322,7 +2127,6 @@ def rebaixar_admin(usuario):
     return True
 
 def usuario_eh_admin(usuario):
-    """Verifica se um usuário é administrador (fixo ou do JSON)."""
     if usuario in ADMIN_FIXOS:
         return True
     usuarios = carregar_usuarios()
