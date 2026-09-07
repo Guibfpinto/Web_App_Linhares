@@ -710,7 +710,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.info("Nenhum atributo detalhado disponível para este membro.")
 
 # ======================================================================
-# FUNÇÃO DETALHES JOGADOR (USANDO A FUNÇÃO UNIFICADA)
+# FUNÇÃO DETALHES JOGADOR (COM ALTURA E PESO)
 # ======================================================================
 def exibir_detalhes_jogador(row, categoria, cartoes):
     nome_exibicao = row.get('nome_completo') or row.get('apelido') or 'Jogador'
@@ -735,6 +735,20 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             data_nasc = row.get('data_nascimento', '')
             idade = row.get('Idade', 'N/I')
             st.write(f"**Data Nasc.:** {data_nasc}  **Idade:** {idade}")
+
+            # ===== ALTURA E PESO =====
+            altura = row.get('altura_cm')
+            if pd.notna(altura):
+                st.write(f"**Altura:** {altura:.1f} cm")
+            else:
+                st.write(f"**Altura:** N/I")
+
+            peso = row.get('peso_kg')
+            if pd.notna(peso):
+                st.write(f"**Peso:** {peso:.1f} kg")
+            else:
+                st.write(f"**Peso:** N/I")
+            # ===== FIM ALTURA E PESO =====
 
             cidade = row.get('cidade_nascimento', '')
             uf = row.get('uf_nascimento', '')
@@ -1101,8 +1115,14 @@ with tabs[0]:
         ])
 
         if opcao_analise == "Lista resumida":
-            cols = ['nome_completo','apelido','Posicao_Principal','Idade','Rating_Geral_FM26','Estado_Fisico']
-            df_exib = df_analise[[c for c in cols if c in df_analise.columns]]
+            # ===== ADICIONADO ALTURA E PESO NA LISTA RESUMIDA =====
+            cols = ['nome_completo','apelido','Posicao_Principal','Idade','Rating_Geral_FM26','Estado_Fisico','altura_cm','peso_kg']
+            df_exib = df_analise[[c for c in cols if c in df_analise.columns]].copy()
+            # Formata altura e peso com unidades
+            if 'altura_cm' in df_exib.columns:
+                df_exib['altura_cm'] = df_exib['altura_cm'].apply(lambda x: f"{x:.1f} cm" if pd.notna(x) else 'N/I')
+            if 'peso_kg' in df_exib.columns:
+                df_exib['peso_kg'] = df_exib['peso_kg'].apply(lambda x: f"{x:.1f} kg" if pd.notna(x) else 'N/I')
             df_exib = sanitizar_dataframe(df_exib)
             st.dataframe(df_exib, width='stretch')
 
