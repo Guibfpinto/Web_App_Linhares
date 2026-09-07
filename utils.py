@@ -196,11 +196,38 @@ def sanitizar_dataframe(df):
 # FUNÇÃO PARA ORDENAR HISTÓRICO DE CARTÕES
 # =============================================
 def ordenar_historico_cartoes(cartoes: dict) -> dict:
+    """
+    Ordena o histórico de cartões por mês (primeiro) e depois por dia (segundo),
+    ignorando o ano na ordenação primária.
+    """
     for jogador, dados in cartoes.items():
         if 'historico' in dados and dados['historico']:
+            # Função para converter string de data em objeto datetime
+            def parse_data(data_str):
+                if not data_str:
+                    return datetime.now()
+                if '/' in data_str:
+                    # formato dd/mm/yyyy
+                    try:
+                        dia, mes, ano = data_str.split('/')
+                        return datetime(int(ano), int(mes), int(dia))
+                    except:
+                        return datetime.now()
+                else:
+                    # formato yyyy-mm-dd
+                    try:
+                        return datetime.strptime(data_str, "%Y-%m-%d")
+                    except:
+                        return datetime.now()
+            
+            # Ordena: primeiro mês, depois dia, depois ano (para desempate)
             dados['historico'] = sorted(
                 dados['historico'],
-                key=lambda x: datetime.strptime(x['data'], "%Y-%m-%d") if x['data'] and '/' not in x['data'] else datetime.strptime(x['data'], "%d/%m/%Y") if '/' in x['data'] else datetime.now()
+                key=lambda x: (
+                    parse_data(x['data']).month,   # mês (1-12)
+                    parse_data(x['data']).day,     # dia (1-31)
+                    parse_data(x['data']).year     # ano (para desempate)
+                )
             )
     return cartoes
 
