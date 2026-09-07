@@ -202,31 +202,26 @@ def ordenar_historico_cartoes(cartoes: dict) -> dict:
     """
     for jogador, dados in cartoes.items():
         if 'historico' in dados and dados['historico']:
-            # Função para converter string de data em objeto datetime
             def parse_data(data_str):
                 if not data_str:
                     return datetime.now()
                 if '/' in data_str:
-                    # formato dd/mm/yyyy
                     try:
                         dia, mes, ano = data_str.split('/')
                         return datetime(int(ano), int(mes), int(dia))
                     except:
                         return datetime.now()
                 else:
-                    # formato yyyy-mm-dd
                     try:
                         return datetime.strptime(data_str, "%Y-%m-%d")
                     except:
                         return datetime.now()
-            
-            # Ordena: primeiro mês, depois dia, depois ano (para desempate)
             dados['historico'] = sorted(
                 dados['historico'],
                 key=lambda x: (
-                    parse_data(x['data']).month,   # mês (1-12)
-                    parse_data(x['data']).day,     # dia (1-31)
-                    parse_data(x['data']).year     # ano (para desempate)
+                    parse_data(x['data']).month,
+                    parse_data(x['data']).day,
+                    parse_data(x['data']).year
                 )
             )
     return cartoes
@@ -910,7 +905,6 @@ def obter_proximo_jogo(categoria="Profissional") -> Optional[Dict]:
 # EXIBIR FOTO (JOGADORES E COMISSÃO)
 # =============================================
 def obter_caminho_foto(pessoa_row, categoria="Profissional"):
-    # Tenta obter o nome a partir da coluna 'foto'
     foto = pessoa_row.get('foto', '')
     if foto and pd.notna(foto) and str(foto).strip():
         caminho = str(foto).strip()
@@ -937,11 +931,23 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         "fotos_sistema_Analise_Elenco/Jogadores/Profissional",
         "fotos_sistema_Analise_Elenco/Jogadores/Sub15",
         "fotos_sistema_Analise_Elenco/Jogadores/Sub17",
+        "assets/fotos_comissao",
+        "assets/fotos_comissao/Profissional",
+        "assets/fotos_comissao/Sub15",
+        "assets/fotos_comissao/Sub17",
+        "assets/fotos_tecnicos",
+        "fotos_comissao",
+        "Fotos_Tecnicos",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Profissional",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub15",
+        "fotos_sistema_Analise_Elenco/Comissao_Tecnica/Sub17",
     ]
     pastas_absolutas = [
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_jogadores",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
         r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos_sistema_Analise_Elenco\Jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
     ]
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
@@ -1500,7 +1506,7 @@ def salvar_cartoes_json(cartoes, categoria, datas_globais=None):
     cartoes = ordenar_historico_cartoes(cartoes)
 
     dados = {'cartoes': cartoes}
-    if datas_globais:
+    if datas_globais and isinstance(datas_globais, dict):
         dados_serializaveis = {}
         for id_jogador, lista_datas in datas_globais.items():
             if isinstance(lista_datas, (list, tuple)):
@@ -1713,7 +1719,7 @@ def inicializar_cartoes_por_csvs(categoria, canonico_para_ogol_id):
     return inicializar_cartoes_por_df(df, categoria, canonico_para_ogol_id)
 
 # =============================================
-# INICIALIZAR CARTÕES COMISSÃO
+# INICIALIZAR CARTÕES COMISSÃO (CORRIGIDO)
 # =============================================
 def inicializar_cartoes_comissao(categoria, df_comissao):
     st.info(f"🔄 Reinicializando cartões da comissão para {categoria}...")
@@ -1743,7 +1749,6 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
                 continue
         arquivos_com_data.append((data_jogo, arq))
     arquivos_com_data.sort(key=lambda x: x[0])
-    datas_globais = [d.strftime("%Y-%m-%d") for d, _ in arquivos_com_data]
 
     cartoes = {}
     competicao_anterior = None
@@ -1864,9 +1869,10 @@ def inicializar_cartoes_comissao(categoria, df_comissao):
             st.warning(f"Erro ao processar {arq}: {e}")
 
     cartoes = ordenar_historico_cartoes(cartoes)
-    salvar_cartoes_json(cartoes, categoria, datas_globais)
+    # CORREÇÃO: passamos None para datas_globais, pois a lista não deve ser usada
+    salvar_cartoes_json(cartoes, categoria, None)
     st.success(f"✅ Cartões da comissão reinicializados para {categoria}.")
-    return cartoes, datas_globais
+    return cartoes, []
 
 # =============================================
 # ESTATÍSTICAS DE PARTIDAS
@@ -2052,10 +2058,9 @@ ADMIN_FIXOS = [
     "MaryaEduarda",
     "KarenLoureiro",
     "FabianoEller",
-    "Delei"  # <--- NOVO ADMIN
+    "Delei"
 ]
 
-# Mapeamento de senhas para os administradores fixos
 SENHAS_FIXAS = {
     "Guibfpinto": "@W.d06302005",
     "Ricardosantosr": "@R.s02011991",
@@ -2066,7 +2071,7 @@ SENHAS_FIXAS = {
     "MaryaEduarda": "@M.e12062002",
     "KarenLoureiro": "@K.l04082000",
     "FabianoEller": "@F.e1977",
-    "Delei": "Delei20031966"  # <--- SENHA DO NOVO ADMIN
+    "Delei": "Delei20031966"
 }
 
 def carregar_usuarios():
