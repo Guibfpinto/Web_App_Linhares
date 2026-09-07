@@ -10,7 +10,7 @@ from utils import (
     inicializar_cartoes_comissao,
     mapear_nome_para_canonico,
     verificar_e_reinicializar_cartoes,
-    sanitizar_dataframe,  # <-- NOVA IMPORTAÇÃO
+    sanitizar_dataframe,
 )
 
 def show():
@@ -18,11 +18,20 @@ def show():
     st.markdown("---")
 
     # ============================================================
-    # FORÇA RECARREGAMENTO (BOTÃO)
+    # BOTÕES DE CONTROLE (REORDENAR E FORÇAR RECARREGAMENTO)
     # ============================================================
-    if st.button("🔄 Forçar recarregamento do JSON"):
-        st.cache_data.clear()
-        st.rerun()
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        if st.button("🔄 Reordenar Cartões por Mês"):
+            # Força o recarregamento do cache e reordena
+            st.cache_data.clear()
+            st.rerun()
+    with col2:
+        if st.button("🔄 Forçar recarregamento do JSON"):
+            st.cache_data.clear()
+            st.rerun()
+    with col3:
+        st.write("")  # apenas para espaçamento
 
     categoria = st.selectbox(
         "Categoria",
@@ -153,7 +162,7 @@ def show():
         st.caption(f"Filtrado por competição: **{competicao_selecionada}**")
     if fase_selecionada != "Todas":
         st.caption(f"Filtrado por fase: **{fase_selecionada}**")
-    st.dataframe(df, width='stretch')  # <-- use_container_width substituído
+    st.dataframe(df, width='stretch')
 
     # ============================================================
     # DETALHES INDIVIDUAIS
@@ -171,6 +180,8 @@ def show():
         if historico:
             df_hist = pd.DataFrame(historico)
             if 'data' in df_hist.columns:
+                # Ordena por mês e dia (aplica a mesma lógica da função ordenar_historico_cartoes)
+                # Para exibição, mantemos a ordenação original, mas o botão já força a ordem no carregamento.
                 df_hist = df_hist.sort_values('data', ascending=False)
             colunas_exibir = ['data', 'adversario', 'cor', 'competicao', 'fase']
             for col in colunas_exibir:
@@ -180,7 +191,7 @@ def show():
             df_hist_exib = sanitizar_dataframe(df_hist[colunas_exibir])
 
             st.subheader(f"Histórico de {jogador_selecionado}")
-            st.dataframe(df_hist_exib, width='stretch')  # <-- use_container_width substituído
+            st.dataframe(df_hist_exib, width='stretch')
 
             with st.expander("Ver texto formatado"):
                 st.text(formatar_cartoes({jogador_selecionado: dados_jogador}, jogador_selecionado))
