@@ -47,8 +47,8 @@
           "fase": "2"
         }
       ],
-      "id_ogol": null,
-      "contador_amarelos_desde_reset": 0,
+      "id_ogol": 39891,
+      "contador_amarelos_desde_reset": 1,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },

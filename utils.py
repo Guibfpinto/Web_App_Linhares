@@ -142,8 +142,8 @@ MAPEAMENTO_NOMES_PROFISSIONAL = {
     'Arthur Darros': 'Arthur Darros',
     'Júlio César Fontana Leite': 'Julio César',
     'Julio César': 'Julio César',
-    'Matheus Sarmento Mesquita': 'Matheus Sarmento',
-    'Matheus Sarmento': 'Matheus Nossa',
+    'Matheus Sarmento Mesquita': 'Matheus Nossa',
+    'Matheus Nossa': 'Matheus Nossa',
     'Gabriel de Jesus Rodrigues': 'Gabriel Jesus',
     'Gabriel Jesus': 'Gabriel Jesus',
     'Luander da Silva Denerval': 'Luander',
@@ -151,7 +151,18 @@ MAPEAMENTO_NOMES_PROFISSIONAL = {
 }
 MAPEAMENTO_NOMES_SUB15 = {}
 MAPEAMENTO_NOMES_SUB17 = {}
-MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL = {}
+MAPEAMENTO_NOMES_COMISSAO_PROFISSIONAL = {'Jonair da Silva Ferreira': 'Yupi Silva',
+                                          'Yupi Silva': 'Yupi Silva',
+                                            'Ricardo da Silva Santos': 'Ricardo',
+                                            'Ricardo': 'Ricardo',
+                                            'Karen da Silva Loureiro': 'Karen',
+                                            'Karen': 'Karen',
+                                            'Marcos Vinicius Vieira Lima Furguilin': 'Asamoah',
+                                            'Asamoah': 'Asamoah',
+                                            'Marya Eduarda Cabral de Carvalho Mello': 'Marya Eduarda',
+                                            'Marya Eduarda': 'Marya Eduarda',
+                                            'Guilherme Battistella Frigini Pinto': 'Guilherme Pinto',
+                                            'Guilherme Pinto': 'Gui Pinto'}
 MAPEAMENTO_NOMES_COMISSAO_SUB15 = {}
 MAPEAMENTO_NOMES_COMISSAO_SUB17 = {}
 
