@@ -10,6 +10,15 @@ from utils import (
     jogador_suspenso,
     mapear_nome_para_canonico,
     sanitizar_dataframe,
+    carregar_elenco_profissional,
+    carregar_elenco_sub15,
+    carregar_elenco_sub17,
+    carregar_cartoes_json,
+    adicionar_coluna_lesionado,
+    carregar_dados_bioimpedancia,
+    aplicar_dados_bioimpedancia,
+    carregar_estatisticas_partidas,
+    precomputar_scores_posicionais,
 )
 from roles_fm26 import (
     get_roles_by_posicao,
@@ -21,20 +30,53 @@ from roles_fm26 import (
 )
 
 # ============================================================
+# FUNÇÃO PARA CARREGAR ELENCO POR CATEGORIA (com cache)
+# ============================================================
+@st.cache_data
+def carregar_elenco_com_lesoes(categoria):
+    """Carrega o elenco da categoria, com lesões e bioimpedância."""
+    if categoria == "Profissional":
+        df = carregar_elenco_profissional()
+        if df is not None and not df.empty:
+            df = adicionar_coluna_lesionado(df, 'profissional')
+            bio = carregar_dados_bioimpedancia('profissional')
+            df = aplicar_dados_bioimpedancia(df, bio)
+            stats = carregar_estatisticas_partidas("Profissional")
+            if not stats.empty:
+                df = precomputar_scores_posicionais(df, stats)
+    elif categoria == "Sub-15":
+        df = carregar_elenco_sub15()
+        if df is not None and not df.empty:
+            df = adicionar_coluna_lesionado(df, 'sub15')
+            bio = carregar_dados_bioimpedancia('sub15')
+            df = aplicar_dados_bioimpedancia(df, bio)
+            stats = carregar_estatisticas_partidas("Sub-15")
+            if not stats.empty:
+                df = precomputar_scores_posicionais(df, stats)
+    elif categoria == "Sub-17":
+        df = carregar_elenco_sub17()
+        if df is not None and not df.empty:
+            df = adicionar_coluna_lesionado(df, 'sub17')
+            bio = carregar_dados_bioimpedancia('sub17')
+            df = aplicar_dados_bioimpedancia(df, bio)
+            stats = carregar_estatisticas_partidas("Sub-17")
+            if not stats.empty:
+                df = precomputar_scores_posicionais(df, stats)
+    else:
+        df = None
+    return df
+
+# ============================================================
 # FUNÇÃO PARA DESENHAR O CAMPO
 # ============================================================
 def desenhar_campo(titulares, titulo, formacao):
-    """Desenha um campo de futebol com os jogadores posicionados e suas funções."""
     if not titulares:
         return None
-
     fig, ax = plt.subplots(figsize=(12, 8))
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 70)
     ax.set_facecolor('#2e7d32')
     ax.set_title(titulo, fontsize=14, fontweight='bold', color='white')
-
-    # Linhas do campo
     ax.plot([0, 100], [0, 0], 'w', linewidth=2)
     ax.plot([0, 100], [70, 70], 'w', linewidth=2)
     ax.plot([0, 0], [0, 70], 'w', linewidth=2)
@@ -43,22 +85,10 @@ def desenhar_campo(titulares, titulo, formacao):
     ax.add_patch(Circle((50, 35), 7, edgecolor='w', facecolor='none', linewidth=2))
     ax.add_patch(Circle((50, 35), 1, edgecolor='w', facecolor='w', linewidth=1))
     ax.add_patch(Rectangle((40, 18), 20, 34, edgecolor='w', facecolor='none', linewidth=2))
-
-    # Posições pré-definidas para 11 jogadores (4-4-2)
     posicoes_padrao = [
-        (50, 8),   # Goleiro
-        (15, 18),  # LE
-        (35, 18),  # ZAG
-        (65, 18),  # ZAG
-        (85, 18),  # LD
-        (15, 35),  # ME
-        (35, 35),  # MC
-        (65, 35),  # MC
-        (85, 35),  # MD
-        (30, 52),  # AT
-        (70, 52)   # AT
+        (50, 8), (15, 18), (35, 18), (65, 18), (85, 18),
+        (15, 35), (35, 35), (65, 35), (85, 35), (30, 52), (70, 52)
     ]
-
     n = len(titulares)
     if n <= 11:
         posicoes = posicoes_padrao[:n]
@@ -68,34 +98,27 @@ def desenhar_campo(titulares, titulo, formacao):
             x = 10 + (i / (n-1)) * 80 if n > 1 else 50
             y = 10 + ((i % 5) / 4) * 50 if n > 5 else 10 + (i / (n-1)) * 50
             posicoes.append((x, y))
-
     for i, (x, y) in enumerate(posicoes):
         if i < len(titulares):
             jog = titulares[i]
             nome = jog.get('apelido', jog.get('nome', 'N/D'))
             funcao = jog.get('funcao', '')
-            cor = '#1f77b4'
-            if i == 0:
-                cor = '#ff7f0e'
+            cor = '#ff7f0e' if i == 0 else '#1f77b4'
             ax.add_patch(Circle((x, y), 3.5, edgecolor='white', facecolor=cor, linewidth=2))
             ax.text(x, y-5, nome[:15], ha='center', va='center', fontsize=7, color='white', weight='bold')
             if funcao:
                 ax.text(x, y-8, funcao[:15], ha='center', va='center', fontsize=5, color='yellow', style='italic')
-
     ax.axis('off')
     plt.tight_layout()
     return fig
 
 # ============================================================
-# FUNÇÃO PARA MAPPING FUZZY DE NOMES
+# FUNÇÃO PARA ENCONTRAR JOGADOR POR NOME (FUZZY)
 # ============================================================
 def encontrar_jogador(nome_digitado, df_elenco, cutoff=0.6):
-    """Tenta encontrar o jogador no elenco usando correspondência aproximada."""
     if not nome_digitado or pd.isna(nome_digitado):
         return None
-
     nome_digitado = nome_digitado.strip().lower()
-    # Lista de nomes disponíveis (nome_completo e apelido)
     nomes_disponiveis = []
     for _, row in df_elenco.iterrows():
         nome_completo = row.get('nome_completo', '')
@@ -104,13 +127,9 @@ def encontrar_jogador(nome_digitado, df_elenco, cutoff=0.6):
             nomes_disponiveis.append((nome_completo, row))
         if apelido and apelido != nome_completo:
             nomes_disponiveis.append((apelido, row))
-
-    # Tenta encontrar correspondência exata (case-insensitive)
     for nome, row in nomes_disponiveis:
         if nome.lower() == nome_digitado:
             return row
-
-    # Usa difflib para correspondência aproximada
     nomes_unicos = list(set([nome for nome, _ in nomes_disponiveis]))
     matches = difflib.get_close_matches(nome_digitado, [n.lower() for n in nomes_unicos], n=1, cutoff=cutoff)
     if matches:
@@ -119,33 +138,19 @@ def encontrar_jogador(nome_digitado, df_elenco, cutoff=0.6):
             for nome, row in nomes_disponiveis:
                 if nome == nome_encontrado:
                     return row
-
     return None
 
 # ============================================================
 # FUNÇÃO PARA PROCESSAR TEXTO DA ESCALAÇÃO RÁPIDA
 # ============================================================
 def processar_escalacao_rapida(texto, df_elenco, posicoes_esperadas):
-    """
-    Processa o texto digitado pelo usuário para preencher a escalação.
-    Exemplo de formato esperado:
-        Goleiro: João
-        Zagueiro: Pedro
-        ...
-    Ou apenas uma lista de nomes, que serão atribuídos na ordem das posições.
-    """
     linhas = [linha.strip() for linha in texto.strip().split('\n') if linha.strip()]
     if not linhas:
         return None, "Nenhum jogador informado."
-
-    # Tenta detectar se há "Posição: Nome" ou apenas nomes
     tem_posicao = any(':' in linha for linha in linhas)
-
     resultados = []
     erros = []
-
     if tem_posicao:
-        # Formato "Posição: Nome"
         for linha in linhas:
             if ':' in linha:
                 posicao, nome = linha.split(':', 1)
@@ -161,7 +166,6 @@ def processar_escalacao_rapida(texto, df_elenco, posicoes_esperadas):
             else:
                 erros.append(f"Linha sem ':' ignorada: '{linha}'")
     else:
-        # Apenas nomes, atribuir na ordem das posições
         nomes = linhas
         if len(nomes) > len(posicoes_esperadas):
             erros.append(f"Mais nomes ({len(nomes)}) do que posições ({len(posicoes_esperadas)}). Os excedentes serão ignorados.")
@@ -172,7 +176,6 @@ def processar_escalacao_rapida(texto, df_elenco, posicoes_esperadas):
                 resultados.append({'posicao': pos_exibida, 'row': row, 'nome': row.get('nome_completo', '')})
             else:
                 erros.append(f"Não encontrado: '{nome}'")
-
     return resultados, "\n".join(erros) if erros else ""
 
 # ============================================================
@@ -182,14 +185,23 @@ def show():
     st.header("📐 Escalação Tática")
     st.markdown("Defina as **4 formações** (Inicial, Ofensiva sem Bola, Defensiva, Ofensiva com Bola) e escolha as **funções do FM26** para cada jogador.")
 
-    # Obtém a categoria e os dados da sessão
+    # Obtém a categoria da sessão (definida no app.py)
     categoria = st.session_state.get("categoria_tatica", "Profissional")
-    df_elenco = st.session_state.get("df_elenco_tatica")
-    cartoes = st.session_state.get("cartoes_tatica", {})
+
+    # Carrega o elenco e cartões
+    df_elenco = carregar_elenco_com_lesoes(categoria)
 
     if df_elenco is None or df_elenco.empty:
-        st.warning(f"Elenco não disponível para {categoria}. Carregue os dados primeiro.")
+        st.warning(f"Elenco não disponível para {categoria}. Verifique se os arquivos CSV estão no lugar certo.")
         return
+
+    # Carrega cartões
+    cartoes_key = {
+        "Profissional": "profissional",
+        "Sub-15": "sub15",
+        "Sub-17": "sub17"
+    }.get(categoria, "profissional")
+    cartoes, _ = carregar_cartoes_json(cartoes_key)
 
     # Tipos de formação
     tipos_formacao = ['inicial', 'ofensiva_sem_bola', 'defensiva', 'ofensiva_com_bola']
@@ -272,28 +284,21 @@ def show():
             if not texto_escalacao.strip():
                 st.warning("Digite pelo menos um nome.")
             else:
-                # Processa o texto
                 resultados, erros = processar_escalacao_rapida(texto_escalacao, jogadores_disponiveis, posicoes)
-
                 if erros:
                     st.warning(f"Alguns jogadores não foram encontrados:\n{erros}")
-
                 if resultados:
-                    # Preenche os titulares selecionados
                     titulares_selecionados = {}
                     funcoes_selecionadas = {}
                     for i, item in enumerate(resultados):
                         pos_exibida = item['posicao'] if i < len(posicoes) else f"Posição {i+1}"
                         titulares_selecionados[pos_exibida] = item['row']['nome_completo']
-                        # Atribui uma função padrão para a posição (ex: a primeira da lista)
                         posicao_principal = item['row'].get('Posicao_Principal', 'Outros')
                         roles = get_roles_by_posicao(posicao_principal)
                         if roles:
                             funcoes_selecionadas[item['row']['nome_completo']] = roles[0]
                         else:
                             funcoes_selecionadas[item['row']['nome_completo']] = ''
-
-                    # Salva no estado da sessão
                     titulares = []
                     for pos, nome in titulares_selecionados.items():
                         row = df_elenco[df_elenco['nome_completo'] == nome].iloc[0]
@@ -304,18 +309,13 @@ def show():
                             'row': row,
                             'funcao': funcoes_selecionadas.get(nome, '')
                         })
-
-                    # Reservas ficam vazios (ou podemos deixar como estavam)
-                    # Mantém reservas anteriores se existirem
                     reservas_atuais = dados_formacao.get('reservas', [])
-
                     st.session_state.escalacoes_tatica[tipo_selecionado] = {
                         'formacao': formacao_input,
                         'titulares': titulares,
                         'reservas': reservas_atuais,
                         'funcoes': funcoes_selecionadas
                     }
-
                     st.success(f"✅ {nomes_tipos[tipo_selecionado]} preenchida com {len(titulares)} jogadores!")
                     st.rerun()
 
@@ -333,7 +333,6 @@ def show():
     cols = st.columns(3)
     for idx, (pos_exibida, pos_tipo) in enumerate(posicoes):
         with cols[idx % 3]:
-            # Filtra candidatos
             if pos_tipo == 'Goleiro':
                 candidatos = jogadores_disponiveis[jogadores_disponiveis['Posicao_Principal'] == 'Goleiro']
             else:
@@ -359,7 +358,6 @@ def show():
                 row = df_elenco[df_elenco['nome_completo'] == selecionado].iloc[0]
                 posicao_principal = row.get('Posicao_Principal', 'Outros')
 
-                # Obtém funções compatíveis
                 roles = get_roles_by_posicao(posicao_principal)
                 if not roles:
                     if tipo_selecionado == 'ofensiva_sem_bola':
@@ -367,7 +365,6 @@ def show():
                     else:
                         roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'in']
 
-                # Traduz
                 funcoes_exibicao = [TRADUCAO_ROLES_PT.get(r, r) for r in roles]
                 mapa_exibicao = dict(zip(funcoes_exibicao, roles))
 
@@ -388,7 +385,6 @@ def show():
                 funcao_original = mapa_exibicao.get(funcao_exibida, '')
                 funcoes_selecionadas[selecionado] = funcao_original
 
-                # Exibe atributos da função
                 if funcao_original:
                     with st.expander(f"📊 Atributos - {funcao_exibida}"):
                         role_data = get_role_attributes(funcao_original)
