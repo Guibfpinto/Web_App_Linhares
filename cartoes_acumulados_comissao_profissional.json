@@ -6,6 +6,14 @@
       "suspenso_proxima": false,
       "historico": [
         {
+          "data": "05/09/2026",
+          "adversario": "Rive",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
           "data": "12/07/2026",
           "adversario": "Audax São Mateus",
           "cor": "amarelo",
@@ -20,14 +28,6 @@
           "terceiro_amarelo": false,
           "suspenso_causada": true,
           "suspenso_cumprida": true
-        },
-        {
-          "data": "05/09/2026",
-          "adversario": "Rive",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
         }
       ]
     }
