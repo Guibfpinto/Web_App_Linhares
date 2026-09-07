@@ -1,6 +1,7 @@
 # pages/tatica_page.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 import difflib
@@ -19,6 +20,7 @@ from utils import (
     aplicar_dados_bioimpedancia,
     carregar_estatisticas_partidas,
     precomputar_scores_posicionais,
+    ATRIBUTOS_FM26,
 )
 from roles_fm26 import (
     get_roles_by_posicao,
@@ -28,6 +30,23 @@ from roles_fm26 import (
     TRADUCAO_ROLES_PT,
     COMPATIBILIDADE_POSICAO
 )
+
+# ============================================================
+# PESOS DA SUGESTÃO
+# ============================================================
+PESO_POSICAO = 0.70
+PESO_ATRIBUTOS = 0.15
+PESO_ROLES = 0.15
+
+# ============================================================
+# MAPEAMENTO DE POSIÇÕES DA FORMAÇÃO PARA POSIÇÕES DO JOGADOR
+# ============================================================
+GRUPO_POSICAO = {
+    'Goleiro': ['Goleiro'],
+    'Defensor': ['Zagueiro', 'Lateral Direito', 'Lateral Esquerdo', 'Lateral'],
+    'Meio-Campo': ['Volante', 'Meia-Central', 'Meia-Atacante', 'Meio-Campo'],
+    'Atacante': ['Ponta Direita', 'Ponta Esquerda', 'Ponta', 'Centroavante', 'Segundo Atacante', 'Atacante']
+}
 
 # ============================================================
 # FUNÇÃO PARA CARREGAR ELENCO
@@ -66,7 +85,7 @@ def carregar_elenco_com_lesoes(categoria):
     return df
 
 # ============================================================
-# FUNÇÃO PARA DESENHAR CAMPO
+# FUNÇÃO PARA DESENHAR CAMPO (COM POSIÇÕES DINÂMICAS)
 # ============================================================
 def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     if not titulares or not posicoes_esperadas:
@@ -88,9 +107,10 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     ax.add_patch(Circle((50, 35), 1, edgecolor='w', facecolor='w', linewidth=1))
     ax.add_patch(Rectangle((40, 18), 20, 34, edgecolor='w', facecolor='none', linewidth=2))
     
+    # Posicionamento baseado no número de jogadores
     n = len(titulares)
     if n >= 1:
-        posicoes = [(50, 8)]
+        posicoes = [(50, 8)]  # goleiro
     else:
         posicoes = []
     
@@ -140,7 +160,98 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     return fig
 
 # ============================================================
-# FUNÇÃO PARA SUGERIR ESCALAÇÃO
+# FUNÇÃO PARA CALCULAR SCORE DO JOGADOR PARA UMA POSIÇÃO
+# ============================================================
+def calcular_score_jogador(row, pos_tipo, posicao_exibida):
+    """
+    Calcula o score ponderado do jogador para a posição.
+    Retorna: dict com score e componentes.
+    """
+    # 1. Score de posição original (70%)
+    pos_principal = row.get('Posicao_Principal', 'Outros')
+    pos_secundarias = row.get('Posicoes_Secundarias', [])
+    if isinstance(pos_secundarias, str):
+        pos_secundarias = [p.strip() for p in pos_secundarias.split(',')] if pos_secundarias else []
+    elif not isinstance(pos_secundarias, list):
+        pos_secundarias = []
+    
+    grupo_esperado = GRUPO_POSICAO.get(pos_tipo, [])
+    
+    # Verifica se a posição principal está no grupo esperado
+    if pos_principal in grupo_esperado:
+        score_posicao = 1.0
+    elif pos_principal in GRUPO_POSICAO.get(pos_tipo, []):
+        # fallback
+        score_posicao = 0.8
+    else:
+        # Verifica se alguma posição secundária está no grupo
+        if any(p in grupo_esperado for p in pos_secundarias):
+            score_posicao = 0.7
+        else:
+            # Se não estiver em nenhuma, compatibilidade baixa
+            score_posicao = 0.3
+    
+    # 2. Score de atributos (15%) - média dos atributos chave da primeira role compatível
+    roles = get_roles_by_posicao(pos_principal)
+    if not roles:
+        roles = get_roles_by_posicao(pos_tipo)  # fallback
+    if not roles:
+        roles = ['Versátil']
+    
+    # Usa a primeira role para obter os atributos chave
+    role_data = get_role_attributes(roles[0])
+    key_attrs = role_data.get('key', [])
+    if not key_attrs:
+        # Se não houver chave, usa todos os atributos FM26
+        key_attrs = ATRIBUTOS_FM26
+    
+    # Calcula a média dos atributos chave
+    valores = []
+    for attr in key_attrs:
+        if attr in row and pd.notna(row[attr]):
+            valores.append(float(row[attr]))
+    if valores:
+        media_atributos = np.mean(valores)
+        # Normaliza para 0-100
+        media_atributos = min(100, max(0, media_atributos))
+    else:
+        media_atributos = 50  # valor padrão
+    
+    # Converte para score 0-1
+    score_atributos = media_atributos / 100.0
+    
+    # 3. Score de roles (15%) - quantidade de roles compatíveis / total de roles disponíveis
+    roles_compativeis = get_roles_by_posicao(pos_principal)
+    if not roles_compativeis:
+        roles_compativeis = get_roles_by_posicao(pos_tipo)
+    total_roles = len(roles_compativeis) if roles_compativeis else 1
+    # Quantos roles o jogador pode executar? Para simplificar, usamos o número de roles compatíveis
+    # Mas como já filtramos, todos são compatíveis. Vamos considerar a quantidade de roles que o jogador tem disponíveis para essa posição (usando a posição principal)
+    # Na verdade, o número de roles é o mesmo para todos os jogadores com a mesma posição principal.
+    # Para diferenciar, podemos usar a média dos atributos das roles? Ou simplesmente contar quantas roles ele pode executar.
+    # Vamos usar uma métrica: se o jogador tem a posição principal exata, ele pode executar todas as roles daquela posição.
+    # Se não, apenas algumas. Vamos definir:
+    if pos_principal in grupo_esperado:
+        score_roles = 1.0
+    elif any(p in grupo_esperado for p in pos_secundarias):
+        score_roles = 0.7
+    else:
+        score_roles = 0.3
+    
+    # Score final ponderado
+    score_final = (PESO_POSICAO * score_posicao) + (PESO_ATRIBUTOS * score_atributos) + (PESO_ROLES * score_roles)
+    
+    return {
+        'score': score_final,
+        'score_posicao': score_posicao,
+        'score_atributos': score_atributos,
+        'score_roles': score_roles,
+        'media_atributos': media_atributos,
+        'roles': roles
+    }
+
+# ============================================================
+# FUNÇÃO PARA SUGERIR ESCALAÇÃO (COM PESOS)
 # ============================================================
 def sugerir_escalacao(df_elenco, posicoes, cartoes):
     jogadores_disponiveis = df_elenco.copy()
@@ -153,27 +264,50 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes):
     ]
     if jogadores_disponiveis.empty:
         return [], []
+    
     titulares = []
     jogadores_usados = []
+    
     for pos_exibida, pos_tipo in posicoes:
+        # Obtém candidatos compatíveis
         candidatos = obter_jogadores_para_posicao(jogadores_disponiveis, pos_tipo, jogadores_usados, cartoes, incluir_lesionados=False)
-        candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
-        if not candidatos.empty:
-            melhor = candidatos.iloc[0]
-            titulares.append({
-                'posicao': pos_exibida,
-                'nome': melhor['nome_completo'],
-                'apelido': melhor['apelido'],
-                'row': melhor
-            })
-            jogadores_usados.append(melhor['nome_completo'])
-        else:
+        if candidatos.empty:
             titulares.append({
                 'posicao': pos_exibida,
                 'nome': '',
                 'apelido': '',
                 'row': None
             })
+            continue
+        
+        # Calcula score para cada candidato
+        scores = []
+        for idx, row in candidatos.iterrows():
+            score_info = calcular_score_jogador(row, pos_tipo, pos_exibida)
+            scores.append({
+                'row': row,
+                'score': score_info['score'],
+                'score_posicao': score_info['score_posicao'],
+                'score_atributos': score_info['score_atributos'],
+                'score_roles': score_info['score_roles'],
+                'media_atributos': score_info['media_atributos'],
+                'roles': score_info['roles']
+            })
+        
+        # Ordena por score decrescente
+        scores.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Escolhe o melhor
+        melhor = scores[0]
+        titulares.append({
+            'posicao': pos_exibida,
+            'nome': melhor['row']['nome_completo'],
+            'apelido': melhor['row']['apelido'],
+            'row': melhor['row']
+        })
+        jogadores_usados.append(melhor['row']['nome_completo'])
+    
+    # Reservas: melhores não usados
     reservas = []
     for _, row in jogadores_disponiveis[~jogadores_disponiveis['nome_completo'].isin(jogadores_usados)].head(12).iterrows():
         reservas.append({
@@ -181,6 +315,7 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes):
             'apelido': row['apelido'],
             'row': row
         })
+    
     return titulares, reservas
 
 # ============================================================
@@ -222,7 +357,7 @@ def aplicar_escalacao_para_todas_formacoes(titulares, reservas, tipos_formacao, 
                 'row': res['row']
             })
         st.session_state.escalacoes_tatica[tipo] = {
-            'formacao': formacao_atual,  # <--- ATUALIZA A FORMAÇÃO
+            'formacao': dados.get('formacao', '4-4-2'),
             'titulares': novos_titulares,
             'reservas': novas_reservas,
             'funcoes': funcoes_existentes
@@ -287,6 +422,12 @@ def show():
             value=formacao_atual,
             key=f"formacao_{tipo_selecionado}"
         )
+        # Botão para atualizar a formação manualmente
+        if st.button("🔄 Atualizar Formação", key=f"atualizar_formacao_{tipo_selecionado}"):
+            # Salva a formação atual no estado
+            st.session_state.escalacoes_tatica[tipo_selecionado]['formacao'] = formacao_input
+            st.success(f"Formação atualizada para {formacao_input}")
+            st.rerun()
     with col_sugerir:
         if st.button("⚽ Sugerir Escalação", key=f"sugerir_{tipo_selecionado}", use_container_width=True):
             defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_input)
@@ -306,15 +447,13 @@ def show():
         if st.button("📋 Copiar para todas", key=f"copiar_{tipo_selecionado}", use_container_width=True):
             titulares_atuais = dados_formacao.get('titulares', [])
             reservas_atuais = dados_formacao.get('reservas', [])
-            # Atualiza a formação também
-            formacao_salva = formacao_input
             aplicar_escalacao_para_todas_formacoes(
-                titulares_atuais, reservas_atuais, tipos_formacao, formacao_salva, dados_formacao.get('funcoes', {})
+                titulares_atuais, reservas_atuais, tipos_formacao, formacao_input, dados_formacao.get('funcoes', {})
             )
-            st.success("✅ Titulares, reservas e formação copiados para todas as formações!")
+            st.success("✅ Titulares e reservas copiados para todas as formações!")
             st.rerun()
     
-    # Interpreta a formação atual (usando formacao_input)
+    # Interpreta a formação atual
     defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_input)
     if not posicoes:
         st.error("Formação inválida. Use X-Y-Z (ex: 4-4-2).")
@@ -335,7 +474,7 @@ def show():
     st.write(f"**Jogadores disponíveis:** {len(jogadores_disponiveis)}")
     
     # ============================================================
-    # CAMPO VISUAL (usa formacao_input)
+    # CAMPO VISUAL
     # ============================================================
     st.subheader("🏟️ Campo")
     titulares_atuais = dados_formacao.get('titulares', [])
@@ -470,12 +609,12 @@ def show():
                         'row': row
                     })
                 st.session_state.escalacoes_tatica[tipo_selecionado] = {
-                    'formacao': formacao_input,  # <--- ATUALIZA A FORMAÇÃO
+                    'formacao': formacao_input,
                     'titulares': titulares,
                     'reservas': reservas,
                     'funcoes': funcoes_selecionadas
                 }
-                st.success(f"✅ {nomes_tipos[tipo_selecionado]} salva com a nova formação!")
+                st.success(f"✅ {nomes_tipos[tipo_selecionado]} salva!")
                 st.rerun()
     
     with col_limpar:
