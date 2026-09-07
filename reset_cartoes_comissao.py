@@ -42,7 +42,7 @@ def forcar_reset():
     # ============================================================
     # SALVA O JSON NO CAMINHO ABSOLUTO ESPECIFICADO
     # ============================================================
-    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web\cartoes_acumulados_profissional.json")
+    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web\cartoes_acumulados_comissao_profissional.json")
 
     # Garante que a pasta exista
     caminho_json.parent.mkdir(parents=True, exist_ok=True)

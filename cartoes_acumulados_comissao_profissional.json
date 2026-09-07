@@ -1,44 +1,98 @@
 {
   "cartoes": {
-    "Yupi Silva": {
+    "Jonair da Silva Ferreira": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
       "historico": [
         {
-          "data": "05/09/2026",
-          "adversario": "Rive",
-          "cor": "amarelo",
-          "terceiro_amarelo": false,
-          "suspenso_causada": false,
-          "suspenso_cumprida": false
-        },
-        {
-          "data": "12/07/2026",
+          "data": "2026-07-12",
           "adversario": "Audax São Mateus",
           "cor": "amarelo",
           "terceiro_amarelo": false,
           "suspenso_causada": false,
-          "suspenso_cumprida": false
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": "1"
         },
         {
-          "data": "08/08/2026",
+          "data": "2026-08-08",
           "adversario": "Audax São Mateus",
           "cor": "vermelho",
           "terceiro_amarelo": false,
           "suspenso_causada": true,
-          "suspenso_cumprida": true
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": "1"
+        },
+        {
+          "data": "2026-08-15",
+          "adversario": "Suspensão cumprida (não jogou)",
+          "cor": "suspensao_cumprida",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": true,
+          "competicao": "",
+          "fase": "",
+          "observacao": "Suspensão cumprida em 2026-08-15"
+        },
+        {
+          "data": "2026-09-05",
+          "adversario": "Rive",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": "2"
         }
-      ]
+      ],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Ricardo da Silva Santos": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Karen da Silva Loureiro": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Marcos Vinicius Vieira Lima Furguilin": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Marya Eduarda Cabral de Carvalho Mello": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     }
   },
-  "datas_globais": [
-    "2026-07-12",
-    "2026-07-19",
-    "2026-07-28",
-    "2026-08-05",
-    "2026-08-08",
-    "2026-08-14",
-    "2026-09-05"
-  ]
+  "datas_globais": {
+  }
 }
