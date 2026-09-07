@@ -28,7 +28,8 @@ from roles_fm26 import (
     get_role_attributes,
     CATEGORIA_ROLE,
     TRADUCAO_ROLES_PT,
-    COMPATIBILIDADE_POSICAO
+    COMPATIBILIDADE_POSICAO,
+    ROLES_FM26_PT,
 )
 
 # ============================================================
@@ -52,7 +53,7 @@ PRIORIDADES = {
 }
 
 # ============================================================
-# MAPEAMENTO DE POSIÇÕES
+# MAPEAMENTO DE GRUPOS DE POSIÇÃO PARA ROLES FM26
 # ============================================================
 GRUPO_POSICAO = {
     'Goleiro': ['Goleiro'],
@@ -60,6 +61,33 @@ GRUPO_POSICAO = {
     'Meio-Campo': ['Volante', 'Meia-Central', 'Meia-Atacante', 'Meio-Campo'],
     'Atacante': ['Ponta Direita', 'Ponta Esquerda', 'Ponta', 'Centroavante', 'Segundo Atacante', 'Atacante']
 }
+
+def get_roles_by_grupo(grupo):
+    """
+    Retorna todas as roles FM26 compatíveis com um grupo de posição
+    (Goleiro, Defensor, Meio-Campo, Atacante) baseado no COMPATIBILIDADE_POSICAO.
+    """
+    posicoes_do_grupo = GRUPO_POSICAO.get(grupo, [])
+    roles = set()
+    for pos in posicoes_do_grupo:
+        # Busca roles compatíveis com essa posição específica
+        roles.update(COMPATIBILIDADE_POSICAO.get(pos, []))
+    # Também inclui roles que têm essa posição como esperada (via role_to_pos)
+    # Mas como role_to_pos não está disponível, vamos fazer um mapeamento inverso:
+    # Para cada role, verificar se sua posição esperada está no grupo.
+    # role_to_pos está definido no roles_fm26, mas não importamos. Vamos reconstruir localmente.
+    # Para evitar erros, vamos usar COMPATIBILIDADE_POSICAO que já mapeia posição -> roles.
+    # O mapeamento inverso pode ser feito: para cada role, vemos se ela aparece em alguma posição do grupo.
+    # Como COMPATIBILIDADE_POSICAO tem mapeamento posição -> roles, podemos inverter.
+    # Mas para simplificar, vamos apenas retornar as roles das posições do grupo.
+    # Se ainda estiver vazio, adicionamos roles de posições relacionadas.
+    if not roles:
+        # Fallback: adicionar roles de posições semelhantes
+        all_roles = set(ROLES_FM26_PT.keys())
+        # Filtra roles pela categoria se disponível
+        # Mas como não temos role_to_pos, vamos apenas retornar todas as roles se estiver vazio
+        roles = all_roles
+    return list(roles)
 
 # ============================================================
 # FUNÇÃO PARA CARREGAR ELENCO
@@ -190,7 +218,7 @@ def calcular_score_jogador(row, pos_tipo, posicao_exibida):
     
     roles = get_roles_by_posicao(pos_principal)
     if not roles:
-        roles = get_roles_by_posicao(pos_tipo)
+        roles = get_roles_by_grupo(pos_tipo)
     if not roles:
         roles = ['Versátil']
     
@@ -227,6 +255,34 @@ def calcular_score_jogador(row, pos_tipo, posicao_exibida):
         'media_atributos': media_atributos,
         'roles': roles
     }
+
+# ============================================================
+# FUNÇÃO PARA OBTER ROLES COMPATÍVEIS (COM BASE NA POSIÇÃO TÁTICA)
+# ============================================================
+def get_roles_compativel(jogador_row, pos_tipo):
+    """
+    Retorna uma lista de roles FM26 compatíveis com a posição tática (pos_tipo)
+    e também inclui roles da posição principal do jogador.
+    """
+    pos_principal = jogador_row.get('Posicao_Principal', 'Outros')
+    
+    # Roles baseadas na posição tática (grupo)
+    roles_tatica = get_roles_by_grupo(pos_tipo)
+    
+    # Roles baseadas na posição principal do jogador
+    roles_principal = get_roles_by_posicao(pos_principal)
+    
+    # Combinar: manter a ordem, priorizar roles_tatica, mas incluir roles_principal que não estão na lista
+    roles_combinadas = roles_tatica.copy()
+    for role in roles_principal:
+        if role not in roles_combinadas:
+            roles_combinadas.append(role)
+    
+    # Se ainda estiver vazio, usar todas as roles (fallback)
+    if not roles_combinadas:
+        roles_combinadas = list(ROLES_FM26_PT.keys())
+    
+    return roles_combinadas
 
 # ============================================================
 # FUNÇÃO PARA ENCONTRAR JOGADOR POR NOME (FUZZY)
@@ -372,6 +428,9 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes, titulares_atuais):
         if posicao_esperada in sugestoes:
             continue
         row = jogador_row.iloc[0]
+        # Atribui função compatível com a posição tática (usa a posição esperada)
+        # Mas para prioridades, a posição esperada é uma string, precisamos mapear para pos_tipo
+        # Para simplificar, vamos usar a posição principal do jogador para a função
         pos_principal = row.get('Posicao_Principal', 'Outros')
         roles = get_roles_by_posicao(pos_principal)
         funcao = roles[0] if roles else ''
@@ -412,8 +471,8 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes, titulares_atuais):
             })
         scores.sort(key=lambda x: x['score'], reverse=True)
         melhor = scores[0]
-        pos_principal = melhor['row'].get('Posicao_Principal', 'Outros')
-        roles = get_roles_by_posicao(pos_principal)
+        # Atribui função compatível com a posição tática
+        roles = get_roles_compativel(melhor['row'], pos_tipo)
         funcao = roles[0] if roles else ''
         novos_titulares.append({
             'posicao': pos_exibida,
@@ -439,8 +498,12 @@ def copiar_para_todas_formacoes(titulares, reservas, tipos_formacao, formacao_at
                 nome = jog['nome']
                 funcao = funcoes_existentes.get(nome, '')
                 if not funcao and jog.get('row') is not None:
-                    posicao_principal = jog['row'].get('Posicao_Principal', 'Outros')
-                    roles = get_roles_by_posicao(posicao_principal)
+                    # Se não tem função, tenta atribuir compatível com a posição tática
+                    # Para isso, precisamos saber qual a posição tática (usamos a posição do jog)
+                    pos_tipo = GRUPO_POSICAO.get(jog.get('posicao', 'Outros'), [])
+                    # fallback: usa posição principal
+                    pos_principal = jog['row'].get('Posicao_Principal', 'Outros')
+                    roles = get_roles_by_posicao(pos_principal)
                     funcao = roles[0] if roles else ''
                 novos_titulares.append({
                     'posicao': jog['posicao'],
@@ -633,8 +696,9 @@ def show():
                                 nome = item['nome']
                                 funcao = item['funcao']
                                 if not funcao and item['row'] is not None:
-                                    pos_principal = item['row'].get('Posicao_Principal', 'Outros')
-                                    roles = get_roles_by_posicao(pos_principal)
+                                    # Usa a posição tática para atribuir função
+                                    pos_tipo_item = dict(posicoes_tipo).get(pos, 'Meio-Campo')
+                                    roles = get_roles_compativel(item['row'], pos_tipo_item)
                                     funcao = roles[0] if roles else ''
                                 titulares.append({
                                     'posicao': pos,
@@ -675,8 +739,8 @@ def show():
                                 nome = item['nome']
                                 funcao = item['funcao']
                                 if not funcao and item['row'] is not None:
-                                    pos_principal = item['row'].get('Posicao_Principal', 'Outros')
-                                    roles = get_roles_by_posicao(pos_principal)
+                                    pos_tipo_item = dict(posicoes_tipo).get(pos, 'Meio-Campo')
+                                    roles = get_roles_compativel(item['row'], pos_tipo_item)
                                     funcao = roles[0] if roles else ''
                                 titulares.append({
                                     'posicao': pos,
@@ -701,7 +765,7 @@ def show():
                             st.rerun()
     
     # ============================================================
-    # DROPDOWNS MANUAIS
+    # DROPDOWNS MANUAIS (COM FUNÇÕES CORRIGIDAS)
     # ============================================================
     st.subheader("📋 Preencher Titulares (Dropdowns)")
     st.markdown("Selecione um jogador e sua função para cada posição. Posições preenchidas serão preservadas ao sugerir.")
@@ -717,6 +781,7 @@ def show():
         with col1:
             st.write(pos_exibida)
         with col2:
+            # Candidatos
             candidatos = obter_jogadores_para_posicao(jogadores_disponiveis, pos_tipo, list(titulares_selecionados.values()), cartoes, incluir_lesionados=False)
             candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
             opcoes = [''] + candidatos['nome_completo'].tolist()
@@ -735,20 +800,31 @@ def show():
         with col3:
             if selecionado:
                 row = df_elenco[df_elenco['nome_completo'] == selecionado].iloc[0]
-                posicao_principal = row.get('Posicao_Principal', 'Outros')
-                roles = get_roles_by_posicao(posicao_principal)
+                # Obtém funções compatíveis com a posição tática (pos_tipo)
+                roles = get_roles_compativel(row, pos_tipo)
+                
+                # Também filtra por categoria (in/out) se necessário
+                if tipo_selecionado == 'ofensiva_sem_bola':
+                    roles = [r for r in roles if CATEGORIA_ROLE.get(r) == 'out']
+                else:
+                    roles = [r for r in roles if CATEGORIA_ROLE.get(r) == 'in']
+                
+                # Se ainda estiver vazio, usa todas as roles da categoria
                 if not roles:
                     if tipo_selecionado == 'ofensiva_sem_bola':
                         roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'out']
                     else:
                         roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'in']
+                
                 funcoes_exibicao = [TRADUCAO_ROLES_PT.get(r, r) for r in roles]
                 mapa_exibicao = dict(zip(funcoes_exibicao, roles))
+                
                 funcao_atual = funcoes_salvas.get(selecionado, '')
                 if funcao_atual and funcao_atual not in roles:
                     roles.append(funcao_atual)
                     funcoes_exibicao.append(TRADUCAO_ROLES_PT.get(funcao_atual, funcao_atual))
                     mapa_exibicao[funcoes_exibicao[-1]] = funcao_atual
+                
                 funcao_idx = roles.index(funcao_atual) if funcao_atual in roles else 0
                 funcao_exibida = st.selectbox(
                     f"Função {idx}",
