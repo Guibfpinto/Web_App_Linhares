@@ -2062,30 +2062,100 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
 # =============================================
 def interpretar_formacao(formacao_str):
     """
-    Interpreta uma string de formação (ex: '4-4-2') e retorna a lista de posições.
-    Retorna (None, None, None, None) se a formação for inválida ou vazia.
+    Interpreta uma string de formação (ex: '4-4-2', '4-3-3', '3-5-2').
+    Retorna uma tupla (defensores, meio_campistas, atacantes, posicoes_lista)
+    onde posicoes_lista é uma lista de (posicao_exibida, posicao_tipo) para cada jogador.
     """
     if not formacao_str or not isinstance(formacao_str, str):
         return None, None, None, None
-    partes = formacao_str.split('-')
+
+    # Remove espaços e hífens extras
+    formacao_str = formacao_str.strip()
+    partes = re.split(r'[-/]', formacao_str)
     if len(partes) < 3:
         return None, None, None, None
+
     try:
         nums = [int(p) for p in partes]
         if sum(nums) != 10:
             return None, None, None, None
         defensores = nums[0]
-        atacantes = nums[-1]
-        meio_campistas = sum(nums[1:-1])
+        meio_campistas = nums[1] if len(nums) > 2 else 0
+        atacantes = nums[2] if len(nums) > 2 else nums[1]
+        # Se a formação for do tipo "4-4-2", nums = [4,4,2]
+        # Mas se for "4-3-3", nums = [4,3,3]
+        # Vamos ajustar: meio_campistas = nums[1], atacantes = nums[2]
+        if len(nums) >= 3:
+            meio_campistas = nums[1]
+            atacantes = nums[2]
+        else:
+            meio_campistas = nums[1]  # fallback
+
         posicoes = [('Goleiro', 'Goleiro')]
-        for i in range(defensores):
-            posicoes.append((f'Defensor {i+1}', 'Defensor'))
-        for i in range(meio_campistas):
-            posicoes.append((f'Meio-Campista {i+1}', 'Meio-Campo'))
-        for i in range(atacantes):
-            posicoes.append((f'Atacante {i+1}', 'Atacante'))
+
+        # Defensores: Zagueiros e Laterais (distribuição padrão)
+        if defensores == 5:
+            for i in range(defensores):
+                if i == 0:
+                    posicoes.append(('Lateral Esquerdo', 'Lateral'))
+                elif i == defensores - 1:
+                    posicoes.append(('Lateral Direito', 'Lateral'))
+                else:
+                    posicoes.append((f'Zagueiro {i}', 'Zagueiro'))
+        elif defensores == 4:
+            posicoes.append(('Lateral Esquerdo', 'Lateral'))
+            posicoes.append(('Zagueiro', 'Zagueiro'))
+            posicoes.append(('Zagueiro', 'Zagueiro'))
+            posicoes.append(('Lateral Direito', 'Lateral'))
+        elif defensores == 3:
+            posicoes.append(('Zagueiro Esquerdo', 'Zagueiro'))
+            posicoes.append(('Zagueiro Central', 'Zagueiro'))
+            posicoes.append(('Zagueiro Direito', 'Zagueiro'))
+        else:
+            for i in range(defensores):
+                posicoes.append((f'Defensor {i+1}', 'Defensor'))
+
+        # Meio-campistas
+        if meio_campistas == 5:
+            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Direito', 'Meio-Campo'))
+        elif meio_campistas == 4:
+            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Direito', 'Meio-Campo'))
+        elif meio_campistas == 3:
+            posicoes.append(('Meia Esquerdo', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Direito', 'Meio-Campo'))
+        elif meio_campistas == 2:
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+            posicoes.append(('Meia Central', 'Meio-Campo'))
+        else:
+            for i in range(meio_campistas):
+                posicoes.append((f'Meio-Campo {i+1}', 'Meio-Campo'))
+
+        # Atacantes
+        if atacantes == 3:
+            posicoes.append(('Ponta Esquerda', 'Ponta'))
+            posicoes.append(('Centroavante', 'Atacante'))
+            posicoes.append(('Ponta Direita', 'Ponta'))
+        elif atacantes == 2:
+            posicoes.append(('Atacante', 'Atacante'))
+            posicoes.append(('Atacante', 'Atacante'))
+        elif atacantes == 1:
+            posicoes.append(('Centroavante', 'Atacante'))
+        else:
+            for i in range(atacantes):
+                posicoes.append((f'Atacante {i+1}', 'Atacante'))
+
         return defensores, meio_campistas, atacantes, posicoes
-    except:
+
+    except Exception as e:
+        print(f"Erro ao interpretar formação '{formacao_str}': {e}")
         return None, None, None, None
 
 def obter_jogadores_para_posicao(df, pos_tipo, excluidos, cartoes, incluir_lesionados=False):

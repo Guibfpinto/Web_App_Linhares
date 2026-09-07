@@ -67,16 +67,19 @@ def carregar_elenco_com_lesoes(categoria):
     return df
 
 # ============================================================
-# FUNÇÃO PARA DESENHAR O CAMPO
+# FUNÇÃO PARA DESENHAR O CAMPO (MELHORADA)
 # ============================================================
 def desenhar_campo(titulares, titulo, formacao):
     if not titulares:
         return None
+
     fig, ax = plt.subplots(figsize=(12, 8))
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 70)
     ax.set_facecolor('#2e7d32')
     ax.set_title(titulo, fontsize=14, fontweight='bold', color='white')
+
+    # Linhas do campo
     ax.plot([0, 100], [0, 0], 'w', linewidth=2)
     ax.plot([0, 100], [70, 70], 'w', linewidth=2)
     ax.plot([0, 0], [0, 70], 'w', linewidth=2)
@@ -85,20 +88,47 @@ def desenhar_campo(titulares, titulo, formacao):
     ax.add_patch(Circle((50, 35), 7, edgecolor='w', facecolor='none', linewidth=2))
     ax.add_patch(Circle((50, 35), 1, edgecolor='w', facecolor='w', linewidth=1))
     ax.add_patch(Rectangle((40, 18), 20, 34, edgecolor='w', facecolor='none', linewidth=2))
-    posicoes_padrao = [
-        (50, 8), (15, 18), (35, 18), (65, 18), (85, 18),
-        (15, 35), (35, 35), (65, 35), (85, 35), (30, 52), (70, 52)
-    ]
-    n = len(titulares)
-    if n <= 11:
-        posicoes = posicoes_padrao[:n]
-    else:
-        posicoes = []
-        for i in range(n):
+
+    # Mapeia posições para coordenadas
+    pos_map = {
+        'Goleiro': (50, 8),
+        'Lateral Esquerdo': (15, 18),
+        'Lateral Direito': (85, 18),
+        'Zagueiro': (35, 18),
+        'Zagueiro Central': (50, 18),
+        'Zagueiro Esquerdo': (25, 18),
+        'Zagueiro Direito': (75, 18),
+        'Meia Esquerdo': (15, 35),
+        'Meia Direito': (85, 35),
+        'Meia Central': (50, 35),
+        'Meia Central Largo': (35, 35),
+        'Ponta Esquerda': (15, 52),
+        'Ponta Direita': (85, 52),
+        'Atacante': (50, 52),
+        'Centroavante': (50, 52),
+        'Defensor': (35, 18),
+        'Meio-Campo': (50, 35),
+    }
+
+    # Tenta posicionar cada jogador
+    coords = []
+    for jog in titulares:
+        pos_exibida = jog.get('posicao', '')
+        coord = None
+        for key in pos_map:
+            if key in pos_exibida:
+                coord = pos_map[key]
+                break
+        if coord is None:
+            # Fallback: distribuição simples
+            i = len(coords)
+            n = len(titulares)
             x = 10 + (i / (n-1)) * 80 if n > 1 else 50
             y = 10 + ((i % 5) / 4) * 50 if n > 5 else 10 + (i / (n-1)) * 50
-            posicoes.append((x, y))
-    for i, (x, y) in enumerate(posicoes):
+            coord = (x, y)
+        coords.append(coord)
+
+    for i, (x, y) in enumerate(coords):
         if i < len(titulares):
             jog = titulares[i]
             nome = jog.get('apelido', jog.get('nome', 'N/D'))
@@ -108,6 +138,7 @@ def desenhar_campo(titulares, titulo, formacao):
             ax.text(x, y-5, nome[:15], ha='center', va='center', fontsize=7, color='white', weight='bold')
             if funcao:
                 ax.text(x, y-8, funcao[:15], ha='center', va='center', fontsize=5, color='yellow', style='italic')
+
     ax.axis('off')
     plt.tight_layout()
     return fig
@@ -320,7 +351,7 @@ def show():
                     st.rerun()
 
     # ============================================================
-    # SELEÇÃO DE TITULARES E FUNÇÕES (Dropdowns)
+    # SELEÇÃO DE TITULARES E FUNÇÕES (Dropdowns) - CORRIGIDO
     # ============================================================
     st.subheader("🏃 Titulares (seleção manual)")
 
@@ -330,9 +361,18 @@ def show():
     titulares_selecionados = {}
     funcoes_selecionadas = {}
 
-    cols = st.columns(3)
+    # Exibe os dropdowns em colunas, mas com rótulos claros
+    # Vamos agrupar por linha de defesa, meio, ataque para ficar mais organizado
+    colunas_por_posicao = 3  # número de colunas
+
+    # Cria uma lista de todos os dropdowns com seus índices
     for idx, (pos_exibida, pos_tipo) in enumerate(posicoes):
-        with cols[idx % 3]:
+        # Usa uma coluna baseada no índice para distribuir
+        col_idx = idx % colunas_por_posicao
+        if col_idx == 0:
+            cols = st.columns(colunas_por_posicao)
+        with cols[col_idx]:
+            # Filtra candidatos
             if pos_tipo == 'Goleiro':
                 candidatos = jogadores_disponiveis[jogadores_disponiveis['Posicao_Principal'] == 'Goleiro']
             else:
@@ -345,8 +385,13 @@ def show():
             if idx < len(titulares_salvos):
                 default_value = titulares_salvos[idx].get('nome', '')
 
+            # Label com a posição (ex: "Goleiro", "Lateral Esquerdo")
+            label = pos_exibida
+            if pos_tipo and pos_tipo not in label:
+                label = f"{label} ({pos_tipo})"
+
             selecionado = st.selectbox(
-                f"{pos_exibida} ({pos_tipo})",
+                label,
                 opcoes,
                 index=opcoes.index(default_value) if default_value in opcoes else 0,
                 key=f"titular_{tipo_selecionado}_{idx}"
@@ -377,7 +422,7 @@ def show():
                 funcao_idx = roles.index(funcao_atual) if funcao_atual in roles else 0
 
                 funcao_exibida = st.selectbox(
-                    f"Função FM26",
+                    f"Função",
                     funcoes_exibicao,
                     index=funcao_idx,
                     key=f"funcao_{tipo_selecionado}_{idx}"
@@ -385,6 +430,7 @@ def show():
                 funcao_original = mapa_exibicao.get(funcao_exibida, '')
                 funcoes_selecionadas[selecionado] = funcao_original
 
+                # Atributos
                 if funcao_original:
                     with st.expander(f"📊 Atributos - {funcao_exibida}"):
                         role_data = get_role_attributes(funcao_original)
