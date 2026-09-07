@@ -2024,9 +2024,11 @@ ADMIN_FIXOS = [
     "Nanico",
     "MaryaEduarda",
     "KarenLoureiro",
-    "FabianoEller"
+    "FabianoEller",
+    "Delei"  # <--- NOVO ADMIN
 ]
 
+# Mapeamento de senhas para os administradores fixos
 SENHAS_FIXAS = {
     "Guibfpinto": "@W.d06302005",
     "Ricardosantosr": "@R.s02011991",
@@ -2036,7 +2038,8 @@ SENHAS_FIXAS = {
     "Nanico": "@W.s0511",
     "MaryaEduarda": "@M.e12062002",
     "KarenLoureiro": "@K.l04082000",
-    "FabianoEller": "@F.e1977"
+    "FabianoEller": "@F.e1977",
+    "Delei": "Delei20031966"  # <--- SENHA DO NOVO ADMIN
 }
 
 def carregar_usuarios():
