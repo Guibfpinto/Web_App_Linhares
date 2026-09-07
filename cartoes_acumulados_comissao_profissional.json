@@ -1,6 +1,6 @@
 {
   "cartoes": {
-    "Jonair da Silva Ferreira": {
+    "Yupi Silva": {
       "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -52,7 +52,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Ricardo da Silva Santos": {
+    "Ricardo": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -62,7 +62,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Karen da Silva Loureiro": {
+    "Karen": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -72,7 +72,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Marcos Vinicius Vieira Lima Furguilin": {
+    "Asamoah": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
@@ -82,7 +82,7 @@
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
-    "Marya Eduarda Cabral de Carvalho Mello": {
+    "Marya Eduarda": {
       "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
