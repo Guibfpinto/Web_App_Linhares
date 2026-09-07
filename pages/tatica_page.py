@@ -30,7 +30,7 @@ from roles_fm26 import (
 )
 
 # ============================================================
-# FUNÇÃO PARA CARREGAR ELENCO POR CATEGORIA
+# FUNÇÃO PARA CARREGAR ELENCO
 # ============================================================
 @st.cache_data
 def carregar_elenco_com_lesoes(categoria):
@@ -66,7 +66,7 @@ def carregar_elenco_com_lesoes(categoria):
     return df
 
 # ============================================================
-# FUNÇÃO PARA DESENHAR CAMPO (DINÂMICO POR FORMAÇÃO)
+# FUNÇÃO PARA DESENHAR CAMPO (COM POSIÇÕES DINÂMICAS)
 # ============================================================
 def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     if not titulares or not posicoes_esperadas:
@@ -88,52 +88,42 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     ax.add_patch(Circle((50, 35), 1, edgecolor='w', facecolor='w', linewidth=1))
     ax.add_patch(Rectangle((40, 18), 20, 34, edgecolor='w', facecolor='none', linewidth=2))
     
-    # Posicionamento genérico baseado na formação
-    # Ordena os titulares na ordem das posições esperadas
-    n = len(posicoes_esperadas)
-    posicoes = []
-    # Posições relativas (x, y) para 11 jogadores em uma grade 4-4-2
-    # Goleiro
-    posicoes.append((50, 8))
-    # Defensores (linha de 4)
+    # Posicionamento baseado no número de jogadores (11 ou menos)
+    n = len(titulares)
+    # Posições relativas (x, y) para até 11 jogadores em um esquema 4-4-2
+    # Vamos distribuir proporcionalmente
+    if n >= 1:
+        posicoes = [(50, 8)]  # goleiro
+    else:
+        posicoes = []
+    
+    # Defensores (segunda linha)
     if n >= 5:
-        posicoes.append((15, 18))  # LE
-        posicoes.append((35, 18))  # ZAG
-        posicoes.append((65, 18))  # ZAG
-        posicoes.append((85, 18))  # LD
+        posicoes.extend([(15, 18), (35, 18), (65, 18), (85, 18)])
     elif n >= 4:
-        posicoes.append((20, 18))
-        posicoes.append((40, 18))
-        posicoes.append((60, 18))
-        posicoes.append((80, 18))
+        posicoes.extend([(20, 18), (40, 18), (60, 18), (80, 18)])
     elif n >= 3:
-        posicoes.append((25, 18))
-        posicoes.append((50, 18))
-        posicoes.append((75, 18))
-    # Meio-campistas (linha de 4)
+        posicoes.extend([(25, 18), (50, 18), (75, 18)])
+    elif n >= 2:
+        posicoes.extend([(30, 18), (70, 18)])
+    
+    # Meio-campistas (terceira linha)
     if n >= 9:
-        posicoes.append((15, 35))  # ME
-        posicoes.append((35, 35))  # MC
-        posicoes.append((65, 35))  # MC
-        posicoes.append((85, 35))  # MD
+        posicoes.extend([(15, 35), (35, 35), (65, 35), (85, 35)])
     elif n >= 8:
-        posicoes.append((20, 35))
-        posicoes.append((40, 35))
-        posicoes.append((60, 35))
-        posicoes.append((80, 35))
+        posicoes.extend([(20, 35), (40, 35), (60, 35), (80, 35)])
     elif n >= 7:
-        posicoes.append((25, 35))
-        posicoes.append((50, 35))
-        posicoes.append((75, 35))
-    # Atacantes
+        posicoes.extend([(25, 35), (50, 35), (75, 35)])
+    elif n >= 6:
+        posicoes.extend([(30, 35), (70, 35)])
+    
+    # Atacantes (quarta linha)
     if n >= 11:
-        posicoes.append((30, 52))  # AT
-        posicoes.append((70, 52))  # AT
+        posicoes.extend([(30, 52), (70, 52)])
     elif n >= 10:
-        posicoes.append((35, 52))
-        posicoes.append((65, 52))
+        posicoes.extend([(35, 52), (65, 52)])
     elif n >= 9:
-        posicoes.append((50, 52))
+        posicoes.extend([(50, 52)])
     
     # Caso ainda falte, preenche com posições extras
     while len(posicoes) < n:
@@ -141,7 +131,7 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
         y = 10 + ((len(posicoes) % 3) / 2) * 50
         posicoes.append((x, y))
     
-    # Desenha cada jogador na posição correspondente
+    # Desenha os jogadores
     for i, (x, y) in enumerate(posicoes[:n]):
         if i < len(titulares):
             jog = titulares[i]
@@ -158,30 +148,24 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     return fig
 
 # ============================================================
-# FUNÇÃO PARA SUGERIR ESCALAÇÃO (USANDO O MESMO FILTRO DOS DROPDOWNS)
+# FUNÇÃO PARA SUGERIR ESCALAÇÃO (usando obter_jogadores_para_posicao)
 # ============================================================
 def sugerir_escalacao(df_elenco, posicoes, cartoes):
-    """Sugere titulares e reservas usando obter_jogadores_para_posicao para filtragem."""
     jogadores_disponiveis = df_elenco.copy()
     if 'lesionado' in jogadores_disponiveis.columns:
         jogadores_disponiveis = jogadores_disponiveis[~jogadores_disponiveis['lesionado']]
-    
-    # Função para verificar suspensão
-    def nao_suspenso(nome):
-        return not jogador_suspenso(mapear_nome_para_canonico(nome), cartoes)
-    jogadores_disponiveis = jogadores_disponiveis[jogadores_disponiveis['nome_completo'].apply(nao_suspenso)]
-    
+    jogadores_disponiveis = jogadores_disponiveis[
+        ~jogadores_disponiveis['nome_completo'].apply(
+            lambda x: jogador_suspenso(mapear_nome_para_canonico(x), cartoes)
+        )
+    ]
     if jogadores_disponiveis.empty:
         return [], []
-    
     titulares = []
     jogadores_usados = []
-    
     for pos_exibida, pos_tipo in posicoes:
-        # Usa a mesma função de filtro dos dropdowns
         candidatos = obter_jogadores_para_posicao(jogadores_disponiveis, pos_tipo, jogadores_usados, cartoes, incluir_lesionados=False)
         candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
-        
         if not candidatos.empty:
             melhor = candidatos.iloc[0]
             titulares.append({
@@ -198,8 +182,6 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes):
                 'apelido': '',
                 'row': None
             })
-    
-    # Reservas: melhores não usados
     reservas = []
     for _, row in jogadores_disponiveis[~jogadores_disponiveis['nome_completo'].isin(jogadores_usados)].head(12).iterrows():
         reservas.append({
@@ -207,7 +189,6 @@ def sugerir_escalacao(df_elenco, posicoes, cartoes):
             'apelido': row['apelido'],
             'row': row
         })
-    
     return titulares, reservas
 
 # ============================================================
@@ -290,6 +271,7 @@ def show():
                 'funcoes': {}
             }
     
+    # Seleção da formação atual
     tipo_selecionado = st.radio(
         "Selecione a formação para configurar",
         options=tipos_formacao,
@@ -302,7 +284,7 @@ def show():
     formacao_atual = dados_formacao.get('formacao', '4-4-2')
     
     # ============================================================
-    # CONFIGURAÇÃO DA FORMAÇÃO
+    # TOPO: Configuração da formação e botões
     # ============================================================
     st.subheader(f"⚙️ Configurar {nomes_tipos[tipo_selecionado]}")
     
@@ -338,6 +320,7 @@ def show():
             st.success("✅ Titulares e reservas copiados para todas as formações!")
             st.rerun()
     
+    # Interpreta a formação atual
     defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_input)
     if not posicoes:
         st.error("Formação inválida. Use X-Y-Z (ex: 4-4-2).")
@@ -358,79 +341,91 @@ def show():
     st.write(f"**Jogadores disponíveis:** {len(jogadores_disponiveis)}")
     
     # ============================================================
-    # DROPDOWNS DE TITULARES E FUNÇÕES (USANDO obter_jogadores_para_posicao)
+    # CAMPO VISUAL
     # ============================================================
-    st.subheader("🏃 Titulares")
+    st.subheader("🏟️ Campo")
+    titulares_atuais = dados_formacao.get('titulares', [])
+    fig = desenhar_campo(titulares_atuais, f"{nomes_tipos[tipo_selecionado]} - {formacao_input}", formacao_input, posicoes)
+    if fig:
+        st.pyplot(fig)
+        plt.close(fig)
+    else:
+        st.info("Nenhum titular definido ainda. Use a sugestão ou preencha manualmente.")
+    
+    # ============================================================
+    # TABELA DE SELEÇÃO DE TITULARES E FUNÇÕES
+    # ============================================================
+    st.subheader("📋 Preencher Titulares")
+    st.markdown("Selecione um jogador e sua função para cada posição.")
     
     titulares_salvos = dados_formacao.get('titulares', [])
     funcoes_salvas = dados_formacao.get('funcoes', {})
     
+    # Cria uma tabela com 3 colunas: Posição, Jogador, Função
+    cols = st.columns(3)
+    col_titulos = ["Posição", "Jogador", "Função FM26"]
+    for i, titulo in enumerate(col_titulos):
+        cols[i].write(f"**{titulo}**")
+    
+    # Para cada posição, cria uma linha com dropdowns
     titulares_selecionados = {}
     funcoes_selecionadas = {}
     
-    cols = st.columns(3)
     for idx, (pos_exibida, pos_tipo) in enumerate(posicoes):
-        with cols[idx % 3]:
-            # Usa a função do utils para filtrar candidatos (inclui posições secundárias)
-            candidatos = obter_jogadores_para_posicao(jogadores_disponiveis, pos_tipo, list(titulares_selecionados.values()), cartoes, incluir_lesionados=False)
-            candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
+        # Coluna Posição
+        cols[0].write(pos_exibida)
+        
+        # Coluna Jogador (dropdown)
+        candidatos = obter_jogadores_para_posicao(jogadores_disponiveis, pos_tipo, list(titulares_selecionados.values()), cartoes, incluir_lesionados=False)
+        candidatos = candidatos.sort_values('Rating_Geral_FM26', ascending=False)
+        opcoes = [''] + candidatos['nome_completo'].tolist()
+        default_value = ''
+        if idx < len(titulares_salvos):
+            default_value = titulares_salvos[idx].get('nome', '')
+        selecionado = cols[1].selectbox(
+            f"Jogador {idx}",
+            opcoes,
+            index=opcoes.index(default_value) if default_value in opcoes else 0,
+            key=f"titular_{tipo_selecionado}_{idx}",
+            label_visibility="collapsed"
+        )
+        if selecionado:
+            titulares_selecionados[pos_exibida] = selecionado
+            row = df_elenco[df_elenco['nome_completo'] == selecionado].iloc[0]
+            posicao_principal = row.get('Posicao_Principal', 'Outros')
             
-            opcoes = [''] + candidatos['nome_completo'].tolist()
-            default_value = ''
-            if idx < len(titulares_salvos):
-                default_value = titulares_salvos[idx].get('nome', '')
+            # Funções compatíveis
+            roles = get_roles_by_posicao(posicao_principal)
+            if not roles:
+                if tipo_selecionado == 'ofensiva_sem_bola':
+                    roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'out']
+                else:
+                    roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'in']
             
-            selecionado = st.selectbox(
-                f"{pos_exibida}",
-                opcoes,
-                index=opcoes.index(default_value) if default_value in opcoes else 0,
-                key=f"titular_{tipo_selecionado}_{idx}"
+            funcoes_exibicao = [TRADUCAO_ROLES_PT.get(r, r) for r in roles]
+            mapa_exibicao = dict(zip(funcoes_exibicao, roles))
+            
+            funcao_atual = funcoes_salvas.get(selecionado, '')
+            if funcao_atual and funcao_atual not in roles:
+                roles.append(funcao_atual)
+                funcoes_exibicao.append(TRADUCAO_ROLES_PT.get(funcao_atual, funcao_atual))
+                mapa_exibicao[funcoes_exibicao[-1]] = funcao_atual
+            
+            funcao_idx = roles.index(funcao_atual) if funcao_atual in roles else 0
+            
+            # Coluna Função
+            funcao_exibida = cols[2].selectbox(
+                f"Função {idx}",
+                funcoes_exibicao,
+                index=funcao_idx,
+                key=f"funcao_{tipo_selecionado}_{idx}",
+                label_visibility="collapsed"
             )
-            
-            if selecionado:
-                titulares_selecionados[pos_exibida] = selecionado
-                row = df_elenco[df_elenco['nome_completo'] == selecionado].iloc[0]
-                posicao_principal = row.get('Posicao_Principal', 'Outros')
-                
-                # Funções compatíveis com a posição principal
-                roles = get_roles_by_posicao(posicao_principal)
-                if not roles:
-                    if tipo_selecionado == 'ofensiva_sem_bola':
-                        roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'out']
-                    else:
-                        roles = [r for r, cat in CATEGORIA_ROLE.items() if cat == 'in']
-                
-                funcoes_exibicao = [TRADUCAO_ROLES_PT.get(r, r) for r in roles]
-                mapa_exibicao = dict(zip(funcoes_exibicao, roles))
-                
-                funcao_atual = funcoes_salvas.get(selecionado, '')
-                if funcao_atual and funcao_atual not in roles:
-                    roles.append(funcao_atual)
-                    funcoes_exibicao.append(TRADUCAO_ROLES_PT.get(funcao_atual, funcao_atual))
-                    mapa_exibicao[funcoes_exibicao[-1]] = funcao_atual
-                
-                funcao_idx = roles.index(funcao_atual) if funcao_atual in roles else 0
-                funcao_exibida = st.selectbox(
-                    f"Função FM26",
-                    funcoes_exibicao,
-                    index=funcao_idx,
-                    key=f"funcao_{tipo_selecionado}_{idx}"
-                )
-                funcao_original = mapa_exibicao.get(funcao_exibida, '')
-                funcoes_selecionadas[selecionado] = funcao_original
-                
-                if funcao_original:
-                    with st.expander(f"📊 Atributos - {funcao_exibida}"):
-                        role_data = get_role_attributes(funcao_original)
-                        key_attrs = role_data.get('key', [])
-                        pref_attrs = role_data.get('preferred', [])
-                        unnec_attrs = role_data.get('unnecessary', [])
-                        if key_attrs:
-                            st.write("**Chave:**", ', '.join(key_attrs))
-                        if pref_attrs:
-                            st.write("**Preferidos:**", ', '.join(pref_attrs))
-                        if unnec_attrs:
-                            st.write("**Desnecessários:**", ', '.join(unnec_attrs))
+            funcao_original = mapa_exibicao.get(funcao_exibida, '')
+            funcoes_selecionadas[selecionado] = funcao_original
+        else:
+            # Se não selecionou jogador, limpa a função
+            cols[2].write("")
     
     # ============================================================
     # RESERVAS
@@ -504,12 +499,11 @@ def show():
     # VISUALIZAÇÃO DAS FORMAÇÕES SALVAS
     # ============================================================
     st.divider()
-    st.subheader("📋 Visualização das Formações")
+    st.subheader("📋 Visualização de todas as formações")
     for tipo in tipos_formacao:
         dados = st.session_state.escalacoes_tatica.get(tipo, {})
         titulares = dados.get('titulares', [])
         formacao = dados.get('formacao', '4-4-2')
-        # Interpreta a formação para obter posições esperadas
         _, _, _, posicoes_esperadas = interpretar_formacao(formacao)
         with st.expander(f"{nomes_tipos[tipo]} - {formacao} ({len(titulares)} jogadores)"):
             if titulares:
