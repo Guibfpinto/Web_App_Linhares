@@ -66,7 +66,7 @@ def carregar_elenco_com_lesoes(categoria):
     return df
 
 # ============================================================
-# FUNÇÃO PARA DESENHAR CAMPO (COM POSIÇÕES DINÂMICAS)
+# FUNÇÃO PARA DESENHAR CAMPO
 # ============================================================
 def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     if not titulares or not posicoes_esperadas:
@@ -88,16 +88,12 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     ax.add_patch(Circle((50, 35), 1, edgecolor='w', facecolor='w', linewidth=1))
     ax.add_patch(Rectangle((40, 18), 20, 34, edgecolor='w', facecolor='none', linewidth=2))
     
-    # Posicionamento baseado no número de jogadores (11 ou menos)
     n = len(titulares)
-    # Posições relativas (x, y) para até 11 jogadores em um esquema 4-4-2
-    # Vamos distribuir proporcionalmente
     if n >= 1:
-        posicoes = [(50, 8)]  # goleiro
+        posicoes = [(50, 8)]
     else:
         posicoes = []
     
-    # Defensores (segunda linha)
     if n >= 5:
         posicoes.extend([(15, 18), (35, 18), (65, 18), (85, 18)])
     elif n >= 4:
@@ -107,7 +103,6 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     elif n >= 2:
         posicoes.extend([(30, 18), (70, 18)])
     
-    # Meio-campistas (terceira linha)
     if n >= 9:
         posicoes.extend([(15, 35), (35, 35), (65, 35), (85, 35)])
     elif n >= 8:
@@ -117,7 +112,6 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     elif n >= 6:
         posicoes.extend([(30, 35), (70, 35)])
     
-    # Atacantes (quarta linha)
     if n >= 11:
         posicoes.extend([(30, 52), (70, 52)])
     elif n >= 10:
@@ -125,13 +119,11 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     elif n >= 9:
         posicoes.extend([(50, 52)])
     
-    # Caso ainda falte, preenche com posições extras
     while len(posicoes) < n:
         x = 10 + (len(posicoes) / n) * 80
         y = 10 + ((len(posicoes) % 3) / 2) * 50
         posicoes.append((x, y))
     
-    # Desenha os jogadores
     for i, (x, y) in enumerate(posicoes[:n]):
         if i < len(titulares):
             jog = titulares[i]
@@ -148,7 +140,7 @@ def desenhar_campo(titulares, titulo, formacao, posicoes_esperadas):
     return fig
 
 # ============================================================
-# FUNÇÃO PARA SUGERIR ESCALAÇÃO (usando obter_jogadores_para_posicao)
+# FUNÇÃO PARA SUGERIR ESCALAÇÃO
 # ============================================================
 def sugerir_escalacao(df_elenco, posicoes, cartoes):
     jogadores_disponiveis = df_elenco.copy()
@@ -230,7 +222,7 @@ def aplicar_escalacao_para_todas_formacoes(titulares, reservas, tipos_formacao, 
                 'row': res['row']
             })
         st.session_state.escalacoes_tatica[tipo] = {
-            'formacao': dados.get('formacao', '4-4-2'),
+            'formacao': formacao_atual,  # <--- ATUALIZA A FORMAÇÃO
             'titulares': novos_titulares,
             'reservas': novas_reservas,
             'funcoes': funcoes_existentes
@@ -314,13 +306,15 @@ def show():
         if st.button("📋 Copiar para todas", key=f"copiar_{tipo_selecionado}", use_container_width=True):
             titulares_atuais = dados_formacao.get('titulares', [])
             reservas_atuais = dados_formacao.get('reservas', [])
+            # Atualiza a formação também
+            formacao_salva = formacao_input
             aplicar_escalacao_para_todas_formacoes(
-                titulares_atuais, reservas_atuais, tipos_formacao, formacao_input, dados_formacao.get('funcoes', {})
+                titulares_atuais, reservas_atuais, tipos_formacao, formacao_salva, dados_formacao.get('funcoes', {})
             )
-            st.success("✅ Titulares e reservas copiados para todas as formações!")
+            st.success("✅ Titulares, reservas e formação copiados para todas as formações!")
             st.rerun()
     
-    # Interpreta a formação atual
+    # Interpreta a formação atual (usando formacao_input)
     defensores, meias, atacantes, posicoes = interpretar_formacao(formacao_input)
     if not posicoes:
         st.error("Formação inválida. Use X-Y-Z (ex: 4-4-2).")
@@ -341,7 +335,7 @@ def show():
     st.write(f"**Jogadores disponíveis:** {len(jogadores_disponiveis)}")
     
     # ============================================================
-    # CAMPO VISUAL
+    # CAMPO VISUAL (usa formacao_input)
     # ============================================================
     st.subheader("🏟️ Campo")
     titulares_atuais = dados_formacao.get('titulares', [])
@@ -476,12 +470,12 @@ def show():
                         'row': row
                     })
                 st.session_state.escalacoes_tatica[tipo_selecionado] = {
-                    'formacao': formacao_input,
+                    'formacao': formacao_input,  # <--- ATUALIZA A FORMAÇÃO
                     'titulares': titulares,
                     'reservas': reservas,
                     'funcoes': funcoes_selecionadas
                 }
-                st.success(f"✅ {nomes_tipos[tipo_selecionado]} salva!")
+                st.success(f"✅ {nomes_tipos[tipo_selecionado]} salva com a nova formação!")
                 st.rerun()
     
     with col_limpar:
