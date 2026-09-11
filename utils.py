@@ -2182,13 +2182,59 @@ def usuario_eh_admin(usuario):
 # RELATÓRIOS E EXPORTAÇÃO
 # =============================================
 def gerar_relatorio_completo_texto(df, nome_categoria):
+    """
+    Gera relatório completo com TODAS as estatísticas do elenco
+    (estatísticas gerais, gordura, FM26, distribuição por posição).
+    """
     if df is None or df.empty:
         return f"Sem dados para {nome_categoria}"
-    texto = f"Relatório - {nome_categoria}\n\nTotal: {len(df)}\n"
-    if 'Idade' in df.columns:
-        texto += f"Idade média: {df['Idade'].mean():.1f}\n"
-    if 'Rating_Geral_FM26' in df.columns:
-        texto += f"Rating médio: {df['Rating_Geral_FM26'].mean():.1f}\n"
+
+    total = len(df)
+    idade_media = df['Idade'].mean() if 'Idade' in df.columns else 0
+    altura_media = df['altura_cm'].mean() if 'altura_cm' in df.columns else 0
+    peso_media = df['peso_kg'].mean() if 'peso_kg' in df.columns else 0
+    imc_media = df['IMC'].mean() if 'IMC' in df.columns else 0
+
+    gordura_media = df['Gordura_Corporal_%'].mean() if 'Gordura_Corporal_%' in df.columns else 0
+    massa_magra_media = df['Massa_Magra_kg'].mean() if 'Massa_Magra_kg' in df.columns else 0
+    massa_gorda_media = peso_media - massa_magra_media if peso_media and massa_magra_media else 0
+    massa_muscular_media = df['Massa_Muscular_Estimada_kg'].mean() if 'Massa_Muscular_Estimada_kg' in df.columns else 0
+
+    ca_media = df['habilidade_atual'].mean() if 'habilidade_atual' in df.columns else 0
+    pa_media = df['habilidade_potencial'].mean() if 'habilidade_potencial' in df.columns else 0
+    rating_medio = df['Rating_Geral_FM26'].mean() if 'Rating_Geral_FM26' in df.columns else 0
+
+    dist_posicao = df['Posicao_Principal'].value_counts() if 'Posicao_Principal' in df.columns else pd.Series()
+
+    texto = f"""
+RELATÓRIO COMPLETO - Linhares FC ({nome_categoria})
+TEMPORADA: 2026
+======================================================================
+
+📊 ESTATÍSTICAS GERAIS:
+• Total jogadores: {total}
+• Idade média: {idade_media:.1f} anos
+• Altura média: {altura_media:.1f} cm
+• Peso médio: {peso_media:.1f} kg
+• IMC médio: {imc_media:.1f}
+
+💧 PERCENTUAIS DE GORDURA:
+• Média geral (utilizada): {gordura_media:.1f}%
+• Massa magra média: {massa_magra_media:.1f} kg
+• Massa gorda média: {massa_gorda_media:.1f} kg
+• Massa muscular média (geral): {massa_muscular_media:.1f} kg
+
+🎮 DADOS FM26:
+• CA médio: {ca_media:.1f}
+• PA médio: {pa_media:.1f}
+• Rating geral médio: {rating_medio:.1f}
+
+⚽ DISTRIBUIÇÃO POR POSIÇÃO PRINCIPAL:
+"""
+    for posicao, qtd in dist_posicao.items():
+        pct = (qtd / total) * 100 if total > 0 else 0
+        texto += f"• {posicao}: {qtd} jogador(es) ({pct:.1f}%)\n"
+
     return texto
 
 def exportar_para_excel(df, nome_categoria, caminho_arquivo):
