@@ -1,7 +1,7 @@
 {
   "cartoes": {
     "Yupi Silva": {
-      "amarelos": 1,
+      "amarelos": 0,
       "vermelho": false,
       "suspenso_proxima": false,
       "historico": [
@@ -13,7 +13,7 @@
           "suspenso_causada": false,
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
-          "fase": "1"
+          "fase": 1
         },
         {
           "data": "2026-08-08",
@@ -23,7 +23,7 @@
           "suspenso_causada": true,
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
-          "fase": "1"
+          "fase": 1
         },
         {
           "data": "2026-08-15",
@@ -44,11 +44,11 @@
           "suspenso_causada": false,
           "suspenso_cumprida": false,
           "competicao": "Capixaba Série B",
-          "fase": "2"
+          "fase": 2
         }
       ],
-      "id_ogol": 39891,
-      "contador_amarelos_desde_reset": 1,
+      "id_ogol": null,
+      "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
@@ -93,6 +93,5 @@
       "data_suspensao": null
     }
   },
-  "datas_globais": {
-  }
+  "datas_globais": {}
 }
