@@ -12,7 +12,7 @@ from mplsoccer import Pitch, VerticalPitch
 import sqlite3
 
 # ======================================================================
-# IMPORTAÇÕES DO UTILS
+# IMPORTAÇÕES DO UTILS (APENAS FUNÇÕES EXISTENTES)
 # ======================================================================
 from utils import (
     carregar_elenco_profissional, carregar_elenco_sub15, carregar_elenco_sub17,
@@ -26,7 +26,7 @@ from utils import (
     autenticar_usuario, listar_usuarios, adicionar_usuario, remover_usuario,
     promover_admin, rebaixar_admin, usuario_eh_admin, carregar_usuarios,
     ADMIN_FIXOS, SENHAS_FIXAS,
-    gerar_relatorio_completo_texto, gerar_relatorio_completo_detalhado, gerar_relatorio_gestao,
+    gerar_relatorio_completo_texto,
     exportar_para_excel, exportar_para_powerbi,
     verificar_jogo_ao_vivo, obter_detalhes_jogo, obter_estatisticas_jogo,
     obter_eventos_jogo, obter_lineups_completos, obter_players_stats,
@@ -445,9 +445,10 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = sanitizar_dataframe(pd.DataFrame(historico))
-                st.dataframe(df_hist[['data', 'adversario', 'cor',
-                                       'terceiro_amarelo', 'suspenso_causada',
-                                       'suspenso_cumprida']], width='stretch')
+                cols = [c for c in ['data', 'adversario', 'cor',
+                                    'terceiro_amarelo', 'suspenso_causada',
+                                    'suspenso_cumprida'] if c in df_hist.columns]
+                st.dataframe(df_hist[cols], width='stretch')
             else:
                 st.info("Nenhum cartão registrado.")
         else:
@@ -520,7 +521,8 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
 
             st.write(f"**Pos. Principal:** {row.get('Posicao_Principal', 'N/I')}")
             pos_sec = row.get('Posicoes_Secundarias', [])
-            pos_sec_str = ", ".join(pos_sec) if isinstance(pos_sec, list) and pos_sec else (str(pos_sec) if pd.notna(pos_sec) else "Nenhuma")
+            pos_sec_str = ", ".join(pos_sec) if isinstance(pos_sec, list) and pos_sec else (
+                str(pos_sec) if pd.notna(pos_sec) else "Nenhuma")
             st.write(f"**Pos. Secundárias:** {pos_sec_str}")
             rating = row.get('Rating_Geral_FM26', 0)
             st.write(f"**Rating FM26:** {rating:.1f}" if pd.notna(rating) else "N/I")
@@ -571,9 +573,10 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             historico = cartoes[nome_canonico].get('historico', [])
             if historico:
                 df_hist = sanitizar_dataframe(pd.DataFrame(historico))
-                st.dataframe(df_hist[['data', 'adversario', 'cor',
-                                       'terceiro_amarelo', 'suspenso_causada',
-                                       'suspenso_cumprida']], width='stretch')
+                cols = [c for c in ['data', 'adversario', 'cor',
+                                    'terceiro_amarelo', 'suspenso_causada',
+                                    'suspenso_cumprida'] if c in df_hist.columns]
+                st.dataframe(df_hist[cols], width='stretch')
             else:
                 st.info("Nenhum cartão registrado.")
         else:
@@ -602,7 +605,7 @@ def login():
                 st.session_state.authenticated = True
                 st.session_state.usuario = usuario
                 st.session_state.is_admin = is_admin
-                st.session_state.carregando = True   # <-- ativa loading
+                st.session_state.carregando = True
                 st.rerun()
             else:
                 st.error("Usuário ou senha inválidos")
@@ -657,41 +660,24 @@ if st.session_state.get("carregando", False):
         st.markdown("""
         <style>
             .loading-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 80vh;
-                gap: 20px;
+                display: flex; flex-direction: column; align-items: center;
+                justify-content: center; height: 80vh; gap: 20px;
             }
             .spinner {
-                width: 80px;
-                height: 80px;
+                width: 80px; height: 80px;
                 border: 6px solid rgba(30, 144, 255, 0.2);
                 border-top: 6px solid #1E90FF;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
                 box-shadow: 0 0 20px rgba(30, 144, 255, 0.5);
             }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             .loading-text {
-                color: #1E90FF;
-                font-size: 22px;
-                font-weight: bold;
+                color: #1E90FF; font-size: 22px; font-weight: bold;
                 animation: pulse 1.5s ease-in-out infinite;
             }
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.4; }
-            }
-            .loading-sub {
-                color: #cccccc;
-                font-size: 14px;
-                font-style: italic;
-            }
+            @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+            .loading-sub { color: #cccccc; font-size: 14px; font-style: italic; }
         </style>
         <div class="loading-container">
             <div class="spinner"></div>
@@ -801,7 +787,7 @@ if st.session_state.get("is_admin", False):
             st.rerun()
 
 # ======================================================================
-# ABAS PRINCIPAIS (11 ABAS)
+# ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco", "👥 Comissão Técnica", "⚽ Monitoramento ao Vivo",
