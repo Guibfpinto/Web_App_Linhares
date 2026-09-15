@@ -17,11 +17,13 @@ import sqlite3
 from utils import (
     carregar_elenco_profissional, carregar_elenco_sub15, carregar_elenco_sub17,
     carregar_comissao, carregar_comissao_sub15, carregar_comissao_sub17,
+    carregar_diretoria,
     carregar_cartoes_json, salvar_cartoes_json,
     adicionar_coluna_lesionado, carregar_dados_bioimpedancia, aplicar_dados_bioimpedancia,
     carregar_estatisticas_partidas, precomputar_scores_posicionais,
     interpretar_formacao, obter_jogadores_para_posicao, jogador_suspenso,
     mapear_nome_para_canonico, obter_caminho_foto, obter_caminho_foto_arbitro,
+    obter_caminho_foto_diretoria,
     obter_historico_clubes, obter_lesao_atual, obter_historico_lesoes_texto,
     autenticar_usuario, listar_usuarios, adicionar_usuario, remover_usuario,
     promover_admin, rebaixar_admin, usuario_eh_admin, carregar_usuarios,
@@ -34,6 +36,7 @@ from utils import (
     ATRIBUTOS_FM26, NOME_TIME, TEMPORADA, DATA_DIR,
     ARQUIVO_CSV_PROFISSIONAL, ARQUIVO_CSV_SUB15, ARQUIVO_CSV_SUB17,
     ARQUIVO_CSV_COMISSAO_PROFISSIONAL, ARQUIVO_CSV_COMISSAO_SUB15, ARQUIVO_CSV_COMISSAO_SUB17,
+    ARQUIVO_CSV_DIRETORIA,
     obter_proximo_jogo, exibir_foto, formatar_cartoes,
     inicializar_banco, carregar_cronograma, normalizar_texto, sanitizar_dataframe,
 )
@@ -142,6 +145,125 @@ TRADUCAO_ATRIBUTOS = {
     'cartoes_vermelhos_totais': 'Cartões vermelhos (total)',
     'media_cartoes_amarelos': 'Média de amarelos',
     'media_cartoes_vermelhos': 'Média de vermelhos',
+}
+
+# ======================================================================
+# AGRUPAMENTO DOS ATRIBUTOS DA DIRETORIA
+# ======================================================================
+ATRIBUTOS_DIRETORIA_GRUPOS = {
+    "🏆 Reputação": [
+        ('reputacao_mundial', 'Reputação Mundial'),
+        ('reputacao_atual', 'Reputação Atual'),
+        ('reputacao_local', 'Reputação Local'),
+    ],
+    "🎯 Habilidade (FM26)": [
+        ('CA', 'CA (Habilidade Atual)'),
+        ('ca', 'CA (Habilidade Atual)'),
+        ('PA', 'PA (Potencial)'),
+        ('pa', 'PA (Potencial)'),
+        ('habilidade_atual', 'Habilidade Atual'),
+        ('habilidade_potencial', 'Habilidade Potencial'),
+    ],
+    "🏛️ Atributos de Presidente": [
+        ('chairmanattributes_business', 'Negócios'),
+        ('chairmanattributes_interference', 'Interferência'),
+        ('chairmanattributes_patience', 'Paciência'),
+        ('chairmanattributes_resources', 'Recursos'),
+    ],
+    "📋 Funções / Cargos": [
+        ('rolesattributes_chairman', 'Presidente'),
+        ('rolesattributes_directoroffootball', 'Diretor de Futebol'),
+        ('rolesattributes_technicaldirector', 'Diretor Técnico'),
+        ('rolesattributes_manager', 'Treinador Principal'),
+        ('rolesattributes_assistantmanager', 'Auxiliar Técnico'),
+        ('rolesattributes_coach', 'Treinador'),
+        ('rolesattributes_headofyouthdevelopment', 'Chefe da Base'),
+        ('rolesattributes_dataanalyst', 'Analista de Dados'),
+        ('rolesattributes_sportsscientist', 'Cientista do Esporte'),
+        ('rolesattributes_loanmanager', 'Gerente de Empréstimos'),
+        ('rolesattributes_scout', 'Olheiro'),
+        ('rolesattributes_setpiececoach', 'Treinador de Bolas Paradas'),
+        ('rolesattributes_physio', 'Fisioterapeuta'),
+        ('rolesattributes_fitnesscoach', 'Preparador Físico'),
+        ('rolesattributes_goalkeepingcoach', 'Preparador de Goleiros'),
+    ],
+    "🧠 Personalidade": [
+        ('personalityattributes_adaptability', 'Adaptabilidade'),
+        ('personalityattributes_ambition', 'Ambição'),
+        ('personalityattributes_loyalty', 'Lealdade'),
+        ('personalityattributes_pressure', 'Pressão'),
+        ('personalityattributes_professional', 'Profissionalismo'),
+        ('personalityattributes_sportsmanship', 'Espírito Esportivo'),
+        ('personalityattributes_temperament', 'Temperamento'),
+        ('personalityattributes_controversy', 'Controvérsia'),
+    ],
+    "💼 Não-Táticas": [
+        ('nontacticalattributes_buyingplayers', 'Compra de Jogadores'),
+        ('nontacticalattributes_hardnessoftraining', 'Intensidade do Treino'),
+        ('nontacticalattributes_mindgames', 'Jogos Mentais'),
+        ('nontacticalattributes_squadrotation', 'Rotação do Elenco'),
+    ],
+    "⚽ Táticas": [
+        ('tacticalattributes_attacking', 'Ataque'),
+        ('tacticalattributes_depth', 'Profundidade'),
+        ('tacticalattributes_directness', 'Direção'),
+        ('tacticalattributes_flamboyancy', 'Espetacularidade'),
+        ('tacticalattributes_flexibility', 'Flexibilidade'),
+        ('tacticalattributes_freeroles', 'Funções Livres'),
+        ('tacticalattributes_marking', 'Marcação'),
+        ('tacticalattributes_offside', 'Impedimento'),
+        ('tacticalattributes_pressing', 'Pressão'),
+        ('tacticalattributes_sittingback', 'Recuar'),
+        ('tacticalattributes_tempo', 'Ritmo'),
+        ('tacticalattributes_useofplaymaker', 'Uso do Armador'),
+        ('tacticalattributes_useofsubstitutions', 'Uso de Substituições'),
+        ('tacticalattributes_width', 'Largura'),
+    ],
+    "🔍 Scouting": [
+        ('scoutingattributes_judgingplayerdata', 'Avaliação Dados Jogador'),
+        ('scoutingattributes_judgingteamdata', 'Avaliação Dados Time'),
+        ('scoutingattributes_presentingdata', 'Apresentação de Dados'),
+    ],
+    "🩺 Médico / Ciência": [
+        ('medicalattributes_sportsscience', 'Ciência do Esporte'),
+    ],
+    "🧑‍🏫 Treinamento (Coaching)": [
+        ('coachingattributes_attacking', 'Ataque'),
+        ('coachingattributes_defending', 'Defesa'),
+        ('coachingattributes_fitness', 'Condicionamento'),
+        ('coachingattributes_goalkeeping', 'Goleiros'),
+        ('coachingattributes_possession', 'Posse'),
+        ('coachingattributes_player', 'Jogadores'),
+        ('coachingattributes_tactical', 'Tática'),
+        ('coachingattributes_technical', 'Técnico'),
+        ('coachingattributes_peoplemanagement', 'Gestão de Pessoas'),
+        ('coachingattributes_workingwithyoungsters', 'Trabalho com Jovens'),
+        ('coachingattributes_dirtinessallowance', 'Tolerância a Rudes'),
+        ('coachingattributes_versatility', 'Versatilidade'),
+        ('coachingattributes_setpieces', 'Bolas Paradas'),
+    ],
+    "🧠 Mental (Staff)": [
+        ('staffmentalattributes_adaptability', 'Adaptabilidade'),
+        ('staffmentalattributes_determination', 'Determinação'),
+        ('staffmentalattributes_judgingplayerability', 'Avaliação Habilidade Jogador'),
+        ('staffmentalattributes_judgingplayerpotential', 'Avaliação Potencial Jogador'),
+        ('staffmentalattributes_judgingstaffability', 'Avaliação Habilidade Staff'),
+        ('staffmentalattributes_negotiating', 'Negociação'),
+        ('staffmentalattributes_authority', 'Autoridade'),
+        ('staffmentalattributes_motivating', 'Motivação'),
+        ('staffmentalattributes_physiotherapy', 'Fisioterapia'),
+        ('staffmentalattributes_tacticalknowledge', 'Conhecimento Tático'),
+    ],
+    "🌎 Dados Gerais / Carreira": [
+        ('pais', 'País'),
+        ('sigla_pais', 'Sigla País'),
+        ('tipo_documento', 'Tipo de Documento'),
+        ('qualificacoes_treinador', 'Qualificações de Treinador'),
+        ('jogos_selecao', 'Jogos pela Seleção'),
+        ('gols_selecao', 'Gols pela Seleção'),
+        ('jogos_sub21', 'Jogos Sub-21'),
+        ('gols_sub21', 'Gols Sub-21'),
+    ],
 }
 
 # ======================================================================
@@ -289,6 +411,9 @@ else:
 def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
     if tipo == 'jogador':
         return obter_caminho_foto(row, categoria)
+    if tipo == 'diretoria':
+        return obter_caminho_foto_diretoria(row)
+    # comissão
     foto = row.get('foto', '')
     if not foto:
         nome_base = row.get('apelido') or row.get('nome')
@@ -513,7 +638,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             st.write(f"**Cidade/UF:** {cidade if pd.notna(cidade) else 'N/I'} / {uf if pd.notna(uf) else 'N/I'}")
             st.write(f"**País:** {pais if pd.notna(pais) else 'N/I'}")
 
-            # Altura e Peso
             altura = row.get('altura_cm')
             st.write(f"**Altura:** {altura:.1f} cm" if pd.notna(altura) else "**Altura:** N/I")
             peso = row.get('peso_kg')
@@ -581,6 +705,117 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                 st.info("Nenhum cartão registrado.")
         else:
             st.info("Nenhum cartão registrado.")
+
+
+# ======================================================================
+# EXIBIR ATRIBUTOS DA DIRETORIA (agrupados)
+# ======================================================================
+def exibir_atributos_diretoria(row):
+    """Exibe os atributos da diretoria agrupados por categoria."""
+    st.subheader("📊 Atributos da Diretoria")
+
+    colunas_usadas = set()
+    grupos_mostrados = 0
+
+    for titulo_grupo, atributos in ATRIBUTOS_DIRETORIA_GRUPOS.items():
+        encontrados = []
+        for key, label in atributos:
+            if key in row.index and pd.notna(row[key]) and str(row[key]).strip() != '':
+                if key in colunas_usadas:
+                    continue
+                encontrados.append((label, row[key]))
+                colunas_usadas.add(key)
+
+        if encontrados:
+            grupos_mostrados += 1
+            with st.expander(f"{titulo_grupo} ({len(encontrados)})", expanded=True):
+                col_a, col_b = st.columns(2)
+                for i, (label, valor) in enumerate(encontrados):
+                    with col_a if i % 2 == 0 else col_b:
+                        st.write(f"• **{label}:** {valor}")
+
+    # ----- Atributos não catalogados (fallback) -----
+    colunas_excluir = {
+        'nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento',
+        'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
+        'idade', 'cidade', 'uf', 'cidade_uf',
+        'historico', 'historico_profissional', 'historico_diretoria',
+        'historico_jogador', 'nome_canonico', 'foto',
+    }
+    restantes = [
+        c for c in row.index
+        if c not in colunas_excluir
+        and c not in colunas_usadas
+        and not pd.isna(row[c])
+        and str(row[c]).strip() != ''
+    ]
+
+    if restantes:
+        with st.expander(f"📌 Outros Atributos ({len(restantes)})", expanded=False):
+            col_a, col_b = st.columns(2)
+            for i, attr in enumerate(restantes):
+                valor = row[attr]
+                nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr.replace('_', ' ').title())
+                with col_a if i % 2 == 0 else col_b:
+                    st.write(f"• **{nome_attr}:** {valor}")
+
+    if grupos_mostrados == 0 and not restantes:
+        st.info("Nenhum atributo disponível para este membro da diretoria.")
+
+
+# ======================================================================
+# DETALHES DIRETORIA
+# ======================================================================
+def exibir_detalhes_diretoria(row):
+    nome_exibicao = (
+        row.get('nome_completo')
+        or row.get('nome')
+        or row.get('apelido')
+        or 'Membro da Diretoria'
+    )
+    with st.expander(f"📋 DETALHES - {nome_exibicao}", expanded=True):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            caminho_foto = buscar_foto_unificada(row, "Diretoria", tipo='diretoria')
+            if caminho_foto and (str(caminho_foto).startswith('http') or os.path.exists(caminho_foto)):
+                try:
+                    st.image(caminho_foto, width=150)
+                except Exception:
+                    st.write("📷 Sem foto")
+            else:
+                st.write("📷 Sem foto")
+
+        with col2:
+            st.write(f"**Nome:** {row.get('nome_completo', row.get('nome', 'N/I'))}")
+            st.write(f"**Apelido:** {row.get('apelido', 'N/I')}")
+            st.write(f"**Cargo:** {row.get('cargo', 'N/I')}")
+            st.write(f"**Data Nasc.:** {row.get('data_nascimento', 'N/I')}")
+            st.write(f"**Idade:** {row.get('idade', 'N/I')}")
+            st.write(
+                f"**Cidade/UF:** {row.get('cidade_nascimento', 'N/I')} / "
+                f"{row.get('uf_nascimento', 'N/I')}"
+            )
+            st.write(f"**País:** {row.get('pais_nascimento', row.get('pais', 'N/I'))}")
+
+        st.divider()
+
+        # ---------- Histórico Profissional ----------
+        st.subheader("📜 Histórico Profissional")
+        st.write(row.get('historico_profissional',
+                         row.get('historico_diretoria',
+                                 row.get('historico', 'Não informado'))))
+
+        # ---------- Histórico como Jogador ----------
+        st.subheader("⚽ Histórico como Jogador")
+        hist_jog = row.get('historico_jogador', 'Não informado')
+        if pd.isna(hist_jog) or str(hist_jog).strip() == '':
+            hist_jog = 'Não informado'
+        st.write(hist_jog)
+
+        st.divider()
+
+        # ---------- Atributos da Diretoria (agrupados) ----------
+        exibir_atributos_diretoria(row)
 
 
 # ======================================================================
@@ -705,6 +940,7 @@ def carregar_dfs():
     resultado = {
         "Profissional": None, "Sub-15": None, "Sub-17": None,
         "Comissão Profissional": None, "Comissão Sub-15": None, "Comissão Sub-17": None,
+        "Diretoria": None,
         "cartoes_prof": {}, "cartoes_sub15": {}, "cartoes_sub17": {},
         "cartoes_com_prof": {}, "cartoes_com_sub15": {}, "cartoes_com_sub17": {},
     }
@@ -729,6 +965,7 @@ def carregar_dfs():
         resultado["Comissão Profissional"] = carregar_comissao()
         resultado["Comissão Sub-15"] = carregar_comissao_sub15()
         resultado["Comissão Sub-17"] = carregar_comissao_sub17()
+        resultado["Diretoria"] = carregar_diretoria()
 
         stats_prof = carregar_estatisticas_partidas("Profissional")
         stats_sub15 = carregar_estatisticas_partidas("Sub-15")
@@ -762,9 +999,12 @@ def get_df_cartoes(categoria):
         "Comissão Profissional": ("Comissão Profissional", "cartoes_com_prof"),
         "Comissão Sub-15": ("Comissão Sub-15", "cartoes_com_sub15"),
         "Comissão Sub-17": ("Comissão Sub-17", "cartoes_com_sub17"),
+        "Diretoria": ("Diretoria", None),
     }
     df_key, cart_key = m.get(categoria, (None, None))
-    return dados.get(df_key), dados.get(cart_key, {})
+    df = dados.get(df_key) if df_key else None
+    cart = dados.get(cart_key, {}) if cart_key else {}
+    return df, cart
 
 # ======================================================================
 # MENU SUPERIOR
@@ -790,10 +1030,10 @@ if st.session_state.get("is_admin", False):
 # ABAS PRINCIPAIS
 # ======================================================================
 tabs = st.tabs([
-    "📊 Análise de Elenco", "👥 Comissão Técnica", "⚽ Monitoramento ao Vivo",
-    "🟨 Cartões", "📅 Próximo Jogo", "📐 Escalação Tática",
-    "⚙️ Gestão", "📄 Relatórios", "📊 Minutagem",
-    "📤 Exportar", "🎥 Visualização Tática"
+    "📊 Análise de Elenco", "👥 Comissão Técnica", "🏛️ Diretoria",
+    "⚽ Monitoramento ao Vivo", "🟨 Cartões", "📅 Próximo Jogo",
+    "📐 Escalação Tática", "⚙️ Gestão", "📄 Relatórios",
+    "📊 Minutagem", "📤 Exportar", "🎥 Visualização Tática"
 ])
 
 # ======================================================================
@@ -1076,9 +1316,93 @@ with tabs[1]:
         st.info("Nenhum dado de comissão disponível.")
 
 # ======================================================================
-# ABA 2: MONITORAMENTO
+# ABA 2: DIRETORIA
 # ======================================================================
 with tabs[2]:
+    st.header("🏛️ Diretoria")
+    df_dir = dados.get("Diretoria")
+
+    if df_dir is None or df_dir.empty:
+        st.warning("Nenhum dado de diretoria disponível. "
+                   "Verifique se o arquivo `perfil_completo_diretoria_2026.csv` está na pasta `data/`.")
+    else:
+        # ----- KPIs -----
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total de Membros", len(df_dir))
+        with col2:
+            if 'idade' in df_dir.columns:
+                try:
+                    st.metric("Idade Média", f"{df_dir['idade'].astype(float).mean():.1f}")
+                except Exception:
+                    st.metric("Idade Média", "N/I")
+        with col3:
+            if 'cargo' in df_dir.columns:
+                st.metric("Cargos Distintos", df_dir['cargo'].nunique())
+
+        # ----- Busca -----
+        busca_dir = st.text_input("🔍 Buscar membro da diretoria", key="busca_diretoria")
+        if busca_dir:
+            cols_busca = ['nome_completo', 'nome', 'apelido', 'cargo']
+            mask = pd.Series([False] * len(df_dir))
+            for col in cols_busca:
+                if col in df_dir.columns:
+                    mask |= df_dir[col].astype(str).str.contains(
+                        busca_dir, case=False, na=False)
+            df_dir_filtrado = df_dir[mask]
+        else:
+            df_dir_filtrado = df_dir
+
+        # ----- Tabela resumida -----
+        cols_exib = [c for c in ['nome_completo', 'apelido', 'cargo', 'idade',
+                                 'cidade_nascimento', 'uf_nascimento', 'pais_nascimento']
+                     if c in df_dir_filtrado.columns]
+        if cols_exib:
+            st.dataframe(sanitizar_dataframe(df_dir_filtrado[cols_exib]),
+                         width='stretch')
+        else:
+            st.dataframe(sanitizar_dataframe(df_dir_filtrado), width='stretch')
+
+        st.divider()
+
+        # ----- Detalhes individuais (foto + histórico + atributos) -----
+        if not df_dir_filtrado.empty:
+            if 'apelido' in df_dir_filtrado.columns:
+                opcoes = df_dir_filtrado['apelido'].dropna().unique().tolist()
+            elif 'nome' in df_dir_filtrado.columns:
+                opcoes = df_dir_filtrado['nome'].dropna().unique().tolist()
+            else:
+                opcoes = df_dir_filtrado.index.tolist()
+
+            if opcoes:
+                selecionado = st.selectbox("Selecione um membro da diretoria",
+                                            opcoes, key="sel_diretoria")
+                if selecionado:
+                    if 'apelido' in df_dir_filtrado.columns:
+                        row = df_dir_filtrado[df_dir_filtrado['apelido'] == selecionado].iloc[0]
+                    elif 'nome' in df_dir_filtrado.columns:
+                        row = df_dir_filtrado[df_dir_filtrado['nome'] == selecionado].iloc[0]
+                    else:
+                        row = df_dir_filtrado.iloc[0]
+                    exibir_detalhes_diretoria(row)
+
+        st.divider()
+
+        # ----- Distribuição por cargo -----
+        if 'cargo' in df_dir.columns:
+            st.subheader("📊 Distribuição por Cargo")
+            dist = df_dir['cargo'].value_counts().reset_index()
+            dist.columns = ['Cargo', 'Quantidade']
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                st.dataframe(dist, use_container_width=True, hide_index=True)
+            with c2:
+                st.bar_chart(dist.set_index('Cargo')['Quantidade'])
+
+# ======================================================================
+# ABA 3: MONITORAMENTO
+# ======================================================================
+with tabs[3]:
     cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
     try:
         st.session_state.categoria_monitoramento = cat_monitor
@@ -1087,27 +1411,27 @@ with tabs[2]:
         st.error(f"Erro ao executar monitoramento: {e}")
 
 # ======================================================================
-# ABA 3: CARTÕES
+# ABA 4: CARTÕES
 # ======================================================================
-with tabs[3]:
+with tabs[4]:
     try:
         cartoes.show()
     except Exception as e:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 4: PRÓXIMO JOGO
+# ABA 5: PRÓXIMO JOGO
 # ======================================================================
-with tabs[4]:
+with tabs[5]:
     try:
         proximo_jogo.show()
     except Exception as e:
         st.error(f"Erro ao executar próximo jogo: {e}")
 
 # ======================================================================
-# ABA 5: ESCALAÇÃO TÁTICA
+# ABA 6: ESCALAÇÃO TÁTICA
 # ======================================================================
-with tabs[5]:
+with tabs[6]:
     st.header("📐 Escalação Tática")
     cat_tatica = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="tatica_categoria")
     df_elenco, cartoes_tatica = get_df_cartoes(cat_tatica)
@@ -1121,9 +1445,9 @@ with tabs[5]:
             st.error(f"Erro ao carregar tática: {e}")
 
 # ======================================================================
-# ABA 6: GESTÃO
+# ABA 7: GESTÃO
 # ======================================================================
-with tabs[6]:
+with tabs[7]:
     cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
     try:
         st.session_state.categoria_gestao = cat_gestao
@@ -1132,28 +1456,30 @@ with tabs[6]:
         st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 7: RELATÓRIOS
+# ABA 8: RELATÓRIOS
 # ======================================================================
-with tabs[7]:
+with tabs[8]:
     try:
         relatorios.show()
     except Exception as e:
         st.error(f"Erro ao executar relatórios: {e}")
 
 # ======================================================================
-# ABA 8: MINUTAGEM
+# ABA 9: MINUTAGEM
 # ======================================================================
-with tabs[8]:
+with tabs[9]:
     minutagem.show()
 
 # ======================================================================
-# ABA 9: EXPORTAR
+# ABA 10: EXPORTAR
 # ======================================================================
-with tabs[9]:
+with tabs[10]:
     st.header("📤 Exportar Dados")
     cat_export = st.selectbox(
         "Categoria",
-        ["Profissional", "Sub-15", "Sub-17", "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17"],
+        ["Profissional", "Sub-15", "Sub-17",
+         "Comissão Profissional", "Comissão Sub-15", "Comissão Sub-17",
+         "Diretoria"],
         key="export_categoria"
     )
     df_export, _ = get_df_cartoes(cat_export)
@@ -1171,9 +1497,9 @@ with tabs[9]:
         st.warning("Nenhum dado disponível")
 
 # ======================================================================
-# ABA 10: VISUALIZAÇÃO TÁTICA
+# ABA 11: VISUALIZAÇÃO TÁTICA
 # ======================================================================
-with tabs[10]:
+with tabs[11]:
     st.header("🎥 Visualização Tática")
     cat_viz = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="viz_categoria")
     df_viz, _ = get_df_cartoes(cat_viz)
