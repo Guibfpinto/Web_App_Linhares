@@ -590,9 +590,7 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
         else:
             df['pais'] = 'Brasil'
 
-    # =========================================================
-    # ✅ NOVO: garantir coluna historico_jogador (e profissional)
-    # =========================================================
+    # ----- Histórico como jogador -----
     if 'historico_jogador' not in df.columns:
         for alt in ['historico_como_jogador', 'hist_jogador', 'historico_atleta']:
             if alt in df.columns:
@@ -603,6 +601,7 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
     else:
         df['historico_jogador'] = df['historico_jogador'].fillna('Não informado')
 
+    # ----- Histórico profissional -----
     if 'historico_profissional' not in df.columns:
         if 'historico_diretoria' in df.columns:
             df['historico_profissional'] = df['historico_diretoria']
@@ -1412,37 +1411,93 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
-    if df_stats_partidas.empty:
-        for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
+    """Agrega estatísticas de partidas (starts, jogos_90min, minutos_totais_partidas)
+    ao elenco. Cria colunas ausentes com 0 e calcula automaticamente o que for possível."""
+    colunas_alvo = ['starts', 'jogos_90min', 'minutos_totais_partidas']
+
+    # ----- Se não há partidas, apenas garante colunas zeradas -----
+    if df_stats_partidas is None or df_stats_partidas.empty:
+        for col in colunas_alvo:
             if col not in df.columns:
                 df[col] = 0
         return df
+
     df_merged = df.copy()
     if 'apelido' in df_merged.columns:
         df_merged['nome_canonico'] = df_merged['apelido'].apply(mapear_nome_para_canonico)
+    elif 'nome_completo' in df_merged.columns:
+        df_merged['nome_canonico'] = df_merged['nome_completo'].apply(mapear_nome_para_canonico)
     else:
         df_merged['nome_canonico'] = None
+
     df_stats = df_stats_partidas.copy()
-    if 'minutos_totais' in df_stats.columns:
+
+    # ----- Alias: minutos_totais -> minutos_totais_partidas -----
+    if 'minutos_totais' in df_stats.columns and 'minutos_totais_partidas' not in df_stats.columns:
         df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
+
+    # ----- Coluna canônica do jogador no df_stats -----
     if 'jogador_canonico' not in df_stats.columns:
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
         elif 'nome_completo' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['nome_completo'].apply(mapear_nome_para_canonico)
+        elif 'apelido' in df_stats.columns:
+            df_stats['jogador_canonico'] = df_stats['apelido'].apply(mapear_nome_para_canonico)
         else:
-            return df_merged
-    colunas_merge = ['jogador_canonico', 'starts', 'jogos_90min']
-    if 'minutos_totais_partidas' in df_stats.columns:
-        colunas_merge.append('minutos_totais_partidas')
-    df_stats = df_stats[colunas_merge].dropna(subset=['jogador_canonico'])
-    df_merged = df_merged.merge(df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left')
-    df_merged.drop(columns=['jogador_canonico', 'nome_canonico'], errors='ignore', inplace=True)
-    for col in ['starts', 'jogos_90min', 'minutos_totais_partidas']:
+            for col in colunas_alvo:
+                if col not in df_merged.columns:
+                    df_merged[col] = 0
+            return sanitizar_dataframe(df_merged)
+
+    # =========================================================
+    # ✅ CORREÇÃO PRINCIPAL: cria colunas ausentes com 0
+    # =========================================================
+    if 'starts' not in df_stats.columns:
+        if 'titular' in df_stats.columns:
+            df_stats['starts'] = pd.to_numeric(df_stats['titular'], errors='coerce').fillna(0)
+        else:
+            df_stats['starts'] = 0
+
+    if 'jogos_90min' not in df_stats.columns:
+        if 'minutos' in df_stats.columns:
+            minutos_num = pd.to_numeric(df_stats['minutos'], errors='coerce').fillna(0)
+            df_stats['jogos_90min'] = (minutos_num >= 90).astype(int)
+        else:
+            df_stats['jogos_90min'] = 0
+
+    if 'minutos_totais_partidas' not in df_stats.columns:
+        if 'minutos' in df_stats.columns:
+            df_stats['minutos_totais_partidas'] = pd.to_numeric(
+                df_stats['minutos'], errors='coerce').fillna(0)
+        else:
+            df_stats['minutos_totais_partidas'] = 0
+
+    # ----- Agrega por jogador (soma) -----
+    colunas_seguras = ['jogador_canonico'] + colunas_alvo
+    df_stats = df_stats[colunas_seguras].copy()
+
+    for col in colunas_alvo:
+        df_stats[col] = pd.to_numeric(df_stats[col], errors='coerce').fillna(0)
+
+    df_stats = (df_stats
+                .groupby('jogador_canonico', as_index=False)[colunas_alvo]
+                .sum())
+
+    # ----- Merge com o elenco -----
+    df_merged = df_merged.merge(
+        df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left'
+    )
+    df_merged.drop(columns=['jogador_canonico', 'nome_canonico'],
+                   errors='ignore', inplace=True)
+
+    # ----- Garante que as colunas finais existam e sejam inteiras -----
+    for col in colunas_alvo:
         if col in df_merged.columns:
             df_merged[col] = df_merged[col].fillna(0).astype(int)
         else:
             df_merged[col] = 0
+
     return sanitizar_dataframe(df_merged)
 
 # =============================================
