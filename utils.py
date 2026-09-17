@@ -285,7 +285,6 @@ FIELDS = {
 # NORMALIZAÇÃO / NAVEGAÇÃO
 # =============================================
 def norm_key(s) -> str:
-    """minúsculas, sem acento, só a-z0-9."""
     if s is None:
         return ""
     s = str(s).replace("_", " ")
@@ -295,7 +294,6 @@ def norm_key(s) -> str:
 
 
 def get_value(data, path):
-    """Navega dict aninhado por uma tupla de chaves."""
     cur = data
     for k in path:
         if isinstance(cur, dict) and k in cur:
@@ -309,7 +307,6 @@ def get_value(data, path):
 # CLASSIFICADORES — 2ª Divisão Capixaba
 # =============================================
 def classificar_ca_pa(v):
-    """CA/PA (1-200) — faixas realistas para o futebol capixaba."""
     try:
         v = int(float(v))
     except (TypeError, ValueError):
@@ -322,7 +319,6 @@ def classificar_ca_pa(v):
 
 
 def classificar_habilidade(v):
-    """Atributos FM26 (1-20) — recalibrados para a 2ª Divisão Capixaba."""
     try:
         v = int(float(v))
     except (TypeError, ValueError):
@@ -335,7 +331,6 @@ def classificar_habilidade(v):
 
 
 def classificar_perna(v):
-    """Força de perna (1-20)."""
     try:
         v = int(float(v))
     except (TypeError, ValueError):
@@ -355,7 +350,6 @@ CLASSIFICADORES = {
 
 
 def classificar_valor(tipo: str, valor):
-    """Retorna o rótulo textual correspondente ao valor numérico."""
     func = CLASSIFICADORES.get(tipo)
     if func is None:
         return None
@@ -363,7 +357,6 @@ def classificar_valor(tipo: str, valor):
 
 
 def formatar_atributo(valor, tipo: str) -> str:
-    """Retorna 'valor (rótulo)' — ou apenas o valor se não houver classificador."""
     if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return "N/I"
     label = classificar_valor(tipo, valor)
@@ -378,8 +371,6 @@ def formatar_atributo(valor, tipo: str) -> str:
 
 
 def rotulo_atributo(valor, tipo: str) -> str:
-    """Retorna APENAS o rótulo textual (ex: 'Médio', 'Bom', 'Alto (Destaque Estadual)').
-    Se não houver classificador, devolve o próprio valor como string."""
     if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return "N/I"
     label = classificar_valor(tipo, valor)
@@ -394,19 +385,15 @@ def rotulo_atributo(valor, tipo: str) -> str:
 
 
 def encontrar_tipo_atributo(nome_coluna: str) -> Optional[str]:
-    """Descobre o tipo de classificador ('ca_pa', 'habilidade', 'perna')
-    a partir do nome PT-BR ou chave interna da coluna."""
     if not nome_coluna:
         return None
     col = norm_key(nome_coluna)
-
     for path, (nome_pt, tipo) in FIELDS.items():
         if norm_key(nome_pt) == col:
             return tipo
     for path, (nome_pt, tipo) in FIELDS.items():
         if norm_key("".join(path)) == col:
             return tipo
-
     if col.startswith("fispe") or "pe_esquerdo" in col or "pe_direito" in col:
         return "perna"
     if col in ("ca", "pa", "habilidadeatual", "habilidadepotencial"):
@@ -664,15 +651,33 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
         axis=1).round(1)
     df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
     df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
+
+    # %G base — Deurenberg
     df['Gordura_Corporal_%'] = df.apply(
         lambda row: round((1.20 * row['IMC']) + (0.23 * row['Idade']) - 16.2, 1)
         if pd.notna(row['IMC']) and pd.notna(row['Idade']) else np.nan, axis=1)
     df['Massa_Magra_kg'] = df.apply(
         lambda row: round(row['peso_kg'] * (1 - row['Gordura_Corporal_%'] / 100), 1)
         if pd.notna(row['peso_kg']) and pd.notna(row['Gordura_Corporal_%']) else np.nan, axis=1)
+    df['Massa_Gorda_kg'] = df.apply(
+        lambda row: round(row['peso_kg'] - row['Massa_Magra_kg'], 1)
+        if pd.notna(row['peso_kg']) and pd.notna(row['Massa_Magra_kg']) else np.nan, axis=1)
     df['Massa_Muscular_Estimada_kg'] = df.apply(
         lambda row: round(row['Massa_Magra_kg'] * 0.55, 1)
         if pd.notna(row['Massa_Magra_kg']) else np.nan, axis=1)
+
+    # ✅ Origens preenchidas desde o fluxo base
+    df['Massa_Muscular_Origem'] = df['Massa_Muscular_Estimada_kg'].apply(
+        lambda x: 'Estimado (55% da massa magra)' if pd.notna(x) else '')
+    df['Bioimpedancia_Origem'] = df['Gordura_Corporal_%'].apply(
+        lambda x: 'Deurenberg (IMC + idade)' if pd.notna(x) else '')
+
+    # ✅ Garante colunas que virão da bioimpedância
+    for col in ['PctGordura_Faulkner', 'PctGordura_Pollock3', 'PctGordura_Pollock7',
+                'PctGordura_CSV', 'IMC_Bio']:
+        if col not in df.columns:
+            df[col] = np.nan
+
     df['Classificacao_Gordura'] = df.apply(
         lambda x: classif_gordura(x['Gordura_Corporal_%'], x['Idade']), axis=1)
     df['Estado_Fisico'] = df.apply(
@@ -1260,7 +1265,6 @@ def para_float(valor):
 
 
 def _float_ou_none(row, *keys):
-    """Tenta várias chaves; retorna o primeiro valor numérico válido."""
     for k in keys:
         v = para_float(row.get(k))
         if v is not None:
@@ -1269,8 +1273,6 @@ def _float_ou_none(row, *keys):
 
 
 def _calcular_faulkner(triceps, coxa, panturrilha, imc, idade):
-    """Faulkner adaptado (3 dobras em mm): %G = 5.783 + 0.153 × Σ3.
-    Fallback: Deurenberg (IMC e idade) quando não há dobras."""
     if triceps and coxa and panturrilha:
         soma3 = triceps + coxa + panturrilha
         pct = 5.783 + 0.153 * soma3
@@ -1282,7 +1284,6 @@ def _calcular_faulkner(triceps, coxa, panturrilha, imc, idade):
 
 
 def _calcular_pollock3(triceps, coxa, panturrilha, imc, idade):
-    """Jackson & Pollock 3 dobras (adaptado para tríceps/coxa/panturrilha)."""
     if triceps and coxa and panturrilha and idade is not None:
         soma3 = triceps + coxa + panturrilha
         D = (1.10938
@@ -1299,16 +1300,12 @@ def _calcular_pollock3(triceps, coxa, panturrilha, imc, idade):
 
 
 def _calcular_pollock7(triceps, coxa, panturrilha, imc, idade):
-    """Jackson & Pollock 7 dobras. Como só temos 3, usa a base do Pollock 3."""
     return _calcular_pollock3(triceps, coxa, panturrilha, imc, idade)
 
 
 def _calcular_lee(altura_cm, peso_kg, idade,
                   per_braco, per_coxa, per_perna,
                   triceps, coxa, panturrilha):
-    """Lee et al. (2000) — Massa Muscular (kg). Sexo masculino = 1.
-    MM = H*(0.00744*CAG² + 0.00088*CTG² + 0.00441*CCG²) + 2.4 - 0.048*idade + 7.8
-    """
     if (altura_cm and per_braco and per_coxa and per_perna
             and triceps and coxa and panturrilha and idade is not None):
         H = altura_cm / 100.0
@@ -1326,8 +1323,6 @@ def _calcular_lee(altura_cm, peso_kg, idade,
 
 
 def _calcular_bioimpedancia_completa(row):
-    """Recebe uma linha (dict ou Series) e devolve dict com todas as estimativas.
-    Prioriza valores já existentes no CSV; senão calcula pelas equações."""
     altura_cm = _float_ou_none(row, 'altura_cm', 'altura')
     peso_kg = _float_ou_none(row, 'peso_kg', 'peso')
     idade = _float_ou_none(row, 'idade')
@@ -1447,8 +1442,6 @@ def _calcular_bioimpedancia_completa(row):
 
 
 def carregar_dados_bioimpedancia(categoria):
-    """Lê o CSV de bioimpedância e devolve dict {ogol_id|nome: dados_completos}.
-    Para cada atleta, se o CSV já tem dados medidos, usa-os; senão calcula Faulkner/Pollock/Lee."""
     csv_path = {'profissional': ARQUIVO_BIO_PROFISSIONAL,
                 'sub15': ARQUIVO_BIO_SUB15,
                 'sub17': ARQUIVO_BIO_SUB17}.get(categoria)
@@ -1479,7 +1472,8 @@ def carregar_dados_bioimpedancia(categoria):
 
 
 def aplicar_dados_bioimpedancia(df, dados_bio):
-    """Aplica os dados calculados do CSV de bioimpedância ao DataFrame do elenco."""
+    """Aplica os dados calculados do CSV de bioimpedância ao DataFrame do elenco.
+    NÃO apaga valores base (Deurenberg / 55% massa magra) quando o CSV não traz o dado."""
     if not dados_bio:
         return df
 
@@ -1508,11 +1502,13 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
         if bio is None:
             continue
 
+        # --- Atualiza peso/altura se o CSV os tiver ---
         if bio.get('peso') is not None:
             df.at[idx, 'peso_kg'] = bio['peso']
         if bio.get('altura_cm') is not None:
             df.at[idx, 'altura_cm'] = bio['altura_cm']
 
+        # --- Recalcula IMC ---
         altura_cm = df.at[idx, 'altura_cm']
         peso_kg = df.at[idx, 'peso_kg']
         if pd.notna(altura_cm) and pd.notna(peso_kg) and altura_cm > 0:
@@ -1522,6 +1518,7 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
         df.at[idx, 'IMC'] = imc if imc is not None else np.nan
         df.at[idx, 'IMC_Bio'] = bio.get('imc', np.nan)
 
+        # --- Percentuais por método ---
         metodos = bio.get('metodos', {})
         fk = metodos.get('faulkner', {})
         p3 = metodos.get('pollock3', {})
@@ -1534,22 +1531,44 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
         if p7.get('pct') is not None:
             df.at[idx, 'PctGordura_Pollock7'] = p7['pct']
 
+        # ✅ Só sobrescreve %G se o CSV/bio realmente trouxe um valor válido.
+        # Caso contrário, mantém o Deurenberg já calculado no fluxo base.
         if bio.get('pct_gordura') is not None:
             df.at[idx, 'Gordura_Corporal_%'] = bio['pct_gordura']
-            df.at[idx, 'PctGordura_CSV'] = bio['pct_gordura'] if bio.get('pct_origem') == 'CSV' else np.nan
-        else:
-            df.at[idx, 'Gordura_Corporal_%'] = np.nan
+            df.at[idx, 'PctGordura_CSV'] = (
+                bio['pct_gordura'] if bio.get('pct_origem') == 'CSV' else np.nan
+            )
+            df.at[idx, 'Bioimpedancia_Origem'] = bio.get('pct_gordura_origem', '')
 
+        # --- Massa gorda ---
         if bio.get('massa_gorda') is not None:
             df.at[idx, 'Massa_Gorda_kg'] = bio['massa_gorda']
+        elif (pd.notna(df.at[idx, 'Gordura_Corporal_%'])
+              and pd.notna(df.at[idx, 'peso_kg'])):
+            df.at[idx, 'Massa_Gorda_kg'] = round(
+                df.at[idx, 'peso_kg'] * (df.at[idx, 'Gordura_Corporal_%'] / 100.0), 1
+            )
+
+        # --- Massa magra ---
         if bio.get('massa_magra') is not None:
             df.at[idx, 'Massa_Magra_kg'] = bio['massa_magra']
+        elif (pd.notna(df.at[idx, 'peso_kg'])
+              and pd.notna(df.at[idx, 'Massa_Gorda_kg'])):
+            df.at[idx, 'Massa_Magra_kg'] = round(
+                df.at[idx, 'peso_kg'] - df.at[idx, 'Massa_Gorda_kg'], 1
+            )
 
+        # --- Massa muscular ---
         if bio.get('massa_muscular') is not None:
             df.at[idx, 'Massa_Muscular_Estimada_kg'] = bio['massa_muscular']
             df.at[idx, 'Massa_Muscular_Origem'] = bio.get('massa_muscular_origem', '')
-        df.at[idx, 'Bioimpedancia_Origem'] = bio.get('pct_gordura_origem', '')
+        elif pd.notna(df.at[idx, 'Massa_Magra_kg']):
+            df.at[idx, 'Massa_Muscular_Estimada_kg'] = round(
+                df.at[idx, 'Massa_Magra_kg'] * 0.55, 1
+            )
+            df.at[idx, 'Massa_Muscular_Origem'] = 'Estimado (55% da massa magra)'
 
+        # --- Classificações ---
         gordura_val = df.at[idx, 'Gordura_Corporal_%']
         idade_val = df.at[idx, 'Idade']
         if pd.notna(gordura_val) and pd.notna(idade_val):
@@ -1847,8 +1866,6 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
-    """Agrega estatísticas (starts, jogos_90min, minutos_totais_partidas).
-    Cria colunas ausentes com 0 e deriva de 'titular'/'minutos' quando possível."""
     colunas_alvo = ['starts', 'jogos_90min', 'minutos_totais_partidas']
 
     if df_stats_partidas is None or df_stats_partidas.empty:

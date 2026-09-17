@@ -519,7 +519,6 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
 
 
 def exibir_atributo_com_label(coluna, valor, label_override=None):
-    """Mostra APENAS o rótulo da classificação (2ª Divisão Capixaba)."""
     tipo = encontrar_tipo_atributo(coluna)
     valor_fmt = rotulo_atributo(valor, tipo) if tipo else (
         str(valor) if not pd.isna(valor) else "N/I"
@@ -781,7 +780,10 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             except Exception:
                 return str(v)
 
-        if all(pd.isna(x) for x in [fk, p3, p7]):
+        tem_algo = any(pd.notna(x) for x in [fk, p3, p7])
+        gordura_principal = row.get('Gordura_Corporal_%', np.nan)
+
+        if not tem_algo and pd.isna(gordura_principal):
             st.info("Sem dados de dobras cutâneas nem IMC/idade suficientes para estimar.")
         else:
             st.markdown("**Estimativas de Gordura Corporal por Método:**")
@@ -792,9 +794,9 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                 if pd.isna(pct):
                     dados_metodos.append({
                         "Método": nome_m,
-                        "Gordura Corporal (%)": "N/I",
-                        "Massa Gorda (kg)": "N/I",
-                        "Massa Magra (kg)": "N/I",
+                        "Gordura Corporal (%)": "—",
+                        "Massa Gorda (kg)": "—",
+                        "Massa Magra (kg)": "—",
                     })
                 else:
                     mg = peso * (pct / 100.0) if pd.notna(peso) else None
@@ -805,10 +807,25 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                         "Massa Gorda (kg)": _fmt(mg),
                         "Massa Magra (kg)": _fmt(mm),
                     })
-            st.dataframe(pd.DataFrame(dados_metodos), use_container_width=True, hide_index=True)
+
+            # ✅ Linha extra: Deurenberg quando for o método realmente usado
+            if not tem_algo and pd.notna(gordura_principal):
+                mg_princ = peso * (gordura_principal / 100.0) if pd.notna(peso) else None
+                mm_princ = peso * (1 - gordura_principal / 100.0) if pd.notna(peso) else None
+                dados_metodos.append({
+                    "Método": "Deurenberg (IMC + idade) ⭐",
+                    "Gordura Corporal (%)": f"{gordura_principal:.1f}%",
+                    "Massa Gorda (kg)": _fmt(mg_princ),
+                    "Massa Magra (kg)": _fmt(mm_princ),
+                })
+
+            st.dataframe(pd.DataFrame(dados_metodos),
+                         use_container_width=True, hide_index=True)
 
         mm_est = row.get('Massa_Muscular_Estimada_kg', np.nan)
         mm_origem = row.get('Massa_Muscular_Origem', '')
+        if isinstance(mm_origem, float) and pd.isna(mm_origem):
+            mm_origem = ''
         st.markdown("**Massa Muscular Estimada:**")
         if pd.notna(mm_est):
             st.write(f"• **{mm_est:.1f} kg**  _(origem: {mm_origem or 'N/I'})_")
@@ -821,12 +838,13 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
         st.write(f"• **Massa Gorda:** {_fmt(mg)} kg")
         st.write(f"• **Massa Magra:** {_fmt(mmag)} kg")
 
-        gordura_principal = row.get('Gordura_Corporal_%', np.nan)
         if pd.notna(gordura_principal):
             st.write(f"• **%G principal:** {gordura_principal:.1f}% "
                      f"({row.get('Classificacao_Gordura', '')})")
 
         origem_bio = row.get('Bioimpedancia_Origem', '')
+        if isinstance(origem_bio, float) and pd.isna(origem_bio):
+            origem_bio = ''
         if origem_bio:
             st.caption(f"Fonte principal: {origem_bio}")
 
