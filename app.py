@@ -531,7 +531,6 @@ def exibir_atributo_com_label(coluna, valor, label_override=None):
 
 
 def exibir_legenda_classificacoes():
-    """Exibe a legenda das classificações adaptadas à 2ª Divisão Capixaba."""
     with st.expander("ℹ️ Legenda das classificações (2ª Divisão Capixaba)"):
         st.markdown("""
         **CA / PA (escala 1-200):**
@@ -755,12 +754,81 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             st.write(f"**Lesionado:** {'Sim' if row.get('lesionado') else 'Não'}")
             lesao = obter_lesao_atual(row, categoria)
             st.write(f"**Lesão Atual:** {lesao if lesao else 'Nenhuma'}")
-            imc = row.get('IMC')
-            if pd.notna(imc):
-                st.write(f"**IMC:** {imc:.1f} ({row.get('Classificacao_IMC', '')})")
-            gordura = row.get('Gordura_Corporal_%')
-            if pd.notna(gordura):
-                st.write(f"**Gordura Corporal:** {gordura:.1f}% ({row.get('Classificacao_Gordura', '')})")
+
+        # ---------- IMC + Bioimpedância ----------
+        st.divider()
+        st.subheader("🧪 IMC e Bioimpedância (Faulkner / Pollock / Lee)")
+        st.caption("Todos os atletas são do sexo masculino. "
+                   "Estimativas adaptadas quando o CSV não traz dados medidos.")
+
+        imc_val = row.get('IMC')
+        imc_class = row.get('Classificacao_IMC', '')
+        if pd.notna(imc_val):
+            st.write(f"**IMC:** {imc_val:.1f} ({imc_class})")
+        else:
+            st.write("**IMC:** N/I")
+
+        fk = row.get('PctGordura_Faulkner', np.nan)
+        p3 = row.get('PctGordura_Pollock3', np.nan)
+        p7 = row.get('PctGordura_Pollock7', np.nan)
+        peso = row.get('peso_kg', np.nan)
+
+        def _fmt(v, casas=1):
+            if v is None or (isinstance(v, float) and pd.isna(v)):
+                return "N/I"
+            try:
+                return f"{float(v):.{casas}f}"
+            except Exception:
+                return str(v)
+
+        if all(pd.isna(x) for x in [fk, p3, p7]):
+            st.info("Sem dados de dobras cutâneas nem IMC/idade suficientes para estimar.")
+        else:
+            st.markdown("**Estimativas de Gordura Corporal por Método:**")
+            dados_metodos = []
+            for nome_m, pct in [("Faulkner (3 dobras)", fk),
+                                 ("Pollock 3 (J&P 1978)", p3),
+                                 ("Pollock 7 (J&P 1978)", p7)]:
+                if pd.isna(pct):
+                    dados_metodos.append({
+                        "Método": nome_m,
+                        "Gordura Corporal (%)": "N/I",
+                        "Massa Gorda (kg)": "N/I",
+                        "Massa Magra (kg)": "N/I",
+                    })
+                else:
+                    mg = peso * (pct / 100.0) if pd.notna(peso) else None
+                    mm = peso * (1 - pct / 100.0) if pd.notna(peso) else None
+                    dados_metodos.append({
+                        "Método": nome_m,
+                        "Gordura Corporal (%)": f"{pct:.1f}%",
+                        "Massa Gorda (kg)": _fmt(mg),
+                        "Massa Magra (kg)": _fmt(mm),
+                    })
+            st.dataframe(pd.DataFrame(dados_metodos), use_container_width=True, hide_index=True)
+
+        mm_est = row.get('Massa_Muscular_Estimada_kg', np.nan)
+        mm_origem = row.get('Massa_Muscular_Origem', '')
+        st.markdown("**Massa Muscular Estimada:**")
+        if pd.notna(mm_est):
+            st.write(f"• **{mm_est:.1f} kg**  _(origem: {mm_origem or 'N/I'})_")
+        else:
+            st.write("• N/I")
+
+        mg = row.get('Massa_Gorda_kg', np.nan)
+        mmag = row.get('Massa_Magra_kg', np.nan)
+        st.markdown("**Composição Corporal (método principal):**")
+        st.write(f"• **Massa Gorda:** {_fmt(mg)} kg")
+        st.write(f"• **Massa Magra:** {_fmt(mmag)} kg")
+
+        gordura_principal = row.get('Gordura_Corporal_%', np.nan)
+        if pd.notna(gordura_principal):
+            st.write(f"• **%G principal:** {gordura_principal:.1f}% "
+                     f"({row.get('Classificacao_Gordura', '')})")
+
+        origem_bio = row.get('Bioimpedancia_Origem', '')
+        if origem_bio:
+            st.caption(f"Fonte principal: {origem_bio}")
 
         st.divider()
         st.subheader("📜 Histórico de Clubes")
@@ -815,8 +883,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
 # EXIBIR ATRIBUTOS DA DIRETORIA (agrupados)
 # ======================================================================
 def exibir_atributos_diretoria(row):
-    """Exibe os atributos da diretoria agrupados por categoria,
-    mostrando APENAS o rótulo adaptado à 2ª Divisão Capixaba."""
     st.subheader("📊 Atributos da Diretoria")
     st.caption("Rótulos adaptados à realidade da 2ª Divisão Capixaba")
 
@@ -841,7 +907,6 @@ def exibir_atributos_diretoria(row):
                         tipo = encontrar_tipo_atributo(key) or "habilidade"
                         st.write(f"• **{label}:** {rotulo_atributo(valor, tipo)}")
 
-    # ----- Atributos não catalogados (fallback) -----
     colunas_excluir = {
         'nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento',
         'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
