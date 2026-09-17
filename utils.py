@@ -144,6 +144,290 @@ ATRIBUTOS_FM26 = [
 ]
 
 # =============================================
+# MAPEAMENTO JSON → PT-BR + CLASSIFICADORES
+# Adaptado para a SEGUNDA DIVISÃO DO CAPIXABA
+# =============================================
+FIELDS = {
+    # ---------- CA / PA ----------
+    ("CA",): ("habilidade_atual",     "ca_pa"),
+    ("PA",): ("habilidade_potencial", "ca_pa"),
+
+    # ---------- GOLEIRO ----------
+    ("GoalKeeperAttributes", "AerialAbility"):   ("gol_jogo_aereo",     "habilidade"),
+    ("GoalKeeperAttributes", "CommandOfArea"):   ("gol_comando_area",   "habilidade"),
+    ("GoalKeeperAttributes", "Communication"):   ("gol_comunicacao",    "habilidade"),
+    ("GoalKeeperAttributes", "Eccentricity"):    ("gol_excentricidade", "habilidade"),
+    ("GoalKeeperAttributes", "Handling"):        ("gol_encaixe",        "habilidade"),
+    ("GoalKeeperAttributes", "Kicking"):         ("gol_chute",          "habilidade"),
+    ("GoalKeeperAttributes", "OneOnOnes"):       ("gol_um_a_um",        "habilidade"),
+    ("GoalKeeperAttributes", "Reflexes"):        ("gol_reflexos",       "habilidade"),
+    ("GoalKeeperAttributes", "RushingOut"):      ("gol_saida",          "habilidade"),
+    ("GoalKeeperAttributes", "TendencyToPunch"): ("gol_socar",          "habilidade"),
+    ("GoalKeeperAttributes", "Throwing"):        ("gol_arremesso",      "habilidade"),
+
+    # ---------- MENTAL ----------
+    ("MentalAttributes", "Aggression"):    ("men_agressividade",   "habilidade"),
+    ("MentalAttributes", "Anticipation"):  ("men_antecipacao",     "habilidade"),
+    ("MentalAttributes", "Bravery"):       ("men_coragem",         "habilidade"),
+    ("MentalAttributes", "Composure"):     ("men_sangue_frio",     "habilidade"),
+    ("MentalAttributes", "Concentration"): ("men_concentracao",    "habilidade"),
+    ("MentalAttributes", "Vision"):        ("men_visao",           "habilidade"),
+    ("MentalAttributes", "Decisions"):     ("men_decisoes",        "habilidade"),
+    ("MentalAttributes", "Determination"): ("men_determinacao",    "habilidade"),
+    ("MentalAttributes", "Flair"):         ("men_criatividade",    "habilidade"),
+    ("MentalAttributes", "Leadership"):    ("men_lideranca",       "habilidade"),
+    ("MentalAttributes", "OffTheBall"):    ("men_sem_bola",        "habilidade"),
+    ("MentalAttributes", "Positioning"):   ("men_posicionamento",  "habilidade"),
+    ("MentalAttributes", "Teamwork"):      ("men_trabalho_equipe", "habilidade"),
+    ("MentalAttributes", "Workrate"):      ("men_entrega",         "habilidade"),
+
+    # ---------- FÍSICO ----------
+    ("PhysicalAttributes", "Acceleration"):   ("fis_aceleracao",       "habilidade"),
+    ("PhysicalAttributes", "Agility"):        ("fis_agilidade",        "habilidade"),
+    ("PhysicalAttributes", "Balance"):        ("fis_equilibrio",       "habilidade"),
+    ("PhysicalAttributes", "Jumping"):        ("fis_impulsao",         "habilidade"),
+    ("PhysicalAttributes", "LeftFoot"):       ("fis_pe_esquerdo",      "perna"),
+    ("PhysicalAttributes", "NaturalFitness"): ("fis_condicao_natural", "habilidade"),
+    ("PhysicalAttributes", "Pace"):           ("fis_velocidade",       "habilidade"),
+    ("PhysicalAttributes", "RightFoot"):      ("fis_pe_direito",       "perna"),
+    ("PhysicalAttributes", "Stamina"):        ("fis_resistencia",      "habilidade"),
+    ("PhysicalAttributes", "Strength"):       ("fis_forca",            "habilidade"),
+
+    # ---------- OCULTO ----------
+    ("HiddenAttributes", "Consistency"):      ("ocu_regularidade",    "habilidade"),
+    ("HiddenAttributes", "Dirtiness"):        ("ocu_sujeira",         "habilidade"),
+    ("HiddenAttributes", "ImportantMatches"): ("ocu_grandes_jogos",   "habilidade"),
+    ("HiddenAttributes", "InjuryProness"):    ("ocu_propensao_lesao", "habilidade"),
+    ("HiddenAttributes", "Versatility"):      ("ocu_versatilidade",   "habilidade"),
+
+    # ---------- TÉCNICO ----------
+    ("TechnicalAttributes", "Corners"):       ("tec_cantos",          "habilidade"),
+    ("TechnicalAttributes", "Crossing"):      ("tec_cruzamento",      "habilidade"),
+    ("TechnicalAttributes", "Dribbling"):     ("tec_drible",          "habilidade"),
+    ("TechnicalAttributes", "Finishing"):     ("tec_finalizacao",     "habilidade"),
+    ("TechnicalAttributes", "FirstTouch"):    ("tec_dominio",         "habilidade"),
+    ("TechnicalAttributes", "Freekicks"):     ("tec_faltas",          "habilidade"),
+    ("TechnicalAttributes", "Heading"):       ("tec_cabecada",        "habilidade"),
+    ("TechnicalAttributes", "LongShots"):     ("tec_chutes_longe",    "habilidade"),
+    ("TechnicalAttributes", "Longthrows"):    ("tec_laterais_longos", "habilidade"),
+    ("TechnicalAttributes", "Marking"):       ("tec_marcacao",        "habilidade"),
+    ("TechnicalAttributes", "Passing"):       ("tec_passe",           "habilidade"),
+    ("TechnicalAttributes", "PenaltyTaking"): ("tec_penalties",       "habilidade"),
+    ("TechnicalAttributes", "Tackling"):      ("tec_desarme",         "habilidade"),
+    ("TechnicalAttributes", "Technique"):     ("tec_tecnica",         "habilidade"),
+
+    # ---------- PERSONALIDADE ----------
+    ("PersonalityAttributes", "Adaptability"):  ("per_adaptabilidade",     "habilidade"),
+    ("PersonalityAttributes", "Ambition"):      ("per_ambicao",            "habilidade"),
+    ("PersonalityAttributes", "Loyalty"):       ("per_lealdade",           "habilidade"),
+    ("PersonalityAttributes", "Pressure"):      ("per_pressao",            "habilidade"),
+    ("PersonalityAttributes", "Professional"):  ("per_profissionalismo",   "habilidade"),
+    ("PersonalityAttributes", "Sportsmanship"): ("per_espirito_esportivo", "habilidade"),
+    ("PersonalityAttributes", "Temperament"):   ("per_temperamento",       "habilidade"),
+    ("PersonalityAttributes", "Controversy"):   ("per_controversia",       "habilidade"),
+
+    # ---------- COMISSÃO TÉCNICA ----------
+    ("CoachingAttributes", "Attacking"):              ("tre_ataque",         "habilidade"),
+    ("CoachingAttributes", "Defending"):              ("tre_defesa",         "habilidade"),
+    ("CoachingAttributes", "Fitness"):                ("tre_condicionamento", "habilidade"),
+    ("CoachingAttributes", "Goalkeeping"):            ("tre_goleiros",       "habilidade"),
+    ("CoachingAttributes", "Possession"):             ("tre_posse",          "habilidade"),
+    ("CoachingAttributes", "Player"):                 ("tre_jogadores",      "habilidade"),
+    ("CoachingAttributes", "Tactical"):               ("tre_tatica",         "habilidade"),
+    ("CoachingAttributes", "Technical"):              ("tre_tecnico",        "habilidade"),
+    ("CoachingAttributes", "PeopleManagement"):       ("tre_gestao_pessoas", "habilidade"),
+    ("CoachingAttributes", "WorkingWithYoungsters"):  ("tre_jovens",         "habilidade"),
+    ("CoachingAttributes", "DirtinessAllowance"):     ("tre_tolerancia",     "habilidade"),
+    ("CoachingAttributes", "Versatility"):            ("tre_versatilidade",  "habilidade"),
+    ("CoachingAttributes", "SetPieces"):              ("tre_bolas_paradas",  "habilidade"),
+
+    ("StaffMentalAttributes", "Adaptability"):           ("sta_adaptabilidade",     "habilidade"),
+    ("StaffMentalAttributes", "Determination"):          ("sta_determinacao",       "habilidade"),
+    ("StaffMentalAttributes", "JudgingPlayerAbility"):   ("sta_aval_habilidade",    "habilidade"),
+    ("StaffMentalAttributes", "JudgingPlayerPotential"): ("sta_aval_potencial",     "habilidade"),
+    ("StaffMentalAttributes", "JudgingStaffAbility"):    ("sta_aval_staff",         "habilidade"),
+    ("StaffMentalAttributes", "Negotiating"):            ("sta_negociacao",         "habilidade"),
+    ("StaffMentalAttributes", "Authority"):              ("sta_autoridade",         "habilidade"),
+    ("StaffMentalAttributes", "Motivating"):             ("sta_motivacao",          "habilidade"),
+    ("StaffMentalAttributes", "Physiotherapy"):          ("sta_fisioterapia",       "habilidade"),
+    ("StaffMentalAttributes", "TacticalKnowledge"):      ("sta_conhecimento_tatico","habilidade"),
+
+    ("NonTacticalAttributes", "BuyingPlayers"):       ("nta_compra_jogadores", "habilidade"),
+    ("NonTacticalAttributes", "HardnessOfTraining"):  ("nta_intensidade_treino","habilidade"),
+    ("NonTacticalAttributes", "MindGames"):           ("nta_jogos_mentais",    "habilidade"),
+    ("NonTacticalAttributes", "SquadRotation"):       ("nta_rotacao_elenco",   "habilidade"),
+
+    ("TacticalAttributes", "Attacking"):               ("tac_ataque",         "habilidade"),
+    ("TacticalAttributes", "Depth"):                   ("tac_profundidade",   "habilidade"),
+    ("TacticalAttributes", "Directness"):              ("tac_direcao",        "habilidade"),
+    ("TacticalAttributes", "Flamboyancy"):             ("tac_espetaculo",     "habilidade"),
+    ("TacticalAttributes", "Flexibility"):             ("tac_flexibilidade",  "habilidade"),
+    ("TacticalAttributes", "FreeRoles"):               ("tac_funcoes_livres", "habilidade"),
+    ("TacticalAttributes", "Marking"):                 ("tac_marcacao",       "habilidade"),
+    ("TacticalAttributes", "Offside"):                 ("tac_impedimento",    "habilidade"),
+    ("TacticalAttributes", "Pressing"):                ("tac_pressao",        "habilidade"),
+    ("TacticalAttributes", "SittingBack"):             ("tac_recuar",         "habilidade"),
+    ("TacticalAttributes", "Tempo"):                   ("tac_ritmo",          "habilidade"),
+    ("TacticalAttributes", "UseOfPlaymaker"):          ("tac_armador",        "habilidade"),
+    ("TacticalAttributes", "UseOfSubstitutions"):      ("tac_substituicoes",  "habilidade"),
+    ("TacticalAttributes", "Width"):                   ("tac_largura",        "habilidade"),
+
+    ("ScoutingAttributes", "JudgingPlayerData"): ("sct_aval_dados_jogador", "habilidade"),
+    ("ScoutingAttributes", "JudgingTeamData"):   ("sct_aval_dados_time",    "habilidade"),
+    ("ScoutingAttributes", "PresentingData"):    ("sct_apresentacao",       "habilidade"),
+
+    ("MedicalAttributes", "SportsScience"): ("med_ciencia_esporte", "habilidade"),
+
+    # ---------- DIRETORIA ----------
+    ("ChairmanAttributes", "Business"):       ("dir_negocios",      "habilidade"),
+    ("ChairmanAttributes", "Interference"):   ("dir_interferencia", "habilidade"),
+    ("ChairmanAttributes", "Patience"):       ("dir_paciencia",     "habilidade"),
+    ("ChairmanAttributes", "Resources"):      ("dir_recursos",      "habilidade"),
+
+    ("Reputation", "Worldwide"): ("dir_rep_mundial", "habilidade"),
+    ("Reputation", "Current"):   ("dir_rep_atual",   "habilidade"),
+    ("Reputation", "Local"):     ("dir_rep_local",   "habilidade"),
+}
+
+
+# =============================================
+# NORMALIZAÇÃO / NAVEGAÇÃO
+# =============================================
+def norm_key(s) -> str:
+    """minúsculas, sem acento, só a-z0-9."""
+    if s is None:
+        return ""
+    s = str(s).replace("_", " ")
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def get_value(data, path):
+    """Navega dict aninhado por uma tupla de chaves."""
+    cur = data
+    for k in path:
+        if isinstance(cur, dict) and k in cur:
+            cur = cur[k]
+        else:
+            return None
+    return cur
+
+
+# =============================================
+# CLASSIFICADORES — 2ª Divisão Capixaba
+# =============================================
+def classificar_ca_pa(v):
+    """CA/PA (1-200) — faixas realistas para o futebol capixaba."""
+    try:
+        v = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    if v <= 20:  return "Muito Baixo (Amador)"
+    if v <= 40:  return "Baixo (Semi-amador)"
+    if v <= 65:  return "Médio (Regional)"
+    if v <= 90:  return "Alto (Destaque Estadual)"
+    return "Muito Alto (Fora do Padrão)"
+
+
+def classificar_habilidade(v):
+    """Atributos FM26 (1-20) — recalibrados para a 2ª Divisão Capixaba."""
+    try:
+        v = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    if v <= 5:   return "Muito Ruim"
+    if v <= 8:   return "Ruim"
+    if v <= 12:  return "Médio"
+    if v <= 15:  return "Bom"
+    return "Muito Bom"
+
+
+def classificar_perna(v):
+    """Força de perna (1-20)."""
+    try:
+        v = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    if v <= 4:   return "Muito Fraco"
+    if v <= 9:   return "Fraco"
+    if v <= 13:  return "Razoável"
+    if v <= 17:  return "Forte"
+    return "Muito Forte"
+
+
+CLASSIFICADORES = {
+    "ca_pa":      classificar_ca_pa,
+    "perna":      classificar_perna,
+    "habilidade": classificar_habilidade,
+}
+
+
+def classificar_valor(tipo: str, valor):
+    """Retorna o rótulo textual correspondente ao valor numérico."""
+    func = CLASSIFICADORES.get(tipo)
+    if func is None:
+        return None
+    return func(valor)
+
+
+def formatar_atributo(valor, tipo: str) -> str:
+    """Retorna 'valor (rótulo)' — ou apenas o valor se não houver classificador."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return "N/I"
+    label = classificar_valor(tipo, valor)
+    try:
+        if isinstance(valor, float) and valor.is_integer():
+            valor_fmt = str(int(valor))
+        else:
+            valor_fmt = str(valor)
+    except Exception:
+        valor_fmt = str(valor)
+    return f"{valor_fmt} ({label})" if label else valor_fmt
+
+
+def rotulo_atributo(valor, tipo: str) -> str:
+    """Retorna APENAS o rótulo textual (ex: 'Médio', 'Bom', 'Alto (Destaque Estadual)').
+    Se não houver classificador, devolve o próprio valor como string."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return "N/I"
+    label = classificar_valor(tipo, valor)
+    if label:
+        return label
+    try:
+        if isinstance(valor, float) and valor.is_integer():
+            return str(int(valor))
+        return str(valor)
+    except Exception:
+        return str(valor)
+
+
+def encontrar_tipo_atributo(nome_coluna: str) -> Optional[str]:
+    """Descobre o tipo de classificador ('ca_pa', 'habilidade', 'perna')
+    a partir do nome PT-BR ou chave interna da coluna."""
+    if not nome_coluna:
+        return None
+    col = norm_key(nome_coluna)
+
+    # 1) tenta pelo nome PT-BR do FIELDS
+    for path, (nome_pt, tipo) in FIELDS.items():
+        if norm_key(nome_pt) == col:
+            return tipo
+
+    # 2) tenta pelas chaves internas em inglês
+    for path, (nome_pt, tipo) in FIELDS.items():
+        if norm_key("".join(path)) == col:
+            return tipo
+
+    # 3) regras por prefixo / nome
+    if col.startswith("fispe") or "pe_esquerdo" in col or "pe_direito" in col:
+        return "perna"
+    if col in ("ca", "pa", "habilidadeatual", "habilidadepotencial"):
+        return "ca_pa"
+    return "habilidade"   # padrão para qualquer atributo FM26
+
+
+# =============================================
 # SANITIZAÇÃO E ORDENAÇÃO
 # =============================================
 def sanitizar_dataframe(df):
@@ -526,8 +810,6 @@ def carregar_comissao_sub17() -> pd.DataFrame:
 # CARREGAMENTO DA DIRETORIA
 # =============================================
 def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
-    """Carrega o CSV da diretoria, garantindo colunas `historico_jogador`
-    e `historico_profissional`, além de normalizar nome/cidade/país."""
     if not os.path.exists(caminho_arquivo):
         caminho_arquivo = os.path.join(DATA_DIR, ARQUIVO_CSV_DIRETORIA)
     if not os.path.exists(caminho_arquivo):
@@ -553,7 +835,6 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
     df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
     df = df.loc[:, ~df.columns.str.match('^unnamed.*$', case=False)]
 
-    # ----- Nome principal -----
     if 'nome' not in df.columns and 'apelido' in df.columns:
         df['nome'] = df['apelido']
     elif 'nome' not in df.columns and 'nome_completo' in df.columns:
@@ -563,16 +844,13 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
     if 'apelido' not in df.columns:
         df['apelido'] = df['nome_completo']
 
-    # ----- Cargo -----
     if 'cargo' not in df.columns:
         df['cargo'] = 'Diretor'
 
-    # ----- Idade -----
     if 'idade' not in df.columns and 'data_nascimento' in df.columns:
         df['idade'] = df['data_nascimento'].apply(
             lambda x: calcular_idade(x) if pd.notna(x) else np.nan)
 
-    # ----- Cidade/UF -----
     if 'cidade_uf' not in df.columns:
         if 'cidade_nascimento' in df.columns and 'uf_nascimento' in df.columns:
             df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df['uf_nascimento'].fillna('')
@@ -583,14 +861,12 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
         else:
             df['cidade_uf'] = 'N/I'
 
-    # ----- País -----
     if 'pais' not in df.columns:
         if 'pais_nascimento' in df.columns:
             df['pais'] = df['pais_nascimento']
         else:
             df['pais'] = 'Brasil'
 
-    # ----- Histórico como jogador -----
     if 'historico_jogador' not in df.columns:
         for alt in ['historico_como_jogador', 'hist_jogador', 'historico_atleta']:
             if alt in df.columns:
@@ -601,7 +877,6 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
     else:
         df['historico_jogador'] = df['historico_jogador'].fillna('Não informado')
 
-    # ----- Histórico profissional -----
     if 'historico_profissional' not in df.columns:
         if 'historico_diretoria' in df.columns:
             df['historico_profissional'] = df['historico_diretoria']
@@ -615,7 +890,6 @@ def _carregar_diretoria_generico(caminho_arquivo: str) -> pd.DataFrame:
     if 'historico' not in df.columns:
         df['historico'] = df['historico_profissional']
 
-    # ----- Nome canônico -----
     if 'nome_canonico' not in df.columns:
         df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
 
@@ -735,7 +1009,6 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
     return None
 
 def obter_caminho_foto_diretoria(pessoa_row) -> Optional[str]:
-    """Wrapper específico para fotos da diretoria (reaproveita obter_caminho_foto)."""
     if pessoa_row is None:
         return None
     return obter_caminho_foto(pessoa_row, "Diretoria")
@@ -1411,11 +1684,10 @@ def carregar_estatisticas_partidas(categoria="Profissional") -> pd.DataFrame:
         return pd.DataFrame()
 
 def precomputar_scores_posicionais(df, df_stats_partidas):
-    """Agrega estatísticas de partidas (starts, jogos_90min, minutos_totais_partidas)
-    ao elenco. Cria colunas ausentes com 0 e calcula automaticamente o que for possível."""
+    """Agrega estatísticas (starts, jogos_90min, minutos_totais_partidas).
+    Cria colunas ausentes com 0 e deriva de 'titular'/'minutos' quando possível."""
     colunas_alvo = ['starts', 'jogos_90min', 'minutos_totais_partidas']
 
-    # ----- Se não há partidas, apenas garante colunas zeradas -----
     if df_stats_partidas is None or df_stats_partidas.empty:
         for col in colunas_alvo:
             if col not in df.columns:
@@ -1432,11 +1704,9 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
 
     df_stats = df_stats_partidas.copy()
 
-    # ----- Alias: minutos_totais -> minutos_totais_partidas -----
     if 'minutos_totais' in df_stats.columns and 'minutos_totais_partidas' not in df_stats.columns:
         df_stats = df_stats.rename(columns={'minutos_totais': 'minutos_totais_partidas'})
 
-    # ----- Coluna canônica do jogador no df_stats -----
     if 'jogador_canonico' not in df_stats.columns:
         if 'jogador' in df_stats.columns:
             df_stats['jogador_canonico'] = df_stats['jogador'].apply(mapear_nome_para_canonico)
@@ -1450,9 +1720,6 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
                     df_merged[col] = 0
             return sanitizar_dataframe(df_merged)
 
-    # =========================================================
-    # ✅ CORREÇÃO PRINCIPAL: cria colunas ausentes com 0
-    # =========================================================
     if 'starts' not in df_stats.columns:
         if 'titular' in df_stats.columns:
             df_stats['starts'] = pd.to_numeric(df_stats['titular'], errors='coerce').fillna(0)
@@ -1473,7 +1740,6 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
         else:
             df_stats['minutos_totais_partidas'] = 0
 
-    # ----- Agrega por jogador (soma) -----
     colunas_seguras = ['jogador_canonico'] + colunas_alvo
     df_stats = df_stats[colunas_seguras].copy()
 
@@ -1484,14 +1750,12 @@ def precomputar_scores_posicionais(df, df_stats_partidas):
                 .groupby('jogador_canonico', as_index=False)[colunas_alvo]
                 .sum())
 
-    # ----- Merge com o elenco -----
     df_merged = df_merged.merge(
         df_stats, left_on='nome_canonico', right_on='jogador_canonico', how='left'
     )
     df_merged.drop(columns=['jogador_canonico', 'nome_canonico'],
                    errors='ignore', inplace=True)
 
-    # ----- Garante que as colunas finais existam e sejam inteiras -----
     for col in colunas_alvo:
         if col in df_merged.columns:
             df_merged[col] = df_merged[col].fillna(0).astype(int)

@@ -12,7 +12,7 @@ from mplsoccer import Pitch, VerticalPitch
 import sqlite3
 
 # ======================================================================
-# IMPORTAÇÕES DO UTILS (APENAS FUNÇÕES EXISTENTES)
+# IMPORTAÇÕES DO UTILS
 # ======================================================================
 from utils import (
     carregar_elenco_profissional, carregar_elenco_sub15, carregar_elenco_sub17,
@@ -39,6 +39,9 @@ from utils import (
     ARQUIVO_CSV_DIRETORIA,
     obter_proximo_jogo, exibir_foto, formatar_cartoes,
     inicializar_banco, carregar_cronograma, normalizar_texto, sanitizar_dataframe,
+    FIELDS, CLASSIFICADORES,
+    classificar_valor, formatar_atributo, encontrar_tipo_atributo,
+    rotulo_atributo,
 )
 
 # ======================================================================
@@ -54,7 +57,7 @@ import pages.relatorios as relatorios
 import pages.minutagem as minutagem
 
 # ======================================================================
-# TRADUÇÃO DE ATRIBUTOS DA COMISSÃO
+# TRADUÇÃO DE ATRIBUTOS
 # ======================================================================
 TRADUCAO_ATRIBUTOS = {
     'CA': 'CA (Habilidade Atual)', 'PA': 'PA (Potencial)',
@@ -155,6 +158,9 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('reputacao_mundial', 'Reputação Mundial'),
         ('reputacao_atual', 'Reputação Atual'),
         ('reputacao_local', 'Reputação Local'),
+        ('dir_rep_mundial', 'Reputação Mundial'),
+        ('dir_rep_atual', 'Reputação Atual'),
+        ('dir_rep_local', 'Reputação Local'),
     ],
     "🎯 Habilidade (FM26)": [
         ('CA', 'CA (Habilidade Atual)'),
@@ -169,6 +175,10 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('chairmanattributes_interference', 'Interferência'),
         ('chairmanattributes_patience', 'Paciência'),
         ('chairmanattributes_resources', 'Recursos'),
+        ('dir_negocios', 'Negócios'),
+        ('dir_interferencia', 'Interferência'),
+        ('dir_paciencia', 'Paciência'),
+        ('dir_recursos', 'Recursos'),
     ],
     "📋 Funções / Cargos": [
         ('rolesattributes_chairman', 'Presidente'),
@@ -196,12 +206,24 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('personalityattributes_sportsmanship', 'Espírito Esportivo'),
         ('personalityattributes_temperament', 'Temperamento'),
         ('personalityattributes_controversy', 'Controvérsia'),
+        ('per_adaptabilidade', 'Adaptabilidade'),
+        ('per_ambicao', 'Ambição'),
+        ('per_lealdade', 'Lealdade'),
+        ('per_pressao', 'Pressão'),
+        ('per_profissionalismo', 'Profissionalismo'),
+        ('per_espirito_esportivo', 'Espírito Esportivo'),
+        ('per_temperamento', 'Temperamento'),
+        ('per_controversia', 'Controvérsia'),
     ],
     "💼 Não-Táticas": [
         ('nontacticalattributes_buyingplayers', 'Compra de Jogadores'),
         ('nontacticalattributes_hardnessoftraining', 'Intensidade do Treino'),
         ('nontacticalattributes_mindgames', 'Jogos Mentais'),
         ('nontacticalattributes_squadrotation', 'Rotação do Elenco'),
+        ('nta_compra_jogadores', 'Compra de Jogadores'),
+        ('nta_intensidade_treino', 'Intensidade do Treino'),
+        ('nta_jogos_mentais', 'Jogos Mentais'),
+        ('nta_rotacao_elenco', 'Rotação do Elenco'),
     ],
     "⚽ Táticas": [
         ('tacticalattributes_attacking', 'Ataque'),
@@ -218,14 +240,32 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('tacticalattributes_useofplaymaker', 'Uso do Armador'),
         ('tacticalattributes_useofsubstitutions', 'Uso de Substituições'),
         ('tacticalattributes_width', 'Largura'),
+        ('tac_ataque', 'Ataque'),
+        ('tac_profundidade', 'Profundidade'),
+        ('tac_direcao', 'Direção'),
+        ('tac_espetaculo', 'Espetacularidade'),
+        ('tac_flexibilidade', 'Flexibilidade'),
+        ('tac_funcoes_livres', 'Funções Livres'),
+        ('tac_marcacao', 'Marcação'),
+        ('tac_impedimento', 'Impedimento'),
+        ('tac_pressao', 'Pressão'),
+        ('tac_recuar', 'Recuar'),
+        ('tac_ritmo', 'Ritmo'),
+        ('tac_armador', 'Uso do Armador'),
+        ('tac_substituicoes', 'Uso de Substituições'),
+        ('tac_largura', 'Largura'),
     ],
     "🔍 Scouting": [
         ('scoutingattributes_judgingplayerdata', 'Avaliação Dados Jogador'),
         ('scoutingattributes_judgingteamdata', 'Avaliação Dados Time'),
         ('scoutingattributes_presentingdata', 'Apresentação de Dados'),
+        ('sct_aval_dados_jogador', 'Avaliação Dados Jogador'),
+        ('sct_aval_dados_time', 'Avaliação Dados Time'),
+        ('sct_apresentacao', 'Apresentação de Dados'),
     ],
     "🩺 Médico / Ciência": [
         ('medicalattributes_sportsscience', 'Ciência do Esporte'),
+        ('med_ciencia_esporte', 'Ciência do Esporte'),
     ],
     "🧑‍🏫 Treinamento (Coaching)": [
         ('coachingattributes_attacking', 'Ataque'),
@@ -241,6 +281,19 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('coachingattributes_dirtinessallowance', 'Tolerância a Rudes'),
         ('coachingattributes_versatility', 'Versatilidade'),
         ('coachingattributes_setpieces', 'Bolas Paradas'),
+        ('tre_ataque', 'Ataque'),
+        ('tre_defesa', 'Defesa'),
+        ('tre_condicionamento', 'Condicionamento'),
+        ('tre_goleiros', 'Goleiros'),
+        ('tre_posse', 'Posse'),
+        ('tre_jogadores', 'Jogadores'),
+        ('tre_tatica', 'Tática'),
+        ('tre_tecnico', 'Técnico'),
+        ('tre_gestao_pessoas', 'Gestão de Pessoas'),
+        ('tre_jovens', 'Trabalho com Jovens'),
+        ('tre_tolerancia', 'Tolerância a Rudes'),
+        ('tre_versatilidade', 'Versatilidade'),
+        ('tre_bolas_paradas', 'Bolas Paradas'),
     ],
     "🧠 Mental (Staff)": [
         ('staffmentalattributes_adaptability', 'Adaptabilidade'),
@@ -253,6 +306,16 @@ ATRIBUTOS_DIRETORIA_GRUPOS = {
         ('staffmentalattributes_motivating', 'Motivação'),
         ('staffmentalattributes_physiotherapy', 'Fisioterapia'),
         ('staffmentalattributes_tacticalknowledge', 'Conhecimento Tático'),
+        ('sta_adaptabilidade', 'Adaptabilidade'),
+        ('sta_determinacao', 'Determinação'),
+        ('sta_aval_habilidade', 'Avaliação Habilidade Jogador'),
+        ('sta_aval_potencial', 'Avaliação Potencial Jogador'),
+        ('sta_aval_staff', 'Avaliação Habilidade Staff'),
+        ('sta_negociacao', 'Negociação'),
+        ('sta_autoridade', 'Autoridade'),
+        ('sta_motivacao', 'Motivação'),
+        ('sta_fisioterapia', 'Fisioterapia'),
+        ('sta_conhecimento_tatico', 'Conhecimento Tático'),
     ],
     "🌎 Dados Gerais / Carreira": [
         ('pais', 'País'),
@@ -413,7 +476,6 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
         return obter_caminho_foto(row, categoria)
     if tipo == 'diretoria':
         return obter_caminho_foto_diretoria(row)
-    # comissão
     foto = row.get('foto', '')
     if not foto:
         nome_base = row.get('apelido') or row.get('nome')
@@ -454,6 +516,45 @@ def buscar_foto_unificada(row, categoria=None, tipo='jogador'):
         if matches:
             return os.path.abspath(matches[0])
     return None
+
+
+def exibir_atributo_com_label(coluna, valor, label_override=None):
+    """Mostra APENAS o rótulo da classificação (2ª Divisão Capixaba)."""
+    tipo = encontrar_tipo_atributo(coluna)
+    valor_fmt = rotulo_atributo(valor, tipo) if tipo else (
+        str(valor) if not pd.isna(valor) else "N/I"
+    )
+    nome_attr = label_override or TRADUCAO_ATRIBUTOS.get(
+        coluna, coluna.replace('_', ' ').title()
+    )
+    st.write(f"• **{nome_attr}:** {valor_fmt}")
+
+
+def exibir_legenda_classificacoes():
+    """Exibe a legenda das classificações adaptadas à 2ª Divisão Capixaba."""
+    with st.expander("ℹ️ Legenda das classificações (2ª Divisão Capixaba)"):
+        st.markdown("""
+        **CA / PA (escala 1-200):**
+        - `0–20` → Muito Baixo (Amador)
+        - `21–40` → Baixo (Semi-amador)
+        - `41–65` → Médio (Regional)
+        - `66–90` → Alto (Destaque Estadual)
+        - `91+`  → Muito Alto (Fora do Padrão)
+
+        **Atributos FM26 (escala 1-20):**
+        - `1–5`   → Muito Ruim
+        - `6–8`   → Ruim
+        - `9–12`  → Médio
+        - `13–15` → Bom
+        - `16–20` → Muito Bom
+
+        **Perna (escala 1-20):**
+        - `1–4`   → Muito Fraco
+        - `5–9`   → Fraco
+        - `10–13` → Razoável
+        - `14–17` → Forte
+        - `18–20` → Muito Forte
+        """)
 
 
 def limpar_cache():
@@ -593,6 +694,7 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
             st.divider()
 
         st.subheader("📊 Atributos Detalhados")
+        st.caption("Rótulos adaptados à realidade da 2ª Divisão Capixaba")
         colunas_excluir = [
             'nome', 'nome_completo', 'apelido', 'cargo', 'data_nascimento',
             'cidade_nascimento', 'uf_nascimento', 'pais_nascimento', 'pais',
@@ -604,12 +706,11 @@ def exibir_detalhes_comissao(row, categoria, cartoes):
         if colunas_atributos:
             col1, col2 = st.columns(2)
             for i, attr in enumerate(colunas_atributos):
-                valor = row[attr] if not pd.isna(row[attr]) else "N/I"
-                nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr)
                 with col1 if i % 2 == 0 else col2:
-                    st.write(f"• **{nome_attr}:** {valor}")
+                    exibir_atributo_com_label(attr, row[attr])
         else:
             st.info("Nenhum atributo detalhado disponível para este membro.")
+        exibir_legenda_classificacoes()
 
 
 # ======================================================================
@@ -683,13 +784,16 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
             st.write(f"**{label}:** {valor_str}")
 
         st.subheader("🎮 Atributos FM26")
+        st.caption("Rótulos adaptados à realidade da 2ª Divisão Capixaba")
         cols_atributos = st.columns(2)
         for i, attr in enumerate(ATRIBUTOS_FM26):
-            nome_attr = attr.replace('_', ' ').title()
             valor = row.get(attr, np.nan)
-            valor_str = f"{float(valor):.1f}" if pd.notna(valor) else "N/I"
             with cols_atributos[i % 2]:
-                st.write(f"**{nome_attr}:** {valor_str}")
+                nome_attr = attr.replace('_', ' ').title()
+                tipo = encontrar_tipo_atributo(attr) or "habilidade"
+                rotulo = rotulo_atributo(valor, tipo)
+                st.write(f"**{nome_attr}:** {rotulo}")
+        exibir_legenda_classificacoes()
 
         st.subheader("🟨 Histórico de Cartões")
         nome_canonico = mapear_nome_para_canonico(row.get('nome_completo', ''))
@@ -711,8 +815,10 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
 # EXIBIR ATRIBUTOS DA DIRETORIA (agrupados)
 # ======================================================================
 def exibir_atributos_diretoria(row):
-    """Exibe os atributos da diretoria agrupados por categoria."""
+    """Exibe os atributos da diretoria agrupados por categoria,
+    mostrando APENAS o rótulo adaptado à 2ª Divisão Capixaba."""
     st.subheader("📊 Atributos da Diretoria")
+    st.caption("Rótulos adaptados à realidade da 2ª Divisão Capixaba")
 
     colunas_usadas = set()
     grupos_mostrados = 0
@@ -723,16 +829,17 @@ def exibir_atributos_diretoria(row):
             if key in row.index and pd.notna(row[key]) and str(row[key]).strip() != '':
                 if key in colunas_usadas:
                     continue
-                encontrados.append((label, row[key]))
+                encontrados.append((key, label, row[key]))
                 colunas_usadas.add(key)
 
         if encontrados:
             grupos_mostrados += 1
             with st.expander(f"{titulo_grupo} ({len(encontrados)})", expanded=True):
                 col_a, col_b = st.columns(2)
-                for i, (label, valor) in enumerate(encontrados):
+                for i, (key, label, valor) in enumerate(encontrados):
                     with col_a if i % 2 == 0 else col_b:
-                        st.write(f"• **{label}:** {valor}")
+                        tipo = encontrar_tipo_atributo(key) or "habilidade"
+                        st.write(f"• **{label}:** {rotulo_atributo(valor, tipo)}")
 
     # ----- Atributos não catalogados (fallback) -----
     colunas_excluir = {
@@ -754,13 +861,13 @@ def exibir_atributos_diretoria(row):
         with st.expander(f"📌 Outros Atributos ({len(restantes)})", expanded=False):
             col_a, col_b = st.columns(2)
             for i, attr in enumerate(restantes):
-                valor = row[attr]
-                nome_attr = TRADUCAO_ATRIBUTOS.get(attr, attr.replace('_', ' ').title())
                 with col_a if i % 2 == 0 else col_b:
-                    st.write(f"• **{nome_attr}:** {valor}")
+                    exibir_atributo_com_label(attr, row[attr])
 
     if grupos_mostrados == 0 and not restantes:
         st.info("Nenhum atributo disponível para este membro da diretoria.")
+    else:
+        exibir_legenda_classificacoes()
 
 
 # ======================================================================
@@ -799,13 +906,11 @@ def exibir_detalhes_diretoria(row):
 
         st.divider()
 
-        # ---------- Histórico Profissional ----------
         st.subheader("📜 Histórico Profissional")
         st.write(row.get('historico_profissional',
                          row.get('historico_diretoria',
                                  row.get('historico', 'Não informado'))))
 
-        # ---------- Histórico como Jogador ----------
         st.subheader("⚽ Histórico como Jogador")
         hist_jog = row.get('historico_jogador', 'Não informado')
         if pd.isna(hist_jog) or str(hist_jog).strip() == '':
@@ -814,7 +919,6 @@ def exibir_detalhes_diretoria(row):
 
         st.divider()
 
-        # ---------- Atributos da Diretoria (agrupados) ----------
         exibir_atributos_diretoria(row)
 
 
@@ -1124,9 +1228,9 @@ with tabs[0]:
             rating_medio = df_analise['Rating_Geral_FM26'].mean() if 'Rating_Geral_FM26' in df_analise.columns else 0
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.metric("🎯 CA Médio", f"{ca_media:.1f}")
+                st.metric("🎯 CA Médio", f"{ca_media:.1f} ({classificar_valor('ca_pa', ca_media) or 'N/A'})")
             with c2:
-                st.metric("🚀 PA Médio", f"{pa_media:.1f}")
+                st.metric("🚀 PA Médio", f"{pa_media:.1f} ({classificar_valor('ca_pa', pa_media) or 'N/A'})")
             with c3:
                 st.metric("⭐ Rating Médio", f"{rating_medio:.1f}")
 
@@ -1149,6 +1253,8 @@ with tabs[0]:
                 estado_dist.columns = ['Estado', 'Quantidade']
                 st.bar_chart(estado_dist.set_index('Estado')['Quantidade'])
                 st.divider()
+
+            exibir_legenda_classificacoes()
 
             with st.expander("📄 Ver relatório em texto (igual ao desktop)", expanded=False):
                 texto = gerar_relatorio_completo_texto(df_analise, cat_analise)
@@ -1326,7 +1432,6 @@ with tabs[2]:
         st.warning("Nenhum dado de diretoria disponível. "
                    "Verifique se o arquivo `perfil_completo_diretoria_2026.csv` está na pasta `data/`.")
     else:
-        # ----- KPIs -----
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total de Membros", len(df_dir))
@@ -1340,7 +1445,6 @@ with tabs[2]:
             if 'cargo' in df_dir.columns:
                 st.metric("Cargos Distintos", df_dir['cargo'].nunique())
 
-        # ----- Busca -----
         busca_dir = st.text_input("🔍 Buscar membro da diretoria", key="busca_diretoria")
         if busca_dir:
             cols_busca = ['nome_completo', 'nome', 'apelido', 'cargo']
@@ -1353,7 +1457,6 @@ with tabs[2]:
         else:
             df_dir_filtrado = df_dir
 
-        # ----- Tabela resumida -----
         cols_exib = [c for c in ['nome_completo', 'apelido', 'cargo', 'idade',
                                  'cidade_nascimento', 'uf_nascimento', 'pais_nascimento']
                      if c in df_dir_filtrado.columns]
@@ -1365,7 +1468,6 @@ with tabs[2]:
 
         st.divider()
 
-        # ----- Detalhes individuais (foto + histórico + atributos) -----
         if not df_dir_filtrado.empty:
             if 'apelido' in df_dir_filtrado.columns:
                 opcoes = df_dir_filtrado['apelido'].dropna().unique().tolist()
@@ -1388,7 +1490,6 @@ with tabs[2]:
 
         st.divider()
 
-        # ----- Distribuição por cargo -----
         if 'cargo' in df_dir.columns:
             st.subheader("📊 Distribuição por Cargo")
             dist = df_dir['cargo'].value_counts().reset_index()
