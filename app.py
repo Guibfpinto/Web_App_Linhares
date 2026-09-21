@@ -45,9 +45,8 @@ from utils import (
 )
 
 # ======================================================================
-# IMPORTAÇÕES DAS PÁGINAS
+# IMPORTAÇÕES DAS PÁGINAS (sem monitoramento)
 # ======================================================================
-import pages.monitoramento as monitoramento
 import pages.cartoes as cartoes
 import pages.proximo_jogo as proximo_jogo
 import pages.tatica_page as tatica_page
@@ -808,7 +807,6 @@ def exibir_detalhes_jogador(row, categoria, cartoes):
                         "Massa Magra (kg)": _fmt(mm),
                     })
 
-            # ✅ Linha extra: Deurenberg quando for o método realmente usado
             if not tem_algo and pd.notna(gordura_principal):
                 mg_princ = peso * (gordura_principal / 100.0) if pd.notna(peso) else None
                 mm_princ = peso * (1 - gordura_principal / 100.0) if pd.notna(peso) else None
@@ -1214,13 +1212,13 @@ if st.session_state.get("is_admin", False):
             st.rerun()
 
 # ======================================================================
-# ABAS PRINCIPAIS
+# ABAS PRINCIPAIS (SEM MONITORAMENTO AO VIVO)
 # ======================================================================
 tabs = st.tabs([
     "📊 Análise de Elenco", "👥 Comissão Técnica", "🏛️ Diretoria",
-    "⚽ Monitoramento ao Vivo", "🟨 Cartões", "📅 Próximo Jogo",
-    "📐 Escalação Tática", "⚙️ Gestão", "📄 Relatórios",
-    "📊 Minutagem", "📤 Exportar", "🎥 Visualização Tática"
+    "🟨 Cartões", "📅 Próximo Jogo", "📐 Escalação Tática",
+    "⚙️ Gestão", "📄 Relatórios", "📊 Minutagem",
+    "📤 Exportar", "🎥 Visualização Tática"
 ])
 
 # ======================================================================
@@ -1584,38 +1582,27 @@ with tabs[2]:
                 st.bar_chart(dist.set_index('Cargo')['Quantidade'])
 
 # ======================================================================
-# ABA 3: MONITORAMENTO
+# ABA 3: CARTÕES
 # ======================================================================
 with tabs[3]:
-    cat_monitor = st.selectbox("Categoria para Monitoramento", ["Profissional", "Sub-15", "Sub-17"], key="monitor_categoria")
-    try:
-        st.session_state.categoria_monitoramento = cat_monitor
-        monitoramento.show()
-    except Exception as e:
-        st.error(f"Erro ao executar monitoramento: {e}")
-
-# ======================================================================
-# ABA 4: CARTÕES
-# ======================================================================
-with tabs[4]:
     try:
         cartoes.show()
     except Exception as e:
         st.error(f"Erro ao carregar página de cartões: {e}")
 
 # ======================================================================
-# ABA 5: PRÓXIMO JOGO
+# ABA 4: PRÓXIMO JOGO
 # ======================================================================
-with tabs[5]:
+with tabs[4]:
     try:
         proximo_jogo.show()
     except Exception as e:
         st.error(f"Erro ao executar próximo jogo: {e}")
 
 # ======================================================================
-# ABA 6: ESCALAÇÃO TÁTICA
+# ABA 5: ESCALAÇÃO TÁTICA
 # ======================================================================
-with tabs[6]:
+with tabs[5]:
     st.header("📐 Escalação Tática")
     cat_tatica = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="tatica_categoria")
     df_elenco, cartoes_tatica = get_df_cartoes(cat_tatica)
@@ -1629,9 +1616,9 @@ with tabs[6]:
             st.error(f"Erro ao carregar tática: {e}")
 
 # ======================================================================
-# ABA 7: GESTÃO
+# ABA 6: GESTÃO
 # ======================================================================
-with tabs[7]:
+with tabs[6]:
     cat_gestao = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="gestao_categoria")
     try:
         st.session_state.categoria_gestao = cat_gestao
@@ -1640,24 +1627,24 @@ with tabs[7]:
         st.error(f"Erro ao executar gestão: {e}")
 
 # ======================================================================
-# ABA 8: RELATÓRIOS
+# ABA 7: RELATÓRIOS
 # ======================================================================
-with tabs[8]:
+with tabs[7]:
     try:
         relatorios.show()
     except Exception as e:
         st.error(f"Erro ao executar relatórios: {e}")
 
 # ======================================================================
-# ABA 9: MINUTAGEM
+# ABA 8: MINUTAGEM
 # ======================================================================
-with tabs[9]:
+with tabs[8]:
     minutagem.show()
 
 # ======================================================================
-# ABA 10: EXPORTAR
+# ABA 9: EXPORTAR
 # ======================================================================
-with tabs[10]:
+with tabs[9]:
     st.header("📤 Exportar Dados")
     cat_export = st.selectbox(
         "Categoria",
@@ -1681,9 +1668,9 @@ with tabs[10]:
         st.warning("Nenhum dado disponível")
 
 # ======================================================================
-# ABA 11: VISUALIZAÇÃO TÁTICA
+# ABA 10: VISUALIZAÇÃO TÁTICA
 # ======================================================================
-with tabs[11]:
+with tabs[10]:
     st.header("🎥 Visualização Tática")
     cat_viz = st.selectbox("Categoria", ["Profissional", "Sub-15", "Sub-17"], key="viz_categoria")
     df_viz, _ = get_df_cartoes(cat_viz)
