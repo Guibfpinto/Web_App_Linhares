@@ -2,13 +2,13 @@
   "jogos": [
     {
     "id_jogo": "",
-    "data": "19/09/2026",
+    "data": "20/09/2026",
     "horario": "13:00",
     "adversario": "Jaguaré U17",
     "time_casa": "Linhares U17",
     "time_fora": "Jaguaré U17",
     "local_jogo": "CT Ninho da Coruja",
-    "status": "AGENDADO",
+    "status": "REALIZADO",
     "estadio": "CT Ninho da Coruja",
     "endereco": "Rua, Av. Étore Pedroni - Três Barras, Linhares - ES, 29907-304",
     "cidade": "Linhares",

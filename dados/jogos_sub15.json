@@ -2,13 +2,13 @@
   "jogos": [
     {
       "id_jogo": "",
-      "data": "19/09/2026",
+      "data": "20/09/2026",
       "horario": "15:00",
     "adversario": "Jaguaré U15",
     "time_casa": "Linhares U15",
     "time_fora": "Jaguaré U15",
     "local_jogo": "CT Ninho da Coruja",
-    "status": "AGENDADO",
+    "status": "REALIZADO",
     "estadio": "CT Ninho da Coruja",
     "endereco": "Rua, Av. Étore Pedroni - Três Barras, Linhares - ES, 29907-304",
     "cidade": "Linhares",
