@@ -634,9 +634,19 @@ def _carregar_elenco_generico(caminho_arquivo: str) -> pd.DataFrame:
     if 'apelido' not in df.columns:
         df['apelido'] = df['nome_completo']
 
+    # =========================================================
+    # ✅ CORREÇÃO PRINCIPAL — Deduplicação segura
+    # Antes: drop_duplicates(subset=['ogol_id']) removia TODOS os
+    # jogadores quando ogol_id estava vazio/0/duplicado.
+    # Agora: só deduplica por ogol_id quando ele é um valor VÁLIDO e ÚNICO.
+    # =========================================================
     if 'ogol_id' in df.columns:
-        df = df.drop_duplicates(subset=['ogol_id'], keep='first')
-    else:
+        ogol_str = df['ogol_id'].astype(str).str.strip()
+        ogol_invalidos = ogol_str.isin(['', 'nan', 'NaN', 'None', '0', '0.0'])
+        df_com_ogol = df[~ogol_invalidos].drop_duplicates(subset=['ogol_id'], keep='first')
+        df_sem_ogol = df[ogol_invalidos]
+        df = pd.concat([df_com_ogol, df_sem_ogol], ignore_index=True)
+    if 'nome_completo' in df.columns:
         df = df.drop_duplicates(subset=['nome_completo'], keep='first')
 
     for col in ['data_nascimento', 'posicao', 'pe_pref', 'altura_cm', 'peso_kg']:
@@ -1502,13 +1512,11 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
         if bio is None:
             continue
 
-        # --- Atualiza peso/altura se o CSV os tiver ---
         if bio.get('peso') is not None:
             df.at[idx, 'peso_kg'] = bio['peso']
         if bio.get('altura_cm') is not None:
             df.at[idx, 'altura_cm'] = bio['altura_cm']
 
-        # --- Recalcula IMC ---
         altura_cm = df.at[idx, 'altura_cm']
         peso_kg = df.at[idx, 'peso_kg']
         if pd.notna(altura_cm) and pd.notna(peso_kg) and altura_cm > 0:
@@ -1518,7 +1526,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
         df.at[idx, 'IMC'] = imc if imc is not None else np.nan
         df.at[idx, 'IMC_Bio'] = bio.get('imc', np.nan)
 
-        # --- Percentuais por método ---
         metodos = bio.get('metodos', {})
         fk = metodos.get('faulkner', {})
         p3 = metodos.get('pollock3', {})
@@ -1532,7 +1539,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
             df.at[idx, 'PctGordura_Pollock7'] = p7['pct']
 
         # ✅ Só sobrescreve %G se o CSV/bio realmente trouxe um valor válido.
-        # Caso contrário, mantém o Deurenberg já calculado no fluxo base.
         if bio.get('pct_gordura') is not None:
             df.at[idx, 'Gordura_Corporal_%'] = bio['pct_gordura']
             df.at[idx, 'PctGordura_CSV'] = (
@@ -1540,7 +1546,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
             )
             df.at[idx, 'Bioimpedancia_Origem'] = bio.get('pct_gordura_origem', '')
 
-        # --- Massa gorda ---
         if bio.get('massa_gorda') is not None:
             df.at[idx, 'Massa_Gorda_kg'] = bio['massa_gorda']
         elif (pd.notna(df.at[idx, 'Gordura_Corporal_%'])
@@ -1549,7 +1554,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
                 df.at[idx, 'peso_kg'] * (df.at[idx, 'Gordura_Corporal_%'] / 100.0), 1
             )
 
-        # --- Massa magra ---
         if bio.get('massa_magra') is not None:
             df.at[idx, 'Massa_Magra_kg'] = bio['massa_magra']
         elif (pd.notna(df.at[idx, 'peso_kg'])
@@ -1558,7 +1562,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
                 df.at[idx, 'peso_kg'] - df.at[idx, 'Massa_Gorda_kg'], 1
             )
 
-        # --- Massa muscular ---
         if bio.get('massa_muscular') is not None:
             df.at[idx, 'Massa_Muscular_Estimada_kg'] = bio['massa_muscular']
             df.at[idx, 'Massa_Muscular_Origem'] = bio.get('massa_muscular_origem', '')
@@ -1568,7 +1571,6 @@ def aplicar_dados_bioimpedancia(df, dados_bio):
             )
             df.at[idx, 'Massa_Muscular_Origem'] = 'Estimado (55% da massa magra)'
 
-        # --- Classificações ---
         gordura_val = df.at[idx, 'Gordura_Corporal_%']
         idade_val = df.at[idx, 'Idade']
         if pd.notna(gordura_val) and pd.notna(idade_val):
