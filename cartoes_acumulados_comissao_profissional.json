@@ -2,7 +2,7 @@
   "cartoes": {
     "Yupi Silva": {
       "amarelos": 0,
-      "vermelho": false,
+      "vermelho": true,
       "suspenso_proxima": false,
       "historico": [
         {
@@ -73,12 +73,23 @@
       "data_suspensao": null
     },
     "Asamoah": {
-      "amarelos": 0,
+      "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
-      "historico": [],
+      "historico": [
+        {
+          "data": "2026-09-19",
+          "adversario": "Estrela do Norte",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Capixaba Série B",
+          "fase": 2
+        }
+      ],
       "id_ogol": null,
-      "contador_amarelos_desde_reset": 0,
+      "contador_amarelos_desde_reset": 1,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
