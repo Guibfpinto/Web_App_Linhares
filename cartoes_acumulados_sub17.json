@@ -1,8 +1,208 @@
 {
   "cartoes": {
-
-  "datas_globais": [
-
-  ]
-}
+    "Samuel": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618433",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Tharso": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618435",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Sidvan": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618437",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Pedro Paradelas": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618440",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Rhaynner": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618448",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Vitorazzi": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618454",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Arthur Darros": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "2026-09-20",
+          "adversario": "Jaguaré U17",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "",
+          "fase": ""
+        }
+      ],
+      "id_ogol": "2530122",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "João Gabriel": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "2026-09-20",
+          "adversario": "Jaguaré U17",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "",
+          "fase": ""
+        }
+      ],
+      "id_ogol": "3618455",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Peterson": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618456",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Julio César": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "2026-09-20",
+          "adversario": "Jaguaré U17",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "",
+          "fase": ""
+        }
+      ],
+      "id_ogol": "3562873",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Murilo Pratissoli": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618457",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Luis Otávio": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618458",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Davi Cesconetto": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3618459",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    }
+  },
+  "datas_globais": {
+    "3618433": [
+      "2026-09-20"
+    ],
+    "3618435": [
+      "2026-09-20"
+    ],
+    "3618437": [
+      "2026-09-20"
+    ],
+    "3618440": [
+      "2026-09-20"
+    ],
+    "3618448": [
+      "2026-09-20"
+    ],
+    "3618454": [
+      "2026-09-20"
+    ],
+    "2530122": [
+      "2026-09-20"
+    ],
+    "3618455": [
+      "2026-09-20"
+    ],
+    "3618456": [
+      "2026-09-20"
+    ],
+    "3562873": [
+      "2026-09-20"
+    ],
+    "3618457": [
+      "2026-09-20"
+    ],
+    "3618458": [
+      "2026-09-20"
+    ],
+    "3618459": [
+      "2026-09-20"
+    ]
+  }
 }
