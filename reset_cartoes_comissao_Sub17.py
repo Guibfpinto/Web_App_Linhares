@@ -16,7 +16,7 @@ def forcar_reset():
 
     # Caminho absoluto do CSV de estatísticas
     script_dir = Path(__file__).resolve().parent
-    csv_path = script_dir / "data" / "estatisticas_sub17" / "estatisticas_jogadores_sub17_2026.csv"
+    csv_path = script_dir / "data" / "estatisticas_comissao_tecnica_sub17" / "estatisticas_comissao_tecnica_Sub17_2026.csv"
 
     if not csv_path.exists():
         print(f"❌ CSV não encontrado em: {csv_path}")
@@ -42,7 +42,7 @@ def forcar_reset():
     # ============================================================
     # SALVA O JSON NO CAMINHO ABSOLUTO ESPECIFICADO
     # ============================================================
-    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web\cartoes_acumulados_sub17.json")
+    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web\cartoes_acumulados_comissao_sub17.json")
 
     # Garante que a pasta exista
     caminho_json.parent.mkdir(parents=True, exist_ok=True)
