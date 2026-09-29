@@ -51,12 +51,23 @@
       "data_suspensao": null
     },
     "Vitorazzi": {
-      "amarelos": 0,
+      "amarelos": 1,
       "vermelho": false,
       "suspenso_proxima": false,
-      "historico": [],
+      "historico": [
+        {
+          "data": "2026-09-26",
+          "adversario": "Palmeiras de Conceição da Barra U17",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Copa ES U17",
+          "fase": 1
+        }
+      ],
       "id_ogol": "3618454",
-      "contador_amarelos_desde_reset": 0,
+      "contador_amarelos_desde_reset": 1,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
     },
@@ -72,8 +83,8 @@
           "terceiro_amarelo": false,
           "suspenso_causada": false,
           "suspenso_cumprida": false,
-          "competicao": "",
-          "fase": ""
+          "competicao": "Copa ES U17",
+          "fase": 1.0
         }
       ],
       "id_ogol": "2530122",
@@ -93,8 +104,8 @@
           "terceiro_amarelo": false,
           "suspenso_causada": false,
           "suspenso_cumprida": false,
-          "competicao": "",
-          "fase": ""
+          "competicao": "Copa ES U17",
+          "fase": 1.0
         }
       ],
       "id_ogol": "3618455",
@@ -124,8 +135,8 @@
           "terceiro_amarelo": false,
           "suspenso_causada": false,
           "suspenso_cumprida": false,
-          "competicao": "",
-          "fase": ""
+          "competicao": "Copa ES U17",
+          "fase": 1.0
         }
       ],
       "id_ogol": "3562873",
@@ -162,47 +173,172 @@
       "contador_amarelos_desde_reset": 0,
       "suspensoes_cumpridas": 0,
       "data_suspensao": null
+    },
+    "Matheus Nossa": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2541477",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Thayson": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "2026-09-26",
+          "adversario": "Palmeiras de Conceição da Barra U17",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false,
+          "competicao": "Copa ES U17",
+          "fase": 1
+        }
+      ],
+      "id_ogol": "2530125",
+      "contador_amarelos_desde_reset": 1,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Davi Fornaciari": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2522494",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Matheus Vieira": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3627001",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Daniel Olmo": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "2530126",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Livingsthon": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3627004",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Pedro": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3627006",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
+    },
+    "Héctor": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [],
+      "id_ogol": "3627009",
+      "contador_amarelos_desde_reset": 0,
+      "suspensoes_cumpridas": 0,
+      "data_suspensao": null
     }
   },
   "datas_globais": {
     "3618433": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618435": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618437": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618440": [
       "2026-09-20"
     ],
     "3618448": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618454": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "2530122": [
       "2026-09-20"
     ],
     "3618455": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618456": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3562873": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618457": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
     ],
     "3618458": [
       "2026-09-20"
     ],
     "3618459": [
-      "2026-09-20"
+      "2026-09-20",
+      "2026-09-26"
+    ],
+    "2541477": [
+      "2026-09-26"
+    ],
+    "2530125": [
+      "2026-09-26"
+    ],
+    "2522494": [
+      "2026-09-26"
+    ],
+    "3627001": [
+      "2026-09-26"
+    ],
+    "2530126": [
+      "2026-09-26"
+    ],
+    "3627004": [
+      "2026-09-26"
+    ],
+    "3627006": [
+      "2026-09-26"
+    ],
+    "3627009": [
+      "2026-09-26"
     ]
   }
 }
