@@ -11,12 +11,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils import inicializar_cartoes_por_df
 
 def forcar_reset():
-    categoria = "profissional"
+    categoria = "Sub17"
     print(f"🔄 Forçando reset para {categoria}...")
 
     # Caminho absoluto do CSV de estatísticas
     script_dir = Path(__file__).resolve().parent
-    csv_path = script_dir / "data" / "estatisticas_comissao_tecnica_profissional" / "estatisticas_comissao_tecnica_profissional_2026.csv"
+    csv_path = script_dir / "data" / "estatisticas_sub17_2026" / "estatisticas_jogadores_sub17_2026.csv"
 
     if not csv_path.exists():
         print(f"❌ CSV não encontrado em: {csv_path}")
@@ -42,7 +42,7 @@ def forcar_reset():
     # ============================================================
     # SALVA O JSON NO CAMINHO ABSOLUTO ESPECIFICADO
     # ============================================================
-    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web\cartoes_acumulados_comissao_profissional.json")
+    caminho_json = Path(r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\cartoes_acumulados_sub17_2026.json")
 
     # Garante que a pasta exista
     caminho_json.parent.mkdir(parents=True, exist_ok=True)

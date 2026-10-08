@@ -34,12 +34,12 @@ ARQUIVO_CSV_COMISSAO_PROFISSIONAL = "perfil_completo_comissao_2026.csv"
 ARQUIVO_CSV_COMISSAO_SUB15 = "perfil_completo_comissao_Sub15_2026.csv"
 ARQUIVO_CSV_COMISSAO_SUB17 = "perfil_completo_comissao_Sub17_2026.csv"
 ARQUIVO_CSV_DIRETORIA = "perfil_completo_diretoria_2026.csv"
-ARQUIVO_LESOES_PROFISSIONAL = "jogadores_linhares_profissional_lesoes.csv"
-ARQUIVO_LESOES_SUB15 = "jogadores_linhares_Sub15_lesoes.csv"
-ARQUIVO_LESOES_SUB17 = "jogadores_linhares_Sub17_lesoes.csv"
-ARQUIVO_BIO_PROFISSIONAL = "jogadores_linhares_profissional_Bioimpedancia.csv"
-ARQUIVO_BIO_SUB15 = "jogadores_linhares_Sub15_Bioimpedancia.csv"
-ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia.csv"
+ARQUIVO_LESOES_PROFISSIONAL = "jogadores_linhares_profissional_lesoes_2026.csv"
+ARQUIVO_LESOES_SUB15 = "jogadores_linhares_Sub15_lesoes_2026.csv"
+ARQUIVO_LESOES_SUB17 = "jogadores_linhares_Sub17_lesoes_2026.csv"
+ARQUIVO_BIO_PROFISSIONAL = "jogadores_linhares_profissional_Bioimpedancia_2026.csv"
+ARQUIVO_BIO_SUB15 = "jogadores_linhares_Sub15_Bioimpedancia_2026.csv"
+ARQUIVO_BIO_SUB17 = "jogadores_linhares_Sub17_Bioimpedancia_2026.csv"
 ARQUIVO_CRONO_PROF = "cronograma_profissional_2026.csv"
 ARQUIVO_CRONO_SUB15 = "cronograma_sub15_2026.csv"
 ARQUIVO_CRONO_SUB17 = "cronograma_sub17_2026.csv"
@@ -47,22 +47,22 @@ ARQUIVO_CRONO_SUB17 = "cronograma_sub17_2026.csv"
 # =============================================
 # CONSTANTES DE PASTAS DE ESTATÍSTICAS
 # =============================================
-PASTA_ESTATISTICAS_PROFISSIONAL = "data/estatisticas_jogadores/"
-PASTA_ESTATISTICAS_SUB15 = "data/estatisticas_sub15/"
-PASTA_ESTATISTICAS_SUB17 = "data/estatisticas_sub17/"
-PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = "data/estatisticas_comissao_tecnica_profissional/"
-PASTA_ESTATISTICAS_COMISSAO_SUB15 = "data/estatisticas_comissao_tecnica_sub15/"
-PASTA_ESTATISTICAS_COMISSAO_SUB17 = "data/estatisticas_comissao_tecnica_sub17/"
+PASTA_ESTATISTICAS_PROFISSIONAL = "data/estatisticas_jogadores_2026/"
+PASTA_ESTATISTICAS_SUB15 = "data/estatisticas_sub15_2026/"
+PASTA_ESTATISTICAS_SUB17 = "data/estatisticas_sub17_2026/"
+PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = "data/estatisticas_comissao_tecnica_profissional_2026/"
+PASTA_ESTATISTICAS_COMISSAO_SUB15 = "data/estatisticas_comissao_tecnica_sub15_2026/"
+PASTA_ESTATISTICAS_COMISSAO_SUB17 = "data/estatisticas_comissao_tecnica_sub17_2026/"
 
 # =============================================
 # CONSTANTES DOS ARQUIVOS DE CARTÕES (JSON)
 # =============================================
-CAMINHO_CARTOES_PROFISSIONAL = "cartoes_acumulados_profissional.json"
-CAMINHO_CARTOES_SUB15 = "cartoes_acumulados_sub15.json"
-CAMINHO_CARTOES_SUB17 = "cartoes_acumulados_sub17.json"
-CAMINHO_CARTOES_COMISSAO_PROFISSIONAL = "cartoes_acumulados_comissao_profissional.json"
-CAMINHO_CARTOES_COMISSAO_SUB15 = "cartoes_acumulados_comissao_sub15.json"
-CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17.json"
+CAMINHO_CARTOES_PROFISSIONAL = "cartoes_acumulados_profissional_2026.json"
+CAMINHO_CARTOES_SUB15 = "cartoes_acumulados_sub15_2026.json"
+CAMINHO_CARTOES_SUB17 = "cartoes_acumulados_sub17_2026.json"
+CAMINHO_CARTOES_COMISSAO_PROFISSIONAL = "cartoes_acumulados_comissao_profissional_2026.json"
+CAMINHO_CARTOES_COMISSAO_SUB15 = "cartoes_acumulados_comissao_sub15_2026.json"
+CAMINHO_CARTOES_COMISSAO_SUB17 = "cartoes_acumulados_comissao_sub17_2026.json"
 
 # =============================================
 # CONFIGURAÇÕES POR CATEGORIA
@@ -967,12 +967,12 @@ def obter_caminho_foto(pessoa_row, categoria="Profissional"):
         "Fotos_Diretoria",
     ]
     pastas_absolutas = [
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_jogadores",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos_sistema_Analise_Elenco\Jogadores",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_comissao",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\assets\fotos_tecnicos",
-        r"C:\BDAnaliseElencoLinharesFC\projeto_web\fotos_diretoria",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\assets\fotos_jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\fotos",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\fotos_sistema_Analise_Elenco\Jogadores",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\assets\fotos_comissao",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\assets\fotos_tecnicos",
+        r"C:\BDAnaliseElencoLinharesFC\projeto_web_2026\fotos_diretoria",
     ]
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(script_dir)
