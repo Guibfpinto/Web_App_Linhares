@@ -2011,27 +2011,14 @@ def obter_atributos_chave(posicao):
 # AUTENTICAÇÃO DE USUÁRIOS
 # =============================================
 ARQUIVO_USUARIOS = "usuarios.json"
-ADMIN_FIXOS = ["Guibfpinto", "Ricardosantosr", "YupiSilva", "AdautoMenegussi", "Asamoah",
-               "Nanico", "MaryaEduarda", "KarenLoureiro", "FabianoEller", "Delei"]
-SENHAS_FIXAS = {
-    "Guibfpinto": "@W.d06302005", "Ricardosantosr": "@R.s02011991",
-    "YupiSilva": "@J.s10021989", "AdautoMenegussi": "@A.m13071966",
-    "Asamoah": "@M.v24061989", "Nanico": "@W.s0511",
-    "MaryaEduarda": "@M.e12062002", "KarenLoureiro": "@K.l04082000",
-    "FabianoEller": "@F.e1977", "Delei": "Delei20031966"
-}
+# Nenhum usuário ou senha fica no código. Tudo vive no usuarios.json:
+#   {"usuario": {"senha_hash": "<bcrypt>", "is_admin": true/false}}
+# Entradas antigas (só o hash, sem dict) são lidas como usuário comum.
+
 
 def carregar_usuarios():
     if not os.path.exists(ARQUIVO_USUARIOS):
-        usuarios = {}
-        for admin in ADMIN_FIXOS:
-            senha = SENHAS_FIXAS.get(admin)
-            if senha:
-                hash_admin = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                usuarios[admin] = {"senha_hash": hash_admin, "is_admin": True}
-        with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
-            json.dump(usuarios, f, indent=2, ensure_ascii=False)
-        return usuarios
+        return {}
     try:
         with open(ARQUIVO_USUARIOS, 'r', encoding='utf-8') as f:
             dados = json.load(f)
@@ -2040,7 +2027,7 @@ def carregar_usuarios():
             if isinstance(valor, dict):
                 usuarios[usuario] = valor
             else:
-                usuarios[usuario] = {"senha_hash": valor, "is_admin": usuario in ADMIN_FIXOS}
+                usuarios[usuario] = {"senha_hash": valor, "is_admin": False}
         return usuarios
     except Exception as e:
         print(f"Erro ao carregar usuários: {e}")
@@ -2050,45 +2037,48 @@ def salvar_usuarios(usuarios):
     with open(ARQUIVO_USUARIOS, 'w', encoding='utf-8') as f:
         json.dump(usuarios, f, indent=2, ensure_ascii=False)
 
+def existe_algum_usuario():
+    return bool(carregar_usuarios())
+
 def autenticar_usuario(usuario, senha):
-    if usuario in ADMIN_FIXOS:
-        senha_correta = SENHAS_FIXAS.get(usuario)
-        if senha_correta and bcrypt.checkpw(senha.encode('utf-8'),
-                                            bcrypt.hashpw(senha_correta.encode('utf-8'),
-                                                          bcrypt.gensalt())):
-            return True, True
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
         return False, False
     dados = usuarios[usuario]
-    autenticado = bcrypt.checkpw(senha.encode('utf-8'), dados["senha_hash"].encode('utf-8'))
-    return autenticado, dados.get("is_admin", False)
+    try:
+        autenticado = bcrypt.checkpw(senha.encode('utf-8'), dados["senha_hash"].encode('utf-8'))
+    except Exception:
+        return False, False
+    return autenticado, bool(autenticado and dados.get("is_admin", False))
 
 def listar_usuarios():
     return list(carregar_usuarios().keys())
 
 def adicionar_usuario(usuario, senha, is_admin=False):
+    if not usuario or not senha:
+        return False
     usuarios = carregar_usuarios()
     if usuario in usuarios:
         return False
     hash_novo = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    usuarios[usuario] = {"senha_hash": hash_novo, "is_admin": is_admin}
+    usuarios[usuario] = {"senha_hash": hash_novo, "is_admin": bool(is_admin)}
     salvar_usuarios(usuarios)
     return True
 
+def _total_admins(usuarios):
+    return sum(1 for d in usuarios.values() if d.get("is_admin"))
+
 def remover_usuario(usuario):
-    if usuario in ADMIN_FIXOS:
-        return False
     usuarios = carregar_usuarios()
-    if usuario in usuarios:
-        del usuarios[usuario]
-        salvar_usuarios(usuarios)
-        return True
-    return False
+    if usuario not in usuarios:
+        return False
+    if usuarios[usuario].get("is_admin") and _total_admins(usuarios) <= 1:
+        return False  # não deixa o sistema sem nenhum administrador
+    del usuarios[usuario]
+    salvar_usuarios(usuarios)
+    return True
 
 def promover_admin(usuario):
-    if usuario in ADMIN_FIXOS:
-        return True
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
         return False
@@ -2097,20 +2087,17 @@ def promover_admin(usuario):
     return True
 
 def rebaixar_admin(usuario):
-    if usuario in ADMIN_FIXOS:
-        return False
     usuarios = carregar_usuarios()
     if usuario not in usuarios:
         return False
+    if usuarios[usuario].get("is_admin") and _total_admins(usuarios) <= 1:
+        return False  # não deixa o sistema sem nenhum administrador
     usuarios[usuario]["is_admin"] = False
     salvar_usuarios(usuarios)
     return True
 
 def usuario_eh_admin(usuario):
-    if usuario in ADMIN_FIXOS:
-        return True
-    usuarios = carregar_usuarios()
-    return usuarios.get(usuario, {}).get("is_admin", False)
+    return bool(carregar_usuarios().get(usuario, {}).get("is_admin", False))
 
 # =============================================
 # RELATÓRIOS E EXPORTAÇÃO

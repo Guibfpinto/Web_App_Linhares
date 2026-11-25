@@ -23,7 +23,7 @@ from utils import (
     normalizar_texto,
     sanitizar_dataframe,
 )
-from fastapi_client import FastAPIMonitorClient
+from api_football_client import MonitorClient
 
 # ============================================================
 # CONFIGURAÇÕES DE ÁUDIO
@@ -77,8 +77,9 @@ CATEGORIA_CONFIG = {
         "nome_time": "Linhares FC",
         "elenco_func": carregar_elenco_profissional,
         "cartoes_key": "profissional",
-        "liga_nome": "Campeonato Capixaba Série B",
-        "competicao_id": 2,
+        "liga_nome": "Campeonato Capixaba Série A",
+        "competicao_id": 12,     # liga no meu_futebol.db
+        "league_id_api": 611,    # mesma liga na API-Football
         "json_jogos": "jogos_profissional.json"
     },
     "Sub-15": {
@@ -480,10 +481,11 @@ def show():
     inicializar_banco()
 
     # ============================================================
-    # CLIENTE FASTAPI
+    # CLIENTE: API-FOOTBALL com fallback no meu_futebol.db
     # ============================================================
-    FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
-    client = FastAPIMonitorClient(FASTAPI_URL)
+    client = MonitorClient(db_path=DB_PATH)
+    if not client.api.ativo:
+        st.sidebar.caption("⚠️ API_FOOTBALL_KEY não configurada — usando só o banco local.")
 
     # ============================================================
     # SELECIONAR PARTIDA (CORRIGIDO - CONEXÃO MANTIDA ATÉ O FIM)
@@ -643,15 +645,15 @@ def show():
                 else:
                     st.session_state.monitoramento_ativo = False
             except Exception as e:
-                st.warning(f"⚠️ Não foi possível conectar ao servidor FastAPI: {e}")
+                st.warning(f"⚠️ Não foi possível consultar a API-Football nem o banco local: {e}")
                 st.info("📡 Operando em modo offline – apenas dados locais disponíveis.")
                 fixture_id = None
                 st.session_state.monitoramento_ativo = False
 
         if st.session_state.get('monitoramento_ativo', False) and st.session_state.get('fixture_id'):
-            st_autorefresh(interval=10000, key="monitor_auto")
+            st_autorefresh(interval=10000, key="monitor_auto")  # respostas da API ficam 60 s em cache
             fixture_id = st.session_state.fixture_id
-            st.success(f"✅ Jogo ao vivo detectado! ID: {fixture_id}")
+            st.success(f"✅ Jogo ao vivo detectado! ID: {fixture_id} (fonte: {client.ultima_fonte})")
 
             try:
                 detalhes = client.get_fixture_details(fixture_id)
@@ -691,7 +693,9 @@ def show():
                 st.error(f"Erro ao buscar eventos: {e}")
                 eventos_api = []
 
-            if eventos_api:
+            if eventos_api and not client.usando_api:
+                st.info(f"📡 {len(eventos_api)} evento(s) lidos do banco local (API-Football indisponível).")
+            elif eventos_api:
                 conn = conectar_banco()
                 cursor = conn.cursor()
                 novos_eventos = 0
@@ -731,7 +735,7 @@ def show():
                     st.info(f"{novos_eventos} novo(s) evento(s) sincronizado(s) da API.")
                     st.rerun()
             else:
-                st.info("📡 Nenhum evento disponível via FastAPI.")
+                st.info(f"📡 Nenhum evento disponível ({client.ultima_fonte}).")
 
             if st.button("⏹️ Parar Monitoramento", width='stretch'):
                 st.session_state.monitoramento_ativo = False
@@ -739,7 +743,7 @@ def show():
                 st.rerun()
         else:
             st.warning("⏳ Nenhum jogo ao vivo encontrado no momento.")
-            st.info("Use o registro manual abaixo apenas se a FastAPI não estiver retornando dados.")
+            st.info("Use o registro manual abaixo apenas se a API-Football não estiver retornando dados.")
     else:
         st.info(f"📅 O jogo está marcado para {data_jogo}. O monitoramento ao vivo estará disponível no dia da partida.")
 
@@ -749,7 +753,7 @@ def show():
     # REGISTRO MANUAL DE EVENTOS (FALLBACK)
     # ============================================================
     st.subheader("📝 Registro Manual de Eventos (Fallback)")
-    st.caption("Use esta seção apenas se a FastAPI não estiver fornecendo os dados corretamente.")
+    st.caption("Use esta seção apenas se a API-Football não estiver fornecendo os dados corretamente.")
 
     if status in ['1H', '2H', 'HT', 'ET', 'P']:
         with st.form("evento_manual_form", clear_on_submit=True):

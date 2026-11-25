@@ -27,7 +27,7 @@ from utils import (
     obter_historico_clubes, obter_lesao_atual, obter_historico_lesoes_texto,
     autenticar_usuario, listar_usuarios, adicionar_usuario, remover_usuario,
     promover_admin, rebaixar_admin, usuario_eh_admin, carregar_usuarios,
-    ADMIN_FIXOS, SENHAS_FIXAS,
+    existe_algum_usuario,
     gerar_relatorio_completo_texto,
     exportar_para_excel, exportar_para_powerbi,
     verificar_jogo_ao_vivo, obter_detalhes_jogo, obter_estatisticas_jogo,
@@ -1007,11 +1007,19 @@ def exibir_detalhes_diretoria(row):
 # AUTENTICAÇÃO E GERENCIAMENTO DE USUÁRIOS
 # ======================================================================
 def login():
-    if st.session_state.get("gerenciar_usuarios", False):
-        abrir_gerenciador_usuarios()
-        if st.button("🔙 Voltar ao Login"):
-            st.session_state.gerenciar_usuarios = False
-            st.rerun()
+    # Primeiro uso: sem nenhum usuário → cria o administrador
+    if not existe_algum_usuario():
+        with st.form("primeiro_admin_form"):
+            st.subheader("🔐 Criar administrador")
+            st.caption("Nenhum usuário cadastrado. Crie o administrador do sistema.")
+            usuario = st.text_input("Usuário")
+            senha = campo_senha_com_visibilidade("Senha", "primeiro_admin_senha")
+            if st.form_submit_button("Criar"):
+                if adicionar_usuario(usuario.strip(), senha, is_admin=True):
+                    st.success("Administrador criado. Faça o login.")
+                    st.rerun()
+                else:
+                    st.error("Preencha usuário e senha.")
         return
 
     with st.form("login_form"):
@@ -1030,17 +1038,13 @@ def login():
             else:
                 st.error("Usuário ou senha inválidos")
 
-    if st.button("👥 Gerenciar Usuários"):
-        st.session_state.gerenciar_usuarios = True
-        st.rerun()
-
 
 def abrir_gerenciador_usuarios():
     st.subheader("👥 Gerenciamento de Usuários")
     usuarios = carregar_usuarios()
     st.write("**Usuários cadastrados:**")
     for u, dados in usuarios.items():
-        is_admin = dados.get("is_admin", False) or (u in ADMIN_FIXOS)
+        is_admin = dados.get("is_admin", False)
         st.write(f"- {u} {'⭐ Admin' if is_admin else ''}")
     st.divider()
 
@@ -1058,7 +1062,7 @@ def abrir_gerenciador_usuarios():
 
     with st.form("remover_usuario"):
         st.write("**Remover usuário**")
-        usuarios_para_remover = [u for u in listar_usuarios() if u not in ADMIN_FIXOS]
+        usuarios_para_remover = [u for u in listar_usuarios() if u != st.session_state.get("usuario")]
         if usuarios_para_remover:
             remove_user = st.selectbox("Selecionar usuário para remover", usuarios_para_remover)
             if st.form_submit_button("Remover"):
@@ -1066,9 +1070,27 @@ def abrir_gerenciador_usuarios():
                     st.success(f"Usuário {remove_user} removido.")
                     st.rerun()
                 else:
-                    st.error("Não foi possível remover.")
+                    st.error("Não foi possível remover (não dá para remover o último administrador).")
         else:
             st.info("Nenhum outro usuário para remover.")
+
+
+def _form_admin_usuarios():
+    with st.form("admin_usuario"):
+        st.write("**Permissão de administrador**")
+        alvo = st.selectbox("Usuário", listar_usuarios())
+        c1, c2 = st.columns(2)
+        promover = c1.form_submit_button("⭐ Tornar admin")
+        rebaixar = c2.form_submit_button("Remover admin")
+        if promover and promover_admin(alvo):
+            st.success(f"{alvo} agora é administrador.")
+            st.rerun()
+        if rebaixar:
+            if rebaixar_admin(alvo):
+                st.success(f"{alvo} deixou de ser administrador.")
+                st.rerun()
+            else:
+                st.error("Não dá para remover o último administrador.")
 
 
 # ======================================================================
@@ -1210,6 +1232,15 @@ if st.session_state.get("is_admin", False):
         if st.button("👥 Gerenciar Usuários (Admin)"):
             st.session_state.gerenciar_usuarios = True
             st.rerun()
+
+if st.session_state.get("gerenciar_usuarios", False):
+    if usuario_eh_admin(st.session_state.usuario):
+        abrir_gerenciador_usuarios()
+        _form_admin_usuarios()
+    if st.button("🔙 Voltar"):
+        st.session_state.gerenciar_usuarios = False
+        st.rerun()
+    st.stop()
 
 # ======================================================================
 # ABAS PRINCIPAIS (SEM MONITORAMENTO AO VIVO)
